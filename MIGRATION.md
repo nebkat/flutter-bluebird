@@ -1,17 +1,17 @@
 
 # migration guide
 
-Breaking changes in FlutterBluePlus, listed version by version.
+Breaking changes in Bluebird, listed version by version.
 
 ## 2.0.0 (unreleased)
 
 Complete rework of the plugin architecture:
 
-* **Federated plugin**: the package is now split into `flutter_blue_plus` (app-facing),
-  `flutter_blue_plus_platform_interface`, `flutter_blue_plus_android` (Kotlin), and
-  `flutter_blue_plus_darwin` (Swift, shared iOS/macOS). Web and Linux are parked.
+* **Federated plugin**: the package is now split into `bluebird` (app-facing),
+  `bluebird_platform_interface`, `bluebird_android` (Kotlin), and
+  `bluebird_darwin` (Swift, shared iOS/macOS). Web and Linux are parked.
 * **Pigeon codegen**: all platform communication is generated from
-  `packages/flutter_blue_plus_platform_interface/pigeons/messages.dart`. The hand-written
+  `packages/bluebird_platform_interface/pigeons/messages.dart`. The hand-written
   `Bm*` message classes with `toMap`/`fromMap` are gone; pigeon-generated classes are the
   platform interface types.
 * **Typed attribute refs**: attributes are addressed by `BmAttributeId` (uuid + platform
@@ -29,15 +29,15 @@ Complete rework of the plugin architecture:
   rather than an embedded success flag.
 * **Errors**: natives throw typed errors with stable string codes (`gatt_error`,
   `cb_error`, `device_disconnected`, `adapter_off`, `user_canceled`, `unsupported`, ...)
-  which surface as `FlutterBluePlusException`. The `BmStatus` success/errorCode envelope
+  which surface as `BluebirdException`. The `BmStatus` success/errorCode envelope
   is gone.
 * **Values are `Uint8List`** end-to-end on the wire; uuids cross as strings.
 
 ## 1.8.6
 * **renamed:** `BluetoothDevice.id` -> `remoteId`
-* **renamed:** `FlutterBluePlus.name` -> `adapterName`
+* **renamed:** `Bluebird.name` -> `adapterName`
 * **renamed:** `BluetoothDevice.name` -> `platformName`
-* **renamed:** `FlutterBluePlus.state` -> `adapterState`
+* **renamed:** `Bluebird.state` -> `adapterState`
 * **renamed:** `BluetoothDevice.state` -> `connectionState`
 
 ## 1.9.0
@@ -54,7 +54,7 @@ Complete rework of the plugin architecture:
 
 You no longer need to use `.instance`
 
-i.e. `FlutterBluePlus.instance.startScan` becomes `FlutterBluePlus.startScan`
+i.e. `Bluebird.instance.startScan` becomes `Bluebird.startScan`
 
 ### turnOn and turnOff
 
@@ -67,33 +67,33 @@ i.e. `FlutterBluePlus.instance.startScan` becomes `FlutterBluePlus.startScan`
 
 ## 1.15.0
 
-### `FlutterBluePlus.scan` was removed
+### `Bluebird.scan` was removed
 
-**Option 1:** migrate to `FlutterBluePlus.startScan` with `oneByOne` parameter
+**Option 1:** migrate to `Bluebird.startScan` with `oneByOne` parameter
 
 **Option 2:** use the following extension (below)
 
 ```
-extension Scan on FlutterBluePlus {
+extension Scan on Bluebird {
   static Stream<ScanResult> scan({
     List<Guid> withServices = const [],
     Duration? timeout,
     bool androidUsesFineLocation = false,
   }) {
-    if (FlutterBluePlus.isScanningNow) {
+    if (Bluebird.isScanningNow) {
         throw Exception("Another scan is already in progress");
     }
 
     final controller = StreamController<ScanResult>();
 
-    var subscription = FlutterBluePlus.scanResults.listen(
+    var subscription = Bluebird.scanResults.listen(
       (r){if(r.isNotEmpty){controller.add(r.first);}},
       onError: (e, stackTrace) => controller.addError(e, stackTrace),
     );
 
-    Future scanComplete = FlutterBluePlus.isScanning.skip(1).where((e) => e == false).first;
+    Future scanComplete = Bluebird.isScanning.skip(1).where((e) => e == false).first;
 
-    FlutterBluePlus.startScan(
+    Bluebird.startScan(
       withServices: withServices,
       timeout: timeout,
       removeIfGone: null,
@@ -113,12 +113,12 @@ extension Scan on FlutterBluePlus {
 
 ---
 
-### `FlutterBluePlus.startScan` doesn't return List<ScanResult> anymore
+### `Bluebird.startScan` doesn't return List<ScanResult> anymore
 
-**Option 1:** migrate to `FlutterBluePlus.scanResults`. Example code:
+**Option 1:** migrate to `Bluebird.scanResults`. Example code:
 
 ```
-Stream<BluetoothDevice?> myDeviceStream = FlutterBluePlus.scanResults
+Stream<BluetoothDevice?> myDeviceStream = Bluebird.scanResults
     .map((list) => list.first)
     .where((r) => r.advertisementData.advName == "myDeviceName")
     .map((r) => r.device);
@@ -128,7 +128,7 @@ Future<BluetoothDevice?> myDeviceFuture = myDeviceStream.first
     .timeout(Duration(seconds: 10))
     .catchError((error) => null);
 
-await FlutterBluePlus.startScan(timeout: Duration(seconds: 10), oneByOne:true);
+await Bluebird.startScan(timeout: Duration(seconds: 10), oneByOne:true);
 
 BluetoothDevice? myDevice = await myDeviceFuture;
 ```
@@ -136,25 +136,25 @@ BluetoothDevice? myDevice = await myDeviceFuture;
 **Option 2:** use this extension
 
 ```
-extension Scan on FlutterBluePlus {
+extension Scan on Bluebird {
   static Future<List<ScanResult>> startScanWithResult({
     List<Guid> withServices = const [],
     Duration? timeout,
     bool androidUsesFineLocation = false,
   }) async {
-    if (FlutterBluePlus.isScanningNow) {
+    if (Bluebird.isScanningNow) {
       throw Exception("Another scan is already in progress");
     }
 
     List<ScanResult> output = [];
 
-    var subscription = FlutterBluePlus.scanResults.listen((result) {
+    var subscription = Bluebird.scanResults.listen((result) {
       output = result;
     }, onError: (e, stackTrace) {
       throw Exception(e);
     });
 
-    FlutterBluePlus.startScan(
+    Bluebird.startScan(
       withServices: withServices,
       timeout: timeout,
       removeIfGone: null,
@@ -163,7 +163,7 @@ extension Scan on FlutterBluePlus {
     );
 
     // wait scan complete
-    await FlutterBluePlus.isScanning.where((e) => e == false).first;
+    await Bluebird.isScanning.where((e) => e == false).first;
 
     subscription.cancel();
 
@@ -174,13 +174,13 @@ extension Scan on FlutterBluePlus {
 
 ---
 
-### `await FlutterBluePlus.startScan()` does not wait for scan completion anymore
+### `await Bluebird.startScan()` does not wait for scan completion anymore
 
 Use `isScanning` to detect completion instead.
 
 ```
-await FlutterBluePlus.startScan(timeout: Duration(seconds:15));
-await FlutterBluePlus.isScanning.where((value) => value == false).first;
+await Bluebird.startScan(timeout: Duration(seconds:15));
+await Bluebird.isScanning.where((value) => value == false).first;
 ```
 
 ## 1.16.0

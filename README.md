@@ -1,15 +1,11 @@
-[![pub package](https://img.shields.io/pub/v/flutter_blue_plus.svg)](https://pub.dartlang.org/packages/flutter_blue_plus)
+[![pub package](https://img.shields.io/pub/v/bluebird.svg)](https://pub.dartlang.org/packages/bluebird)
 [![Chat](https://img.shields.io/discord/634853295160033301.svg?style=flat-square&colorB=758ED3)](https://discord.gg/Yk5Efra)
 
 <br>
 <p align="center">
-<img alt="FlutterBlue" src="https://github.com/boskokg/flutter_blue_plus/blob/master/site/flutterblueplus.png?raw=true" />
+<img alt="Bluebird" src="https://github.com/boskokg/bluebird/blob/master/site/bluebird.png?raw=true" />
 </p>
 <br><br>
-
-**Note: this plugin is continuous work from [FlutterBlue](https://github.com/pauldemarco/flutter_blue).**
-
-Migrating from [FlutterBlue](https://github.com/pauldemarco/flutter_blue)? See [Migration Guide](MIGRATION.md)
 
 ## Contents
 
@@ -24,7 +20,7 @@ Migrating from [FlutterBlue](https://github.com/pauldemarco/flutter_blue)? See [
 
 ## Introduction
 
-FlutterBluePlus is a Bluetooth Low Energy plugin for [Flutter](https://flutter.dev). 
+Bluebird is a Bluetooth Low Energy plugin for [Flutter](https://flutter.dev). 
 
 It supports BLE Central Role only (most common). 
 
@@ -33,10 +29,10 @@ If you need BLE Peripheral Role, you should check out [FlutterBlePeripheral](htt
 ## Sponsored
 
 <p align="left">
-<img width="250px" alt="FlutterBlue" src="https://github.com/boskokg/flutter_blue_plus/blob/master/site/jamcorder.png?raw=true" />
+<img width="250px" alt="Bluebird" src="https://github.com/boskokg/bluebird/blob/master/site/jamcorder.png?raw=true" />
 </p>
 
-FlutterBluePlus is proudly sponsored by [Jamcorder](https://www.jamcorder.com/). 
+Bluebird is proudly sponsored by [Jamcorder](https://www.jamcorder.com/). 
 
 ## Tutorial
 
@@ -53,31 +49,31 @@ If you are new to Bluetooth, you should start by reading BLE tutorials.
 
 ## Cross-Platform Bluetooth Low Energy
 
-FlutterBluePlus supports nearly every feature on all supported platforms: iOS, macOS, Android.
+Bluebird supports nearly every feature on all supported platforms: iOS, macOS, Android.
 
 ## No Dependencies
 
-FlutterBluePlus has zero dependencies besides Flutter, Android, iOS, and macOS themselves.
+Bluebird has zero dependencies besides Flutter, Android, iOS, and macOS themselves.
 
-This makes FlutterBluePlus very stable, and easy to maintain.
+This makes Bluebird very stable, and easy to maintain.
 
 ## Windows Support
 
-Use [flutter_blue_plus_windows](https://pub.dev/packages/flutter_blue_plus_windows) if you need Windows support.
+Use [bluebird_windows](https://pub.dev/packages/bluebird_windows) if you need Windows support.
 
 It is maintained by @chan150. 
 
 ## Linus & Web Support
 
-[Linux](https://github.com/chipweinberger/flutter_blue_plus/issues/983) & [Web](https://github.com/chipweinberger/flutter_blue_plus/issues/769) support are not planned for FlutterBluePlus.
+[Linux](https://github.com/chipweinberger/bluebird/issues/983) & [Web](https://github.com/chipweinberger/bluebird/issues/769) support are not planned for Bluebird.
 
-If you would like to implement `flutter_blue_plus_linux`, or `flutter_blue_plus_web`, please do! 
+If you would like to implement `bluebird_linux`, or `bluebird_web`, please do! 
 
-See: [flutter_blue_plus_windows](https://pub.dev/packages/flutter_blue_plus_windows) for an example.
+See: [bluebird_windows](https://pub.dev/packages/bluebird_windows) for an example.
 
 ## ⭐ Stars ⭐
 
-Please star this repo & on [pub.dev](https://pub.dev/packages/flutter_blue_plus). We all benefit from having a larger community.
+Please star this repo & on [pub.dev](https://pub.dev/packages/bluebird). We all benefit from having a larger community.
 
 ## Discord 💬
 
@@ -85,7 +81,7 @@ Please star this repo & on [pub.dev](https://pub.dev/packages/flutter_blue_plus)
 
 ## Example
 
-FlutterBluePlus has a beautiful example app, useful to debug issues.
+Bluebird has a beautiful example app, useful to debug issues.
 
 ```
 cd ./example
@@ -93,18 +89,18 @@ flutter run
 ```
 
 <p align="center">
-<img alt="FlutterBlue" src="https://github.com/boskokg/flutter_blue_plus/blob/master/site/example.png?raw=true" />
+<img alt="Bluebird" src="https://github.com/boskokg/bluebird/blob/master/site/example.png?raw=true" />
 </p>
 
 ## Usage
 
 ### 🔥 Error Handling 🔥
 
-Flutter Blue Plus takes error handling seriously. 
+Bluebird takes error handling seriously. 
 
 Every error returned by the native platform is checked and thrown as an exception where appropriate. See [Reference](#reference) for a list of throwable functions.
 
-**Streams:** Streams returned by FlutterBluePlus never emit any errors and never close. There's no need to handle `onError` or `onDone` for  `stream.listen(...)`. The one exception is `FlutterBluePlus.scanResults`, which you should handle `onError`.
+**Streams:** Streams returned by Bluebird never emit any errors and never close. There's no need to handle `onError` or `onDone` for  `stream.listen(...)`. The one exception is `Bluebird.scanResults`, which you should handle `onError`.
 
 ---
 
@@ -112,7 +108,7 @@ Every error returned by the native platform is checked and thrown as an exceptio
 
 ```dart
 // if your terminal doesn't support color you'll see annoying logs like `\x1B[1;35m`
-FlutterBluePlus.setLogLevel(LogLevel.verbose, color:false)
+Bluebird.setLogLevel(LogLevel.verbose, color:false)
 ```
 
 Setting `LogLevel.verbose` shows *all* data in and out.
@@ -123,17 +119,17 @@ Setting `LogLevel.verbose` shows *all* data in and out.
 
 🟡 = data from platform
 
-<img width="600" alt="Screenshot 2023-07-27 at 4 53 08 AM" src="https://github.com/boskokg/flutter_blue_plus/assets/1863934/ee37d702-2752-4402-bf26-fc661728c1c3">
+<img width="600" alt="Screenshot 2023-07-27 at 4 53 08 AM" src="https://github.com/boskokg/bluebird/assets/1863934/ee37d702-2752-4402-bf26-fc661728c1c3">
 
 
 ### Bluetooth On & Off
 
-**Note:** On iOS, a "*This app would like to use Bluetooth*" system dialogue appears on first call to any FlutterBluePlus method. 
+**Note:** On iOS, a "*This app would like to use Bluetooth*" system dialogue appears on first call to any Bluebird method. 
  
 ```dart
 // first, check if bluetooth is supported by your hardware
-// Note: The platform is initialized on the first call to any FlutterBluePlus method.
-if (await FlutterBluePlus.isSupported == false) {
+// Note: The platform is initialized on the first call to any Bluebird method.
+if (await Bluebird.isSupported == false) {
     print("Bluetooth not supported by this device");
     return;
 }
@@ -141,7 +137,7 @@ if (await FlutterBluePlus.isSupported == false) {
 // handle bluetooth on & off
 // note: for iOS the initial state is typically BluetoothAdapterState.unknown
 // note: if you have permissions issues you will get stuck at BluetoothAdapterState.unauthorized
-var subscription = FlutterBluePlus.adapterState.listen((BluetoothAdapterState state) {
+var subscription = Bluebird.adapterState.listen((BluetoothAdapterState state) {
     print(state);
     if (state == BluetoothAdapterState.on) {
         // usually start scanning, connecting, etc
@@ -153,7 +149,7 @@ var subscription = FlutterBluePlus.adapterState.listen((BluetoothAdapterState st
 // turn on bluetooth ourself if we can
 // for iOS, the user controls bluetooth enable/disable
 if (Platform.isAndroid) {
-    await FlutterBluePlus.turnOn();
+    await Bluebird.turnOn();
 }
 
 // cancel to prevent duplicate listeners
@@ -170,7 +166,7 @@ If your device is not found, see [Common Problems](#common-problems).
 // listen to scan results
 // Note: `onScanResults` clears the results between scans. You should use
 //  `scanResults` if you want the current scan results *or* the results from the previous scan.
-var subscription = FlutterBluePlus.onScanResults.listen((results) {
+var subscription = Bluebird.onScanResults.listen((results) {
         if (results.isNotEmpty) {
             ScanResult r = results.last; // the most recently found device
             print('${r.device.remoteId}: "${r.advertisementData.advName}" found!');
@@ -180,21 +176,21 @@ var subscription = FlutterBluePlus.onScanResults.listen((results) {
 );
 
 // cleanup: cancel subscription when scanning stops
-FlutterBluePlus.cancelWhenScanComplete(subscription);
+Bluebird.cancelWhenScanComplete(subscription);
 
 // Wait for Bluetooth enabled & permission granted
-// In your real app you should use `FlutterBluePlus.adapterState.listen` to handle all states
-await FlutterBluePlus.adapterState.where((val) => val == BluetoothAdapterState.on).first;
+// In your real app you should use `Bluebird.adapterState.listen` to handle all states
+await Bluebird.adapterState.where((val) => val == BluetoothAdapterState.on).first;
 
 // Start scanning w/ timeout
 // Optional: use `stopScan()` as an alternative to timeout
-await FlutterBluePlus.startScan(
+await Bluebird.startScan(
   withServices:[Guid("180D")], // match any of the specified services
   withNames:["Bluno"], // *or* any of the specified names
   timeout: Duration(seconds:15));
 
 // wait for scanning to stop
-await FlutterBluePlus.isScanning.where((val) => val == false).first;
+await Bluebird.isScanning.where((val) => val == false).first;
 ```
 
 ### Connect to a device
@@ -384,9 +380,9 @@ await d.write([0x12, 0x34])
 
 ### Services Changed Characteristic
 
-FlutterBluePlus automatically listens to the Services Changed Characteristic (0x2A05)
+Bluebird automatically listens to the Services Changed Characteristic (0x2A05)
 
-In FlutterBluePlus, we call it `onServicesReset` because you must re-discover services.
+In Bluebird, we call it `onServicesReset` because you must re-discover services.
 
 ```dart
 // - uses the GAP Services Changed characteristic (0x2A05)
@@ -402,7 +398,7 @@ device.onServicesReset.listen(() async {
 Get devices currently connected to your app.
 
 ```dart
-List<BluetoothDevice> devs = FlutterBluePlus.connectedDevices;
+List<BluetoothDevice> devs = Bluebird.connectedDevices;
 for (var d in devs) {
     print(d);
 }
@@ -417,7 +413,7 @@ Get devices connected to the system by *any* app.
 ```dart
 // `withServices` required on iOS, ignored on android
 List<Guid> withServices = [Guid("180F")]; 
-List<BluetoothDevice> devs = await FlutterBluePlus.systemDevices(withServices);
+List<BluetoothDevice> devs = await Bluebird.systemDevices(withServices);
 for (var d in devs) {
     await d.connect(); // Must connect *our* app to the device
     await d.discoverServices();
@@ -464,20 +460,20 @@ There are streams for:
 
 ```dart
 // listen to *any device* connection state changes 
-FlutterBluePlus.events.onConnectionStateChanged.listen((event)) {
+Bluebird.events.onConnectionStateChanged.listen((event)) {
     print('${event.device} ${event.connectionState}');
 }
 ```
 
 ## Mocking
 
-To mock `FlutterBluePlus` for development, refer to the [Mocking Guide](MOCKING.md).
+To mock `Bluebird` for development, refer to the [Mocking Guide](MOCKING.md).
 
 ## Getting Started
 
 ### Change the minSdkVersion for Android
 
-flutter_blue_plus is compatible only from version 24 of Android SDK so you should change this in **android/app/build.gradle**:
+bluebird is compatible only from version 24 of Android SDK so you should change this in **android/app/build.gradle**:
 
 ```dart
 android {
@@ -536,7 +532,7 @@ https://developer.android.com/about/versions/12/features/bluetooth-permissions -
 And set **androidUsesFineLocation** when scanning:
 ```dart
 // Start scanning
-flutterBlue.startScan(timeout: Duration(seconds: 4), androidUsesFineLocation: true);
+Bluebird.startScan(timeout: Duration(seconds: 4), androidUsesFineLocation: true);
 ```
 
 ### Android Proguard
@@ -544,7 +540,7 @@ flutterBlue.startScan(timeout: Duration(seconds: 4), androidUsesFineLocation: tr
 Add the following line in your `project/android/app/proguard-rules.pro` file:
 
 ```
--keep class com.lib.flutter_blue_plus.* { *; }
+-keep class com.lib.bluebird.* { *; }
 ```
 
 to avoid seeing the following kind errors in your `release` builds:
@@ -573,11 +569,11 @@ Make sure you have granted access to the Bluetooth hardware:
 
 `Xcode -> Runners -> Targets -> Runner-> Signing & Capabilities -> App Sandbox -> Hardware -> Enable Bluetooth`
 
-<img width="528" alt="Screenshot 2023-12-11 at 10 32 04 AM" src="https://github.com/boskokg/flutter_blue_plus/assets/1863934/554079ef-4627-4dfc-97e3-1f07f84a0f3c">
+<img width="528" alt="Screenshot 2023-12-11 at 10 32 04 AM" src="https://github.com/boskokg/bluebird/assets/1863934/554079ef-4627-4dfc-97e3-1f07f84a0f3c">
 
 ## Using Ble in App Background
 
-**This is an advanced use case**. FlutterBluePlus does not support everything. You may have to fork it. PRs are welcome.
+**This is an advanced use case**. Bluebird does not support everything. You may have to fork it. PRs are welcome.
 
 ### iOS
 
@@ -594,10 +590,10 @@ Add the following to your `Info.plist`
 
 When this key-value pair is included in the app’s Info.plist file, the system wakes up your app to process ble `read`, `write`, and `subscription` events.
 
-To wake up your app even after it is killed by the OS, set the `restoreState` option to true **before** starting any FBP work**:
+To wake up your app even after it is killed by the OS, set the `restoreState` option to true **before** starting any Bluebird work**:
 
 ```
-FlutterBluePlus.setOptions(restoreState: true);
+Bluebird.setOptions(restoreState: true);
 ```
 
 **Note**: Upon being woken up, an app has around 10 seconds to complete a task. Apps that spend too much time executing in the background can be throttled back by the system or killed.
@@ -611,7 +607,7 @@ You can try using https://pub.dev/packages/flutter_foreground_task or possibly h
 🌀 = Stream
 ⚡ = synchronous
 
-### FlutterBluePlus API
+### Bluebird API
 
 |                        |      Android       |        iOS         | Throws | Description                                                |
 | :--------------------- | :----------------: | :----------------: | :----: | :----------------------------------------------------------|
@@ -632,7 +628,7 @@ You can try using https://pub.dev/packages/flutter_foreground_task or possibly h
 | systemDevices          | :white_check_mark: | :white_check_mark: | :fire: | List of devices connected to the system, even by other apps|
 | getPhySupport          | :white_check_mark: |                    | :fire: | Get supported bluetooth phy codings                        |
 
-### FlutterBluePlus Events API
+### Bluebird Events API
 
 |                                    |      Android       |        iOS         | Throws | Description                                           |
 | :--------------------------------- | :----------------: | :----------------: | :----: | :-----------------------------------------------------|
@@ -700,21 +696,21 @@ You can try using https://pub.dev/packages/flutter_foreground_task or possibly h
 
 ## Debugging
 
-The easiest way to debug issues in FlutterBluePlus is to make your own local copy.
+The easiest way to debug issues in Bluebird is to make your own local copy.
 
 ```
 cd /user/downloads
-git clone https://github.com/boskokg/flutter_blue_plus.git
+git clone https://github.com/boskokg/bluebird.git
 ```
 
 then in `pubspec.yaml` add the repo by path:
 
 ```
-  flutter_blue_plus:
-    path: /user/downloads/flutter_blue_plus
+  bluebird:
+    path: /user/downloads/bluebird
 ```
 
-Now you can edit the FlutterBluePlus code yourself.
+Now you can edit the Bluebird code yourself.
 
 ## Common Problems
 
@@ -759,9 +755,9 @@ Flutter Errors:
 
 You need to wait for the bluetooth adapter to fully turn on. 
 
-`await FlutterBluePlus.adapterState.where((state) => state == BluetoothAdapterState.on).first;`
+`await Bluebird.adapterState.where((state) => state == BluetoothAdapterState.on).first;`
 
-You can also use `FlutterBluePlus.adapterState.listen(...)`. See [Usage](#usage).
+You can also use `Bluebird.adapterState.listen(...)`. See [Usage](#usage).
 
 ---
 
@@ -772,7 +768,7 @@ You can also use `FlutterBluePlus.adapterState.listen(...)`. See [Usage](#usage)
 `adapterState` always starts as `unknown`. You need to wait longer for the service to initialize. As simple as:
 
 ```
-if (FlutterBluePlus.adapterStateNow == BluetoothAdapterState.unknown) {
+if (Bluebird.adapterStateNow == BluetoothAdapterState.unknown) {
     await Future.delayed(const Duration(seconds: 1));
 }
 ```
@@ -787,11 +783,11 @@ Check that your device supports Bluetooth & has permissions.
 
 ### adapterState is called multiple times
 
-You are forgetting to cancel the original `FlutterBluePlus.adapterState.listen` resulting in multiple listeners.
+You are forgetting to cancel the original `Bluebird.adapterState.listen` resulting in multiple listeners.
 
 ```dart
 // tip: using ??= makes it easy to only make new listener when currently null
-final subscription ??= FlutterBluePlus.adapterState.listen((value) {
+final subscription ??= Bluebird.adapterState.listen((value) {
     // ...
 });
 
@@ -818,7 +814,7 @@ Install a BLE scanner app on your phone. Can it find your device?
 
 Headphones, speakers, keyboards, mice, gamepads, & printers all use Bluetooth Classic. 
 
-These devices may be found in System Settings, but they cannot be connected to by FlutterBluePlus. FlutterBluePlus only supports Bluetooth Low Energy.
+These devices may be found in System Settings, but they cannot be connected to by Bluebird. Bluebird only supports Bluetooth Low Energy.
 
 **4. your device stopped advertising.**
 
@@ -832,7 +828,7 @@ Try looking through system devices:
 
 ```dart
 // search system devices. i.e. any device connected to by *any* app
-List<BluetoothDevice> system = await FlutterBluePlus.systemDevices;
+List<BluetoothDevice> system = await Bluebird.systemDevices;
 for (var d in system) {
     print('${r.device.platformName} already connected to! ${r.device.remoteId}');
     if (d.platformName == "myBleDevice") {
@@ -903,7 +899,7 @@ You are forgetting to cancel the original `device.connectionState.listen` result
 
 ```dart
 // tip: using ??= makes it easy to only make new listener when currently null
-final subscription ??= FlutterBluePlus.device.connectionState.listen((value) {
+final subscription ??= Bluebird.device.connectionState.listen((value) {
     // ...
 });
 
@@ -931,7 +927,7 @@ e.g. `05:A4:22:31:F7:ED`
 
 You can google this error. It is a common iOS ble error code.
 
-It means your device stopped working. FlutterBluePlus cannot fix it.
+It means your device stopped working. Bluebird cannot fix it.
 
 ---
 
@@ -941,7 +937,7 @@ These GATT error codes are part of the BLE Specification.
 
 **These are *responses* from your ble device because you are sending an invalid request.**
 
-FlutterBluePlus cannot fix these errors. You are doing something wrong & your device is responding with an error.
+Bluebird cannot fix these errors. You are doing something wrong & your device is responding with an error.
 
 **GATT errors as they appear on iOS**:
 ```
@@ -1101,7 +1097,7 @@ await characteristic.setNotifyValue(true);
 
 There is no 100% solution.  
 
-FBP already has mitigations for this error, but Android will still fail with this code randomly. 
+Bluebird already has mitigations for this error, but Android will still fail with this code randomly. 
 
 The recommended solution is to `catch` the error, and retry.
 
@@ -1117,7 +1113,7 @@ You can call `createBond()` yourself just after connecting and this will resolve
 
 ### MissingPluginException(No implementation found for method XXXX ...)
 
-If you just added flutter_blue_plus to your pubspec.yaml, a hot reload / hot restart is not enough.
+If you just added bluebird to your pubspec.yaml, a hot reload / hot restart is not enough.
 
 You need to fully stop your app and run again so that the native plugins are loaded.
 

@@ -1,14 +1,14 @@
 # Mocking guide
 
-How to mock `FlutterBluePlus` for testing.
+How to mock `Bluebird` for testing.
 
 ## Overview
 
-Since version [1.10.0](https://pub.dev/packages/flutter_blue_plus/changelog#1100), `FlutterBluePlus.instance` has been deprecated in favor of static functions. 
+Since version [1.10.0](https://pub.dev/packages/bluebird/changelog#1100), `Bluebird.instance` has been deprecated in favor of static functions. 
 
-Therefore, to mock FlutterBluePlus you must:
+Therefore, to mock Bluebird you must:
 
-1. Wrap `FlutterBluePlus` in a mockable non-static class
+1. Wrap `Bluebird` in a mockable non-static class
 2. Add your mocked functions to the mockable class.
 2. Use the mockable class in your code
 
@@ -19,11 +19,11 @@ A full example is [here](https://dsavir-h.medium.com/mocking-bluetooth-in-flutte
 Create the following class:
 
 ```dart
-import '../flutter_blue_plus.dart';
+import '../bluebird.dart';
 
-/// Wrapper for FlutterBluePlus in order to easily mock it
+/// Wrapper for Bluebird in order to easily mock it
 /// Wraps all static calls for testing purposes
-class FlutterBluePlusMockable {
+class BluebirdMockable {
   Future<void> startScan({
     List<Guid> withServices = const [],
     Duration? timeout,
@@ -31,7 +31,7 @@ class FlutterBluePlusMockable {
     bool oneByOne = false,
     bool androidUsesFineLocation = false,
   }) {
-    return FlutterBluePlus.startScan(
+    return Bluebird.startScan(
         withServices: withServices,
         timeout: timeout,
         removeIfGone: removeIfGone,
@@ -40,66 +40,66 @@ class FlutterBluePlusMockable {
   }
 
   Stream<BluetoothAdapterState> get adapterState {
-    return FlutterBluePlus.adapterState;
+    return Bluebird.adapterState;
   }
 
   Stream<List<ScanResult>> get scanResults {
-    return FlutterBluePlus.scanResults;
+    return Bluebird.scanResults;
   }
 
   bool get isScanningNow {
-    return FlutterBluePlus.isScanningNow;
+    return Bluebird.isScanningNow;
   }
 
   Stream<bool> get isScanning {
-    return FlutterBluePlus.isScanning;
+    return Bluebird.isScanning;
   }
 
   Future<void> stopScan() {
-    return FlutterBluePlus.stopScan();
+    return Bluebird.stopScan();
   }
 
   void setLogLevel(LogLevel level, {color = true}) {
-    return FlutterBluePlus.setLogLevel(level, color: color);
+    return Bluebird.setLogLevel(level, color: color);
   }
 
   LogLevel get logLevel {
-    return FlutterBluePlus.logLevel;
+    return Bluebird.logLevel;
   }
 
   Future<bool> get isSupported {
-    return FlutterBluePlus.isSupported;
+    return Bluebird.isSupported;
   }
 
   Future<String> get adapterName {
-    return FlutterBluePlus.adapterName;
+    return Bluebird.adapterName;
   }
 
   Future<void> turnOn({int timeout = 60}) {
-    return FlutterBluePlus.turnOn(timeout: timeout);
+    return Bluebird.turnOn(timeout: timeout);
   }
 
   List<BluetoothDevice> get connectedDevices {
-    return FlutterBluePlus.connectedDevices;
+    return Bluebird.connectedDevices;
   }
 
   Future<List<BluetoothDevice>> get systemDevices {
-    return FlutterBluePlus.systemDevices;
+    return Bluebird.systemDevices;
   }
 
   Future<PhySupport> getPhySupport() {
-    return FlutterBluePlus.getPhySupport();
+    return Bluebird.getPhySupport();
   }
 
   Future<List<BluetoothDevice>> get bondedDevices {
-    return FlutterBluePlus.bondedDevices;
+    return Bluebird.bondedDevices;
   }
 }
 ```
 
 ## Mock the wrapper class
 
-Using e.g. [Mockito](https://pub.dev/packages/mockito), create a mock for the `FlutterBluePlusMockable` class, and build your tests and stubs.
+Using e.g. [Mockito](https://pub.dev/packages/mockito), create a mock for the `BluebirdMockable` class, and build your tests and stubs.
 
 ## Create instance
 
@@ -112,9 +112,9 @@ void main() {
 
 class MyApp extends StatelessWidget {
   MyApp({Key? key}) : super(key: key);
-  //instance of FlutterBluePlus that will be passed
+  //instance of Bluebird that will be passed
   //throughout the app as necessary
-  FlutterBluePlusMockable bluePlusMockable = FlutterBluePlusMockable();//<--
+  BluebirdMockable bluePlusMockable = BluebirdMockable();//<--
 
   @override
   Widget build(BuildContext context) {
@@ -131,12 +131,12 @@ class MyApp extends StatelessWidget {
 }
 ```
 
-## Use mock instead of FlutterBluePlus
+## Use mock instead of Bluebird
 
-Within your code, replace all calls to `FlutterBluePlus` with the mockable instance, e.g.:  
-`FlutterBluePlus.isScanning` --> `bluePlusMockable.isScanning`  
-`FlutterBluePlus.startScan` --> `bluePlusMockable.startScan`  
-`FlutterBluePlus.scanResults` --> `bluePlusMockable.scanResults`  
+Within your code, replace all calls to `Bluebird` with the mockable instance, e.g.:  
+`Bluebird.isScanning` --> `bluePlusMockable.isScanning`  
+`Bluebird.startScan` --> `bluePlusMockable.startScan`  
+`Bluebird.scanResults` --> `bluePlusMockable.scanResults`  
 etc.
 
 ## Example

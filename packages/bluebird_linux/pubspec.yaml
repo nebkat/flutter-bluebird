@@ -1,0 +1,28 @@
+name: bluebird_linux
+description: Linux implementation of the bluebird plugin.
+version: 1.0.0
+homepage: https://github.com/chipweinberger/bluebird
+
+environment:
+  sdk: ">=3.6.0 <4.0.0"
+  flutter: ">=3.27.0"
+resolution: workspace
+
+dependencies:
+  bluez: '>=0.7.8 <0.9.0'
+  flutter:
+    sdk: flutter
+  bluebird_platform_interface: 1.0.0
+  rxdart: '>=0.27.0 <0.29.0'
+
+dev_dependencies:
+  flutter_lints: ^5.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  plugin:
+    implements: bluebird
+    platforms:
+      linux:
+        dartPluginClass: BluebirdLinux

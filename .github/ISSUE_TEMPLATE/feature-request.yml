@@ -4,9 +4,9 @@ title: "[Feature]: "
 labels: ["feature"]
 body:
   - type: input
-    id: fbp-version
+    id: bluebird-version
     attributes:
-      label: "FlutterBluePlus Version"
+      label: "Bluebird Version"
       description: "run `flutter pub deps` in your project"
       placeholder: "ex. 1.12.7"
     validations:

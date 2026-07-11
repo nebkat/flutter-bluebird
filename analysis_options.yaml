@@ -1,5 +1,5 @@
 analyzer:
   exclude:
     # parked packages, not part of the pub workspace (see root pubspec.yaml)
-    - packages/flutter_blue_plus_web/**
-    - packages/flutter_blue_plus_linux/**
+    - packages/bluebird_web/**
+    - packages/bluebird_linux/**

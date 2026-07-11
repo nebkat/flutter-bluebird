@@ -1,0 +1,30 @@
+name: bluebird_web
+description: Web implementation of the bluebird plugin.
+version: 1.0.0
+homepage: https://github.com/chipweinberger/bluebird
+
+environment:
+  sdk: ">=3.6.0 <4.0.0"
+  flutter: ">=3.27.0"
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  bluebird_platform_interface: 1.0.0
+  flutter_web_plugins:
+    sdk: flutter
+  web: '>=0.5.0 <2.0.0'
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  plugin:
+    implements: bluebird
+    platforms:
+      web:
+        pluginClass: BluebirdWeb
+        fileName: bluebird_web.dart

@@ -78,10 +78,10 @@ function name string written up to **four times**:
 ```dart
 device.ensureConnected("writeCharacteristic");
 await Mutex.global.protect(() async {
-  await FlutterBluePlus.invoke((p) => p.writeCharacteristic(...))
-      .fbpEnsureAdapterIsOn("writeCharacteristic")
-      .fbpEnsureDeviceIsConnected(device, "writeCharacteristic")
-      .fbpTimeout(timeout, "writeCharacteristic");
+  await Bluebird.invoke((p) => p.writeCharacteristic(...))
+      .bluebirdEnsureAdapterIsOn("writeCharacteristic")
+      .bluebirdEnsureDeviceIsConnected(device, "writeCharacteristic")
+      .bluebirdTimeout(timeout, "writeCharacteristic");
 });
 ```
 
@@ -96,7 +96,7 @@ stated once:
 // on BluetoothDevice
 Future<T> op<T>(
   String name,
-  Future<T> Function(FlutterBluePlusPlatform p) call, {
+  Future<T> Function(BluebirdPlatform p) call, {
   Duration timeout = const Duration(seconds: 15),
   bool requiresConnection = true,   // pre-check + mid-flight guard
   System? platform,                 // ensurePlatform when non-null
@@ -122,7 +122,7 @@ op instead of layering two extra `Completer`s per call.
 
 ### 2.2 Merge the twin future-guard extensions (~45 → ~18 LOC)
 
-`fbpEnsureAdapterIsOn` and `fbpEnsureDeviceIsConnected` (utils.dart:41-105)
+`bluebirdEnsureAdapterIsOn` and `bluebirdEnsureDeviceIsConnected` (utils.dart:41-105)
 are the same 30-line completer dance differing only in the stream and the
 error. Generalize:
 
@@ -130,7 +130,7 @@ error. Generalize:
 extension<T> on Future<T> {
   /// Completes with [error] if [fatal] emits before this future completes.
   Future<T> failOn<S>(Stream<S> fatal, bool Function(S) isFatal,
-          FlutterBluePlusException Function() error) =>
+          BluebirdException Function() error) =>
       Future.any([
         this,
         fatal.firstWhere(isFatal).then((_) => throw error()),
@@ -142,25 +142,25 @@ extension<T> on Future<T> {
 keep the completer form if needed, but write it once.) The two public
 guards become one-line wrappers, or disappear entirely into `op()`.
 
-### 2.3 `FbpErrorCode` as a shared pigeon enum (kills the switch + all native string literals)
+### 2.3 `BluebirdErrorCode` as a shared pigeon enum (kills the switch + all native string literals)
 
 Why the hand-written map exists today: error codes cross the channel as
 `PlatformException.code` **strings**, and pigeon cannot type that field.
 But the enum can still be the single source of truth:
 
-1. Move `FbpErrorCode` into `pigeons/messages.dart` (rename members to
+1. Move `BluebirdErrorCode` into `pigeons/messages.dart` (rename members to
    match the wire: `deviceDisconnected`, `adapterOff`, `userCanceled`,
    `bondFailed`, `gattError`, `notConnected`, `invalidIdentifier`,
    `unsupported`, `operationInProgress`, `permissionDenied`, `timeout`, …).
 2. Convention: the wire string is the snake_case of the Dart name. Each
    side needs one ~3-line helper:
    - Kotlin (generated names are UPPER_SNAKE):
-     `fun FbpErrorCode.wire() = name.lowercase()` →
-     `FlutterError(FbpErrorCode.DEVICE_DISCONNECTED.wire(), ...)`
-   - Swift: `extension FbpErrorCode { var wire: String { snakeCased(rawName) } }`
-   - Dart: `FbpErrorCode? fbpCodeFromWire(String s) =>
+     `fun BluebirdErrorCode.wire() = name.lowercase()` →
+     `FlutterError(BluebirdErrorCode.DEVICE_DISCONNECTED.wire(), ...)`
+   - Swift: `extension BluebirdErrorCode { var wire: String { snakeCased(rawName) } }`
+   - Dart: `BluebirdErrorCode? bluebirdCodeFromWire(String s) =>
        _wireNames[s]` where `_wireNames` is built once from `values`.
-3. Delete `_fbpCodeForPlatformError` (flutter_blue_plus.dart:423) and every
+3. Delete `_bluebirdCodeForPlatformError` (bluebird.dart:423) and every
    hand-typed `"device_disconnected"` literal in Kotlin/Swift (~40 literal
    sites native-side become enum references, compiler-checked).
 
@@ -170,10 +170,10 @@ that latent mismatch class permanently.
 
 ### 2.4 Typed, sealed app-event model (~50 LOC + type safety)
 
-- `FlutterBluePlus._eventStream` is `StreamController<dynamic>`. Make the
-  nine `On*Event` classes implement a `sealed class FbpEvent` (with an
+- `Bluebird._eventStream` is `StreamController<dynamic>`. Make the
+  nine `On*Event` classes implement a `sealed class BluebirdEvent` (with an
   optional `BluetoothDevice? device` on the base); the stream becomes
-  `StreamController<FbpEvent>` and `_onPlatformEvent`-style exhaustive
+  `StreamController<BluebirdEvent>` and `_onPlatformEvent`-style exhaustive
   switches become available to users too.
 - `extractEventStream`'s `.where((m) => m is T).map((m) => m as T)` →
   `.where((m) => m is T).cast<T>()`, shared with the platform interface's
@@ -212,9 +212,9 @@ Already done for the four enums. Remaining 1:1 mirrors:
 | `FutureTimeout` extension | merge per §2.2 |
 | `System.current` | good; consider `@visibleForTesting` setter documented for mocking |
 
-### flutter_blue_plus.dart (612 → ~520 LOC)
+### bluebird.dart (612 → ~520 LOC)
 
-- `_fbpCodeForPlatformError` — replaced per §2.3.
+- `_bluebirdCodeForPlatformError` — replaced per §2.3.
 - `invoke` wraps *every* call in `Mutex.platform` while callers additionally
   wrap in `Mutex.global` — after §1.1 is fixed, review whether both layers
   are needed (platform-level serialization exists to gate the hot-restart
@@ -255,7 +255,7 @@ Already done for the four enums. Remaining 1:1 mirrors:
 
 ### platform interface
 
-- `FlutterBluePlusPlatform` default method bodies silently succeed
+- `BluebirdPlatform` default method bodies silently succeed
   (`Future.value()` / empty lists). For an unimplemented platform this
   masks bugs — prefer `throw UnimplementedError('$runtimeType.connect')`
   in the base (the darwin/android adapters override everything anyway).
@@ -268,7 +268,7 @@ Already done for the four enums. Remaining 1:1 mirrors:
 
 ---
 
-## 4. Kotlin (flutter_blue_plus_android, ~1,400 LOC → ~1,200)
+## 4. Kotlin (bluebird_android, ~1,400 LOC → ~1,200)
 
 The port was deliberately 1:1 with the Java. Now condense:
 
@@ -361,7 +361,7 @@ add a dependency and an impedance mismatch for no LOC win.
 
 ---
 
-## 5. Swift (flutter_blue_plus_darwin, ~1,790 LOC → ~1,550)
+## 5. Swift (bluebird_darwin, ~1,790 LOC → ~1,550)
 
 The strongest "direct conversion from ObjC" smells live here:
 
@@ -422,7 +422,7 @@ collapses each to one line. (This is the Swift analog of the Kotlin
 ### 5.4 What to keep as-is
 
 The 25 ms MTU poll timer is the correct approach — CoreBluetooth has no
-MTU callback; upstream FBP does the same (ours at least stops when no
+MTU callback; upstream Bluebird does the same (ours at least stops when no
 device is connected). Don't chase a reactive replacement that doesn't
 exist.
 
@@ -472,8 +472,8 @@ When migrating, bake these in rather than porting the old shape:
 | 1 | `Mutex.protect` `return await` fix (+ test) | none | +6 (test) |
 | 2 | `Phy.leCoded.mask` = 4 | none | 0 |
 | 3 | `op()` invoke pipeline + delete twin guards | medium (touches every op) | −160 |
-| 4 | FbpErrorCode → pigeon enum, all three languages | low | −60 |
-| 5 | Sealed `FbpEvent` + typed event stream | low | −50 |
+| 4 | BluebirdErrorCode → pigeon enum, all three languages | low | −60 |
+| 5 | Sealed `BluebirdEvent` + typed event stream | low | −50 |
 | 6 | `CharacteristicProperties`/`PhySupport` typedefs | low | −30 |
 | 7 | utils.dart cleanup (dead code, transformer rewrite) | low | −140 |
 | 8 | Kotlin helpers (§4.1-4.4) | low | −190 |

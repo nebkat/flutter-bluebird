@@ -4,11 +4,11 @@ environment:
   sdk: ">=3.6.0 <4.0.0"
   flutter: ">=3.27.0"
 workspace:
-  - packages/flutter_blue_plus
-  - packages/flutter_blue_plus_platform_interface
-  - packages/flutter_blue_plus_android
-  - packages/flutter_blue_plus_darwin
-  # parked until the platform interface stabilizes (see packages/flutter_blue_plus/pubspec.yaml)
-  # - packages/flutter_blue_plus_linux
-  # - packages/flutter_blue_plus_web
-  - packages/flutter_blue_plus/example
+  - packages/bluebird
+  - packages/bluebird_platform_interface
+  - packages/bluebird_android
+  - packages/bluebird_darwin
+  # parked until the platform interface stabilizes (see packages/bluebird/pubspec.yaml)
+  # - packages/bluebird_linux
+  # - packages/bluebird_web
+  - packages/bluebird/example

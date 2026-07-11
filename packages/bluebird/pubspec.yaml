@@ -1,0 +1,43 @@
+name: bluebird
+description: Bluetooth Low Energy plugin for Flutter.
+version: 1.0.0
+homepage: https://github.com/boskokg/bluebird
+
+environment:
+  sdk: ">=3.6.0 <4.0.0"
+  flutter: ">=3.27.0"
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # use specific versions.
+  #  - users otherwise forget to update all
+  #  - simpler bug reporting
+  #  - unified changelog
+  #  - users can still manually override
+  bluebird_platform_interface: 1.0.0
+  bluebird_android: 1.0.0
+  bluebird_darwin: 1.0.0
+#  bluebird_linux: 1.0.0
+#  bluebird_web: 1.0.0
+
+dev_dependencies:
+  flutter_lints: ^5.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        default_package: bluebird_android
+      ios:
+        default_package: bluebird_darwin
+      macos:
+        default_package: bluebird_darwin
+      # parked:
+      # linux:
+      #   default_package: bluebird_linux
+      # web:
+      #   default_package: bluebird_web

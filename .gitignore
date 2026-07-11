@@ -29,8 +29,8 @@
 # Flutter/Dart/Pub related
 # Libraries should not include pubspec.lock, per https://dart.dev/guides/libraries/private-files#pubspeclock.
 /pubspec.lock
-/packages/flutter_blue_plus/example/pubspec.lock
-/packages/flutter_blue_plus/example/ios/Podfile.lock
+/packages/bluebird/example/pubspec.lock
+/packages/bluebird/example/ios/Podfile.lock
 **/doc/api/
 .dart_tool/
 .packages
