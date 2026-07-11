@@ -315,7 +315,9 @@ class Mutex {
   Future<T> protect<T>(FutureOr<T> Function() f) async {
     await take();
     try {
-      return f();
+      // must await: `return f()` would run `finally` (releasing the mutex)
+      // before the returned future completes
+      return await f();
     } finally {
       give();
     }

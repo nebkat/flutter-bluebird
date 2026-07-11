@@ -30,10 +30,11 @@ enum Phy {
   le2m,
   leCoded;
 
+  // android PHY_LE_*_MASK constants: 1M=1, 2M=2, CODED=4 (bit flags, not values)
   int get mask => switch (this) {
         Phy.le1m => 1,
         Phy.le2m => 2,
-        Phy.leCoded => 3,
+        Phy.leCoded => 4,
       };
 }
 
