@@ -1,3 +1,6 @@
+## 8.0.0-dev.1
+* Complete rewrite in Swift on the pigeon-generated host API (Objective-C removed). Operations complete from CoreBluetooth delegate callbacks (exactly-once); events flow over the pigeon event channel.
+
 ## 4.0.1
 * fix unrecognized selector sent to instance (regression from 4.0.0)
 

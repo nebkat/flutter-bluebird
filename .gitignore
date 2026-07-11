@@ -21,7 +21,9 @@
 #.vscode/
 
 # Stray build artifacts from running flutter at the repo root
-/macos/Flutter/
+# (the root ios/ and macos/ plugin dirs were removed; nothing should recreate them)
+/ios/
+/macos/
 **/Flutter/ephemeral/
 
 # Flutter/Dart/Pub related

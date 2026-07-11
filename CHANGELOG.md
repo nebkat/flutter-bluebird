@@ -1,3 +1,6 @@
+## 2.0.0-dev.1
+* Complete architecture rework: federated packages, pigeon codegen, Kotlin/Swift natives, true async operations. See MIGRATION.md.
+
 ## 1.34.4
 * **[Improve]** improve error message when secondary service is not found
 

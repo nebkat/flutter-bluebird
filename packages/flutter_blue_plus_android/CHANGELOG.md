@@ -1,3 +1,6 @@
+## 8.0.0-dev.1
+* Complete rewrite in Kotlin on the pigeon-generated host API (Java removed). Operations complete their callback from GATT/receiver callbacks (exactly-once); events flow over the pigeon event channel.
+
 ## 4.0.5
 * Fixes to check for location services when plugin is called from a service
 

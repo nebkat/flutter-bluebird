@@ -3,6 +3,36 @@
 
 Breaking changes in FlutterBluePlus, listed version by version.
 
+## 2.0.0 (unreleased)
+
+Complete rework of the plugin architecture:
+
+* **Federated plugin**: the package is now split into `flutter_blue_plus` (app-facing),
+  `flutter_blue_plus_platform_interface`, `flutter_blue_plus_android` (Kotlin), and
+  `flutter_blue_plus_darwin` (Swift, shared iOS/macOS). Web and Linux are parked.
+* **Pigeon codegen**: all platform communication is generated from
+  `packages/flutter_blue_plus_platform_interface/pigeons/messages.dart`. The hand-written
+  `Bm*` message classes with `toMap`/`fromMap` are gone; pigeon-generated classes are the
+  platform interface types.
+* **Typed attribute refs**: attributes are addressed by `BmAttributeId` (uuid + platform
+  instance token) composed into `BmServiceRef`/`BmCharacteristicRef`/`BmDescriptorRef`,
+  replacing the `"uuid:index/uuid:index"` identifier strings.
+  `BluetoothAttribute.identifier`/`identifierPath` were removed.
+* **True async operations**: native methods now complete their Future when the operation
+  actually finishes (including `connect()`, which completes on connection success/failure
+  rather than when the request is filed). Operation results no longer arrive as separate
+  events that are correlated Dart-side.
+* **Events**: unsolicited platform events arrive on a single typed
+  `Stream<BmEvent>` (pigeon event channel). `onCharacteristicReceived` on the platform
+  interface was renamed `onCharacteristicNotified` and carries notify/indicate values
+  only; `read()` results are emitted app-side. Scan failures are a `BmScanFailedEvent`
+  rather than an embedded success flag.
+* **Errors**: natives throw typed errors with stable string codes (`gatt_error`,
+  `cb_error`, `device_disconnected`, `adapter_off`, `user_canceled`, `unsupported`, ...)
+  which surface as `FlutterBluePlusException`. The `BmStatus` success/errorCode envelope
+  is gone.
+* **Values are `Uint8List`** end-to-end on the wire; uuids cross as strings.
+
 ## 1.8.6
 * **renamed:** `BluetoothDevice.id` -> `remoteId`
 * **renamed:** `FlutterBluePlus.name` -> `adapterName`

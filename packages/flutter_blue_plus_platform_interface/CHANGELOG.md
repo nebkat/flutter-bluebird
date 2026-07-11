@@ -1,3 +1,6 @@
+## 8.0.0-dev.1
+* Complete rework: pigeon-generated message layer (`messages.g.dart`) replaces the hand-written `Bm*` classes; typed attribute refs replace identifier strings; single sealed `Stream<BmEvent>`; @async host API with typed errors. Schema in `pigeons/messages.dart`, regenerate with `tool/generate.sh`.
+
 ## 4.0.2
 * Added `androidCheckLocationServices` to `BmScanSettings` (#1199)
 
