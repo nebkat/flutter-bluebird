@@ -53,6 +53,11 @@ class BluetoothDevice {
   /// - Android: always uses the advertised name
   String get platformName => _platformName ?? "";
 
+  @internal
+  set platformNameInternal(String? name) {
+    _platformName = name ?? _platformName;
+  }
+
   /// Get services
   ///  - returns empty if discoverServices() has not been called
   ///    or if your device does not have any services (rare)
@@ -104,13 +109,11 @@ class BluetoothDevice {
     bool disconnectReturned = false;
 
     await Mutex.global.protect(() async {
-      final request = BmConnectRequest(address: remoteId);
-
       // record connection time
       if (System.isAndroid) _connectTimestamp = DateTime.now();
 
       try {
-        final future = FlutterBluePlus.invoke((p) => p.connect(request))
+        final future = FlutterBluePlus.invoke((p) => p.connect(remoteId))
             .fbpEnsureAdapterIsOn("connect")
             .fbpTimeout(timeout, "connect");
 
@@ -122,8 +125,7 @@ class BluetoothDevice {
         await future;
       } on FlutterBluePlusException catch (e) {
         if (e.code == FbpErrorCode.timeout) {
-          final request = BmDisconnectRequest(address: remoteId);
-          await FlutterBluePlus.invoke((p) => p.disconnect(request));
+          await FlutterBluePlus.invoke((p) => p.disconnect(remoteId));
         }
         rethrow;
       }
@@ -159,8 +161,7 @@ class BluetoothDevice {
         await _ensureAndroidDisconnectionDelay(androidDelay);
 
         // invoke
-        final request = BmDisconnectRequest(address: remoteId);
-        await FlutterBluePlus.invoke((p) => p.disconnect(request))
+        await FlutterBluePlus.invoke((p) => p.disconnect(remoteId))
             .fbpEnsureAdapterIsOn("disconnect")
             .fbpTimeout(timeout, "disconnect");
 
@@ -185,13 +186,12 @@ class BluetoothDevice {
     ensureConnected('discoverServices');
 
     await Mutex.global.protect(() async {
-      final request = BmDiscoverServicesRequest(address: remoteId);
-      final response = await FlutterBluePlus.invoke((p) => p.discoverServices(request))
+      final services = await FlutterBluePlus.invoke((p) => p.discoverServices(remoteId))
           .fbpEnsureAdapterIsOn("discoverServices")
           .fbpEnsureDeviceIsConnected(this, "discoverServices")
           .fbpTimeout(timeout, "discoverServices");
 
-      _services = BluetoothService.constructServices(this, response.services);
+      _services = BluetoothService.constructServices(this, services);
     });
 
     // in order to match iOS behavior on all platforms,
@@ -242,13 +242,10 @@ class BluetoothDevice {
 
     // Only allow a single ble operation to be underway at a time
     return Mutex.global.protect(() async {
-      final request = BmReadRssiRequest(address: remoteId);
-      final response = await FlutterBluePlus.invoke((p) => p.readRssi(request))
+      return await FlutterBluePlus.invoke((p) => p.readRssi(remoteId))
           .fbpEnsureAdapterIsOn("readRssi")
           .fbpEnsureDeviceIsConnected(this, "readRssi")
           .fbpTimeout(timeout, "readRssi");
-
-      return response.rssi;
     });
   }
 
@@ -286,17 +283,10 @@ class BluetoothDevice {
         await Future.delayed(predelay);
       }
 
-      final request = BmMtuChangeRequest(
-        address: remoteId,
-        mtu: desiredMtu,
-      );
-
-      final response = await FlutterBluePlus.invoke((p) => p.requestMtu(request))
+      return await FlutterBluePlus.invoke((p) => p.requestMtu(remoteId, desiredMtu))
           .fbpEnsureAdapterIsOn("requestMtu")
           .fbpEnsureDeviceIsConnected(this, "requestMtu")
           .fbpTimeout(timeout, "requestMtu");
-
-      return response.mtu;
     });
   }
 
@@ -308,12 +298,8 @@ class BluetoothDevice {
     ensurePlatform(System.isAndroid, "requestConnectionPriority");
     ensureConnected("requestConnectionPriority");
 
-    final request = BmConnectionPriorityRequest(
-      address: remoteId,
-      connectionPriority: bmFromConnectionPriority(connectionPriorityRequest),
-    );
-
-    await FlutterBluePlus.invoke((p) => p.requestConnectionPriority(request))
+    await FlutterBluePlus.invoke(
+            (p) => p.requestConnectionPriority(remoteId, bmFromConnectionPriority(connectionPriorityRequest)))
         .fbpEnsureAdapterIsOn("requestConnectionPriority")
         .fbpEnsureDeviceIsConnected(this, "requestConnectionPriority")
         .fbpTimeout(timeout, "requestConnectionPriority");
@@ -333,14 +319,7 @@ class BluetoothDevice {
     ensurePlatform(System.isAndroid, "setPreferredPhy");
     ensureConnected("setPreferredPhy");
 
-    final request = BmPreferredPhy(
-      address: remoteId,
-      txPhy: txPhy,
-      rxPhy: rxPhy,
-      phyOptions: option.index,
-    );
-
-    await FlutterBluePlus.invoke((p) => p.setPreferredPhy(request))
+    await FlutterBluePlus.invoke((p) => p.setPreferredPhy(remoteId, txPhy, rxPhy, option.index))
         .fbpEnsureAdapterIsOn("setPreferredPhy")
         .fbpEnsureDeviceIsConnected(this, "setPreferredPhy")
         .fbpTimeout(timeout, "setPreferredPhy");
@@ -357,18 +336,16 @@ class BluetoothDevice {
 
     // Only allow a single ble operation to be underway at a time
     await Mutex.global.protect(() async {
-      final request = BmCreateBondRequest(address: remoteId, pin: pin);
-      final response = await FlutterBluePlus.invoke((p) => p.createBond(request))
+      final bonded = await FlutterBluePlus.invoke((p) => p.createBond(remoteId, pin))
           .fbpEnsureAdapterIsOn("createBond")
           .fbpEnsureDeviceIsConnected(this, "createBond")
           .fbpTimeout(timeout, "createBond");
 
-      // TODO: Throw instead
-      if (response.bondState != BmBondStateEnum.bonded) {
+      if (!bonded) {
         throw FlutterBluePlusException(
           "createBond",
           FbpErrorCode.createBondFailed,
-          "Failed to create bond. ${response.bondState}",
+          "Failed to create bond",
         );
       }
     });
@@ -380,18 +357,15 @@ class BluetoothDevice {
 
     // Only allow a single ble operation to be underway at a time
     await Mutex.global.protect(() async {
-      final request = BmRemoveBondRequest(address: remoteId);
-      final response = await FlutterBluePlus.invoke((p) => p.removeBond(request))
+      final removed = await FlutterBluePlus.invoke((p) => p.removeBond(remoteId))
           .fbpEnsureAdapterIsOn("removeBond")
-          .fbpEnsureDeviceIsConnected(this, "removeBond")
           .fbpTimeout(timeout, "removeBond");
 
-      // TODO: Throw instead
-      if (response.bondState != BmBondStateEnum.none) {
+      if (!removed) {
         throw FlutterBluePlusException(
           "removeBond",
           FbpErrorCode.removeBondFailed,
-          "Failed to remove bond. ${response.bondState}",
+          "Failed to remove bond",
         );
       }
     });
@@ -401,8 +375,7 @@ class BluetoothDevice {
   Future<void> clearGattCache() async {
     ensurePlatform(System.isAndroid, "clearGattCache");
     ensureConnected("clearGattCache");
-    final request = BmClearGattCacheRequest(address: remoteId);
-    await FlutterBluePlus.invoke((p) => p.clearGattCache(request))
+    await FlutterBluePlus.invoke((p) => p.clearGattCache(remoteId))
         .fbpEnsureAdapterIsOn("clearGattCache")
         .fbpEnsureDeviceIsConnected(this, "clearGattCache");
   }
@@ -410,12 +383,10 @@ class BluetoothDevice {
   Future<BluetoothBondState> get bondStateNow async {
     ensurePlatform(System.isAndroid, "bondState");
 
-    final request = BmBondStateRequest(address: remoteId);
-
     // get current state if needed
-    _bondState ??= await FlutterBluePlus.invoke((p) => p.getBondState(request))
+    _bondState ??= await FlutterBluePlus.invoke((p) => p.getBondState(remoteId))
         .fbpEnsureAdapterIsOn('getBondState')
-        .then((r) => bmToBondState(r.bondState)); // TODO: Only when connected?
+        .then(bmToBondState);
 
     return _bondState!;
   }
@@ -450,7 +421,7 @@ class BluetoothDevice {
     Duration elapsed = DateTime.now().difference(_connectTimestamp!);
     if (elapsed.compareTo(minGap) < 0) {
       Duration timeLeft = minGap - elapsed;
-      print(
+      FlutterBluePlusPlatform.log(
         "[FBP] disconnect: enforcing ${minGap.inMilliseconds}ms disconnect gap,"
         " delaying ${timeLeft.inMilliseconds}ms",
       );
@@ -458,50 +429,131 @@ class BluetoothDevice {
     }
   }
 
-  T _getAttributeFromList<T extends BluetoothAttribute>(List<T> list, String identifier) {
-    final parts = identifier.split(":");
-    if (parts.length != 2) {
-      throw ArgumentError.value(
-        identifier,
-        "identifier",
-        "must be in the form 'uuid:index'",
-      );
-    }
-    final uuid = Uuid(parts[0]);
-    final index = int.parse(parts[1]);
-    return list.firstWhere((s) => s.uuid == uuid && s.index == index);
-  }
+  //
+  // Platform event routing — called by FlutterBluePlus. Each handler updates
+  // this device's private state and returns the app-level event to broadcast.
+  //
 
-  BluetoothService _serviceForIdentifier(String identifier) {
-    return _getAttributeFromList(_services, identifier);
+  @internal
+  OnConnectionStateChangedEvent handleConnectionStateEvent(BmConnectionStateEvent event) {
+    final connectionState = bmToConnectionState(event.connectionState);
+    _connectionState = connectionState;
+
+    if (connectionState == BluetoothConnectionState.disconnected) {
+      _disconnectReason = DisconnectReason(event.disconnectReasonCode, event.disconnectReasonString);
+
+      // clear mtu
+      _mtu = null;
+
+      // cancel & delete subscriptions
+      for (final s in _subscriptions) {
+        s.cancel();
+      }
+      _subscriptions.clear();
+
+      // cancel delayed subscriptions after the disconnected event has been
+      // delivered to their streams
+      if (_delayedSubscriptions.isNotEmpty) {
+        final delayed = List.of(_delayedSubscriptions);
+        _delayedSubscriptions.clear();
+        Future.delayed(Duration.zero).then((_) {
+          for (final s in delayed) {
+            s.cancel();
+          }
+        });
+      }
+
+      // Note: to make FBP easier to use, we do not clear `_services`,
+      // otherwise `services` would be more annoying to use. We also
+      // do not clear `_bondState`, for faster performance.
+    }
+
+    return OnConnectionStateChangedEvent(
+      this,
+      connectionState,
+      connectionState == BluetoothConnectionState.disconnected ? _disconnectReason : null,
+    );
   }
 
   @internal
-  BluetoothCharacteristic characteristicForIdentifier(String identifier) {
-    final parts = identifier.split("/");
-    if (parts.length != 2) {
-      throw ArgumentError.value(
-        identifier,
-        "identifier",
-        "must be in the form 'serviceUuid:index/characteristicUuid:index'",
-      );
-    }
-    final service = _serviceForIdentifier(parts[0]);
-    return _getAttributeFromList(service.characteristics, parts[1]);
+  OnMtuChangedEvent handleMtuChangedEvent(BmMtuChangedEvent event) {
+    _mtu = event.mtu;
+    return OnMtuChangedEvent(this, event.mtu);
   }
 
   @internal
-  BluetoothDescriptor descriptorForIdentifier(String identifier) {
-    final parts = identifier.split("/");
-    if (parts.length != 3) {
-      throw ArgumentError.value(
-        identifier,
-        "identifier",
-        "must be in the form 'serviceUuid:index/characteristicUuid:index/descriptorUuid:index'",
+  OnNameChangedEvent handleNameChangedEvent(BmNameChangedEvent event) {
+    if (System.isDarwin) {
+      // iOS & macOS internally use the name changed callback for the platform name
+      _platformName = event.name;
+    }
+    return OnNameChangedEvent(this, event.name);
+  }
+
+  @internal
+  OnServicesResetEvent handleServicesResetEvent(BmServicesResetEvent event) {
+    _services = [];
+    return OnServicesResetEvent(this);
+  }
+
+  @internal
+  OnBondStateChangedEvent handleBondStateEvent(BmBondStateEvent event) {
+    _prevBondState = event.prevState != null ? bmToBondState(event.prevState!) : _bondState;
+    _bondState = bmToBondState(event.bondState);
+    return OnBondStateChangedEvent(this, _bondState!, _prevBondState);
+  }
+
+  /// Returns null if the characteristic cannot be resolved
+  /// (e.g. services not discovered).
+  @internal
+  OnCharacteristicReceivedEvent? handleCharacteristicNotification(BmCharacteristicNotificationEvent event) {
+    final characteristic = _characteristicForRefOrNull(event.characteristic);
+    if (characteristic == null) return null;
+    characteristic.handleReceivedValue(event.value);
+    return OnCharacteristicReceivedEvent(characteristic, event.value);
+  }
+
+  //
+  // Attribute lookup by typed ref
+  //
+
+  T? _attributeForId<T extends BluetoothAttribute>(List<T> list, BmAttributeId id) {
+    final uuid = Uuid(id.uuid);
+    return list.where((a) => a.uuid == uuid && a.index == id.instance).firstOrNull;
+  }
+
+  BluetoothCharacteristic? _characteristicForRefOrNull(BmCharacteristicRef ref) {
+    final service = _attributeForId(_services, ref.service.service);
+    if (service == null) return null;
+    return _attributeForId(service.characteristics, ref.characteristic);
+  }
+
+  @internal
+  BluetoothCharacteristic characteristicForRef(BmCharacteristicRef ref) {
+    final characteristic = _characteristicForRefOrNull(ref);
+    if (characteristic == null) {
+      throw FlutterBluePlusException(
+        "characteristicForRef",
+        FbpErrorCode.characteristicNotFound,
+        "characteristic not found: ${ref.service.service.uuid}/${ref.characteristic.uuid}",
       );
     }
-    final characteristic = characteristicForIdentifier("${parts[0]}/${parts[1]}");
-    return characteristic.descriptors.firstWhere((d) => d.uuid == Uuid(parts[2]));
+    return characteristic;
+  }
+
+  @internal
+  BluetoothDescriptor descriptorForRef(BmDescriptorRef ref) {
+    final characteristic = characteristicForRef(ref.characteristic);
+    final uuid = Uuid(ref.uuid);
+    final descriptor = characteristic.descriptors.where((d) => d.uuid == uuid).firstOrNull;
+    if (descriptor == null) {
+      throw FlutterBluePlusException(
+        "descriptorForRef",
+        FbpErrorCode.characteristicNotFound,
+        "descriptor not found: ${ref.uuid}",
+      );
+    }
+    return descriptor;
   }
 
   @override

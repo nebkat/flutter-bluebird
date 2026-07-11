@@ -1721,10 +1721,10 @@ class PigeonEventSink<T>(private val sink: EventChannel.EventSink) {
   }
 }
       
-abstract class EventsStreamHandler : MessagesPigeonEventChannelWrapper<BmEvent> {
+abstract class NativeEventsStreamHandler : MessagesPigeonEventChannelWrapper<BmEvent> {
   companion object {
-    fun register(messenger: BinaryMessenger, streamHandler: EventsStreamHandler, instanceName: String = "") {
-      var channelName: String = "dev.flutter.pigeon.flutter_blue_plus.FlutterBluePlusEventChannelApi.events"
+    fun register(messenger: BinaryMessenger, streamHandler: NativeEventsStreamHandler, instanceName: String = "") {
+      var channelName: String = "dev.flutter.pigeon.flutter_blue_plus.FlutterBluePlusEventChannelApi.nativeEvents"
       if (instanceName.isNotEmpty()) {
         channelName += ".$instanceName"
       }

@@ -9,6 +9,7 @@ import 'package:flutter_blue_plus_platform_interface/flutter_blue_plus_platform_
 
 import 'bluetooth_attribute.dart';
 import 'bluetooth_descriptor.dart';
+import 'bluetooth_events.dart';
 import 'bluetooth_service.dart';
 import 'flutter_blue_plus.dart';
 import 'utils.dart';
@@ -21,12 +22,12 @@ class BluetoothCharacteristic extends BluetoothAttribute {
   @internal
   BluetoothCharacteristic.fromProto(BmBluetoothCharacteristic p, this.service)
       : properties = CharacteristicProperties.fromProto(p.properties),
-        super(device: service.device, uuid: p.uuid, index: p.index) {
+        super(device: service.device, uuid: Uuid(p.id.uuid), index: p.id.instance) {
     descriptors = p.descriptors.map((d) => BluetoothDescriptor.fromProto(d, this)).toList();
   }
 
-  @override
-  BluetoothAttribute? get parentAttribute => service;
+  @internal
+  BmCharacteristicRef get ref => BmCharacteristicRef(service: service.ref, characteristic: id);
 
   late final StreamController<List<int>> _streamController = StreamController<List<int>>.broadcast(
     onListen: () async {
@@ -48,6 +49,13 @@ class BluetoothCharacteristic extends BluetoothAttribute {
 
   Stream<List<int>> get notifications => _streamController.stream;
 
+  /// Push a value received via notify/indicate (called from the device's
+  /// platform event routing).
+  @internal
+  void handleReceivedValue(List<int> value) {
+    _streamController.add(value);
+  }
+
   /// convenience accessor
   BluetoothDescriptor? get cccd => descriptors.where((d) => d.uuid == Uuids.cccdDescriptor).firstOrNull;
 
@@ -57,18 +65,16 @@ class BluetoothCharacteristic extends BluetoothAttribute {
 
     // Only allow a single ble operation to be underway at a time
     return Mutex.global.protect(() async {
-      final request = BmReadCharacteristicRequest(
-        address: device.remoteId,
-        identifier: identifierPath,
-      );
-
-      final response = await FlutterBluePlus.invoke((p) => p.readCharacteristic(request))
+      final value = await FlutterBluePlus.invoke((p) => p.readCharacteristic(device.remoteId, ref))
           .fbpEnsureAdapterIsOn("readCharacteristic")
           .fbpEnsureDeviceIsConnected(device, "readCharacteristic")
           .fbpTimeout(timeout, "readCharacteristic");
 
-      // set return value
-      return response.value;
+      // read results are delivered via the returned future (not a platform
+      // event), so emit the app-level event ourselves
+      FlutterBluePlus.emitEvent(OnCharacteristicReceivedEvent(this, value));
+
+      return value;
     });
   }
 
@@ -95,16 +101,10 @@ class BluetoothCharacteristic extends BluetoothAttribute {
     device.ensureConnected("writeCharacteristic");
 
     await Mutex.global.protect(() async {
-      final request = BmWriteCharacteristicRequest(
-        address: device.remoteId,
-        identifier: identifierPath,
-        writeType: withoutResponse ? BmWriteType.withoutResponse : BmWriteType.withResponse,
-        allowLongWrite: allowLongWrite,
-        value: value,
-      );
+      final writeType = withoutResponse ? BmWriteType.withoutResponse : BmWriteType.withResponse;
 
-      // invoke
-      FlutterBluePlus.invoke((p) => p.writeCharacteristic(request))
+      await FlutterBluePlus.invoke(
+              (p) => p.writeCharacteristic(device.remoteId, ref, writeType, allowLongWrite, Uint8List.fromList(value)))
           .fbpEnsureAdapterIsOn("writeCharacteristic")
           .fbpEnsureDeviceIsConnected(device, "writeCharacteristic")
           .fbpTimeout(timeout, "writeCharacteristic");
@@ -127,14 +127,7 @@ class BluetoothCharacteristic extends BluetoothAttribute {
     device.ensureConnected("setNotifyValue");
 
     await Mutex.global.protect(() async {
-      final request = BmSetNotifyValueRequest(
-        address: device.remoteId,
-        identifier: identifierPath,
-        forceIndications: forceIndications,
-        enable: notify,
-      );
-
-      await FlutterBluePlus.invoke((p) => p.setNotifyValue(request))
+      await FlutterBluePlus.invoke((p) => p.setNotifyValue(device.remoteId, ref, forceIndications, notify))
           .fbpEnsureAdapterIsOn("setNotifyValue")
           .fbpEnsureDeviceIsConnected(device, "setNotifyValue")
           .fbpTimeout(timeout, "setNotifyValue");
@@ -152,24 +145,6 @@ class BluetoothCharacteristic extends BluetoothAttribute {
         '}';
   }
 }
-
-// TODO enum CharacteristicProperty {
-//   broadcast,
-//   read,
-//   writeWithoutResponse,
-//   write,
-//   notify,
-//   indicate,
-//   authenticatedSignedWrites,
-//   extendedProperties,
-//   notifyEncryptionRequired,
-//   indicateEncryptionRequired;
-//
-//   const CharacteristicProperty();
-//
-//   factory CharacteristicProperty.fromName(String name) =>
-//       CharacteristicProperty.values.firstWhere((e) => e.name == name);
-// }
 
 class CharacteristicProperties {
   final bool broadcast;

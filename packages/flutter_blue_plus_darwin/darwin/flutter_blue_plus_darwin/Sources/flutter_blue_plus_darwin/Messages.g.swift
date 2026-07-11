@@ -1614,11 +1614,11 @@ class PigeonEventSink<ReturnType> {
 
 }
 
-class EventsStreamHandler: PigeonEventChannelWrapper<BmEvent> {
+class NativeEventsStreamHandler: PigeonEventChannelWrapper<BmEvent> {
   static func register(with messenger: FlutterBinaryMessenger,
                       instanceName: String = "",
-                      streamHandler: EventsStreamHandler) {
-    var channelName = "dev.flutter.pigeon.flutter_blue_plus.FlutterBluePlusEventChannelApi.events"
+                      streamHandler: NativeEventsStreamHandler) {
+    var channelName = "dev.flutter.pigeon.flutter_blue_plus.FlutterBluePlusEventChannelApi.nativeEvents"
     if !instanceName.isEmpty {
       channelName += ".\(instanceName)"
     }

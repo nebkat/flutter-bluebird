@@ -1,9 +1,9 @@
 import 'dart:async';
+import 'dart:typed_data';
 
-import 'src/bluetooth_msgs.dart';
+import 'src/messages.g.dart';
 
-export 'src/bluetooth_msgs.dart';
-export 'src/log_level.dart';
+export 'src/messages.g.dart';
 export 'src/uuid.dart';
 
 /// The interface that implementations of flutter_blue_plus must implement.
@@ -26,41 +26,39 @@ abstract base class FlutterBluePlusPlatform {
     _instance = instance;
   }
 
-  Stream<BmBluetoothAdapterState> get onAdapterStateChanged {
-    return Stream.empty();
+  /// All unsolicited platform events, in native emission order.
+  ///
+  /// Implementations override only this getter; the typed event getters below
+  /// are derived from it.
+  Stream<BmEvent> get events {
+    return const Stream.empty();
   }
 
-  Stream<BmBondStateResponse> get onBondStateChanged {
-    return Stream.empty();
+  Stream<T> _eventsOf<T extends BmEvent>() {
+    return events.where((e) => e is T).cast<T>();
   }
 
-  Stream<BmCharacteristicData> get onCharacteristicReceived {
-    return Stream.empty();
-  }
+  Stream<BmAdapterStateEvent> get onAdapterStateChanged => _eventsOf();
 
-  Stream<BmConnectionStateResponse> get onConnectionStateChanged {
-    return Stream.empty();
-  }
+  Stream<BmBondStateEvent> get onBondStateChanged => _eventsOf();
 
-  Stream<BmDetachedFromEngineResponse> get onDetachedFromEngine {
-    return Stream.empty();
-  }
+  /// Values received via notify/indicate. Read responses are returned from
+  /// [readCharacteristic] instead.
+  Stream<BmCharacteristicNotificationEvent> get onCharacteristicNotified => _eventsOf();
 
-  Stream<BmMtuChangedResponse> get onMtuChanged {
-    return Stream.empty();
-  }
+  Stream<BmConnectionStateEvent> get onConnectionStateChanged => _eventsOf();
 
-  Stream<BmNameChanged> get onNameChanged {
-    return Stream.empty();
-  }
+  Stream<BmDetachedFromEngineEvent> get onDetachedFromEngine => _eventsOf();
 
-  Stream<BmScanResponse> get onScanResponse {
-    return Stream.empty();
-  }
+  Stream<BmMtuChangedEvent> get onMtuChanged => _eventsOf();
 
-  Stream<BmBluetoothDevice> get onServicesReset {
-    return Stream.empty();
-  }
+  Stream<BmNameChangedEvent> get onNameChanged => _eventsOf();
+
+  Stream<BmScanAdvertisementsEvent> get onScanAdvertisements => _eventsOf();
+
+  Stream<BmScanFailedEvent> get onScanFailed => _eventsOf();
+
+  Stream<BmServicesResetEvent> get onServicesReset => _eventsOf();
 
   static final _logsController = StreamController<String>.broadcast();
   static Stream<String> get logs => _logsController.stream;
@@ -71,187 +69,123 @@ abstract base class FlutterBluePlusPlatform {
     print(s);
   }
 
-  Future<bool> clearGattCache(
-    BmClearGattCacheRequest request,
-  ) {
-    return Future.value(false);
-  }
-
-  Future<bool> connect(
-    BmConnectRequest request,
-  ) {
-    return Future.value(false);
-  }
-
-  Future<BmBondStateResponse> createBond(
-    BmCreateBondRequest request,
-  ) {
-    return Future.value(BmBondStateResponse.empty(request.address));
-  }
-
-  Future<void> disconnect(
-    BmDisconnectRequest request,
-  ) {
+  Future<void> clearGattCache(String address) {
     return Future.value();
   }
 
-  Future<BmDiscoverServicesResponse> discoverServices(
-    BmDiscoverServicesRequest request,
-  ) {
-    return Future.value(BmDiscoverServicesResponse.empty());
-  }
-
-  Future<BmBluetoothAdapterName> getAdapterName(
-    BmBluetoothAdapterNameRequest request,
-  ) {
-    return Future.value(
-      BmBluetoothAdapterName(
-        adapterName: '',
-      ),
-    );
-  }
-
-  Future<BmBluetoothAdapterState> getAdapterState(
-    BmBluetoothAdapterStateRequest request,
-  ) {
-    return Future.value(
-      BmBluetoothAdapterState(
-        adapterState: BmAdapterStateEnum.unknown,
-      ),
-    );
-  }
-
-  Future<BmBondStateResponse> getBondState(
-    BmBondStateRequest request,
-  ) {
-    return Future.value(
-      BmBondStateResponse.empty(request.address),
-    );
-  }
-
-  Future<BmDevicesList> getBondedDevices(
-    BmBondedDevicesRequest request,
-  ) {
-    return Future.value(
-      BmDevicesList.empty(),
-    );
-  }
-
-  Future<BmPhySupport> getPhySupport(
-    BmPhySupportRequest request,
-  ) {
-    return Future.value(
-      BmPhySupport.empty(),
-    );
-  }
-
-  Future<BmDevicesList> getSystemDevices(
-    BmSystemDevicesRequest request,
-  ) {
-    return Future.value(
-      BmDevicesList.empty(),
-    );
-  }
-
-  Future<bool> isSupported(
-    BmIsSupportedRequest request,
-  ) {
-    return Future.value(false);
-  }
-
-  Future<BmCharacteristicData> readCharacteristic(
-    BmReadCharacteristicRequest request,
-  ) {
-    return Future.value(BmCharacteristicData.empty(request.address, request.identifier));
-  }
-
-  Future<BmDescriptorData> readDescriptor(
-    BmReadDescriptorRequest request,
-  ) {
-    return Future.value(BmDescriptorData.empty(request.address, request.identifier));
-  }
-
-  Future<BmReadRssiResult> readRssi(
-    BmReadRssiRequest request,
-  ) {
-    return Future.value(BmReadRssiResult.empty(request.address));
-  }
-
-  Future<BmBondStateResponse> removeBond(
-    BmRemoveBondRequest request,
-  ) {
-    return Future.value(BmBondStateResponse.empty(request.address));
-  }
-
-  Future<bool> requestConnectionPriority(
-    BmConnectionPriorityRequest request,
-  ) {
-    return Future.value(false);
-  }
-
-  Future<BmMtuChangedResponse> requestMtu(
-    BmMtuChangeRequest request,
-  ) {
-    return Future.value(BmMtuChangedResponse.empty(request.address));
-  }
-
-  Future<bool> setLogLevel(
-    BmSetLogLevelRequest request,
-  ) {
-    return Future.value(false);
-  }
-
-  Future<void> setNotifyValue(
-    BmSetNotifyValueRequest request,
-  ) {
+  Future<void> connect(String address) {
     return Future.value();
   }
 
-  Future<void> setOptions(
-    BmSetOptionsRequest request,
-  ) {
+  Future<bool> createBond(String address, Uint8List? pin) {
+    return Future.value(false);
+  }
+
+  Future<void> disconnect(String address) {
     return Future.value();
   }
 
-  Future<bool> setPreferredPhy(
-    BmPreferredPhy request,
-  ) {
+  Future<List<BmBluetoothService>> discoverServices(String address) {
+    return Future.value(const []);
+  }
+
+  Future<String> getAdapterName() {
+    return Future.value('');
+  }
+
+  Future<BmAdapterStateEnum> getAdapterState() {
+    return Future.value(BmAdapterStateEnum.unknown);
+  }
+
+  Future<BmBondStateEnum> getBondState(String address) {
+    return Future.value(BmBondStateEnum.none);
+  }
+
+  Future<List<BmBluetoothDevice>> getBondedDevices() {
+    return Future.value(const []);
+  }
+
+  Future<BmPhySupport> getPhySupport() {
+    return Future.value(BmPhySupport(le2M: false, leCoded: false));
+  }
+
+  Future<List<BmBluetoothDevice>> getSystemDevices(List<String> withServices) {
+    return Future.value(const []);
+  }
+
+  Future<bool> isSupported() {
     return Future.value(false);
   }
 
-  Future<bool> startScan(
-    BmScanSettings request,
-  ) {
+  Future<Uint8List> readCharacteristic(String address, BmCharacteristicRef characteristic) {
+    return Future.value(Uint8List(0));
+  }
+
+  Future<Uint8List> readDescriptor(String address, BmDescriptorRef descriptor) {
+    return Future.value(Uint8List(0));
+  }
+
+  Future<int> readRssi(String address) {
+    return Future.value(0);
+  }
+
+  Future<bool> removeBond(String address) {
     return Future.value(false);
   }
 
-  Future<bool> stopScan(
-    BmStopScanRequest request,
-  ) {
+  Future<void> requestConnectionPriority(String address, BmConnectionPriorityEnum connectionPriority) {
+    return Future.value();
+  }
+
+  Future<int> requestMtu(String address, int mtu) {
+    return Future.value(0);
+  }
+
+  /// [color] only affects Dart-side log formatting; it does not cross to the
+  /// platform.
+  Future<void> setLogLevel(LogLevel level, {bool color = true}) {
+    return Future.value();
+  }
+
+  Future<bool> setNotifyValue(String address, BmCharacteristicRef characteristic, bool forceIndications, bool enable) {
     return Future.value(false);
   }
 
-  Future<bool> turnOff(
-    BmTurnOffRequest request,
-  ) {
+  Future<void> setOptions(bool showPowerAlert, bool restoreState) {
+    return Future.value();
+  }
+
+  Future<void> setPreferredPhy(String address, int txPhy, int rxPhy, int phyOptions) {
+    return Future.value();
+  }
+
+  Future<void> startScan(BmScanSettings settings) {
+    return Future.value();
+  }
+
+  Future<void> stopScan() {
+    return Future.value();
+  }
+
+  Future<bool> turnOff() {
     return Future.value(false);
   }
 
-  Future<BmTurnOnResponse> turnOn(
-    BmTurnOnRequest request,
-  ) {
-    return Future.value(BmTurnOnResponse(userAccepted: true));
+  Future<bool> turnOn() {
+    return Future.value(true);
   }
 
   Future<void> writeCharacteristic(
-    BmWriteCharacteristicRequest request,
+    String address,
+    BmCharacteristicRef characteristic,
+    BmWriteType writeType,
+    bool allowLongWrite,
+    Uint8List value,
   ) {
     return Future.value();
   }
 
-  Future<void> writeDescriptor(
-    BmWriteDescriptorRequest request,
-  ) {
+  Future<void> writeDescriptor(String address, BmDescriptorRef descriptor, Uint8List value) {
     return Future.value();
   }
 }

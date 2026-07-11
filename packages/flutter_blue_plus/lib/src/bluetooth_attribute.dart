@@ -10,6 +10,9 @@ import 'bluetooth_device.dart';
 abstract class BluetoothAttribute {
   final BluetoothDevice device;
   final Uuid uuid;
+
+  /// Platform-opaque instance token disambiguating duplicate uuids
+  /// (null for descriptors, which are uuid-unique within a characteristic).
   final int? index;
 
   BluetoothAttribute({
@@ -19,9 +22,5 @@ abstract class BluetoothAttribute {
   });
 
   @internal
-  BluetoothAttribute? get parentAttribute => null;
-
-  String get identifier => "$uuid:$index";
-
-  String get identifierPath => parentAttribute != null ? "${parentAttribute!.identifierPath}/$identifier" : identifier;
+  BmAttributeId get id => BmAttributeId(uuid: uuid.string, instance: index ?? 0);
 }

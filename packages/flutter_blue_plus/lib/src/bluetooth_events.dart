@@ -1,8 +1,6 @@
-import 'package:flutter_blue_plus_platform_interface/flutter_blue_plus_platform_interface.dart';
+import 'package:flutter/foundation.dart';
 
-import 'bluetooth_attribute.dart';
 import 'bluetooth_characteristic.dart';
-import 'bluetooth_descriptor.dart';
 import 'bluetooth_device.dart';
 import 'bluetooth_utils.dart';
 import 'flutter_blue_plus.dart';
@@ -25,169 +23,108 @@ class BluetoothEvents {
 }
 
 //
-// Mixins
-//
-mixin GetDeviceMixin {
-  dynamic get _response;
-
-  /// the relevant device
-  BluetoothDevice get device => FlutterBluePlus.deviceForAddress(_response.remoteId);
-}
-
-mixin GetAttributeValueMixin {
-  dynamic get _response;
-  BluetoothAttribute get attribute;
-
-  /// the new data
-  List<int> get value => _response.value;
-}
-
-mixin GetCharacteristicMixin on GetAttributeValueMixin, GetDeviceMixin {
-  /// the relevant characteristic
-  BluetoothCharacteristic get characteristic => device.characteristicForIdentifier(_response.identifier);
-
-  /// the relevant attribute
-  @override
-  BluetoothAttribute get attribute => characteristic;
-}
-
-mixin GetDescriptorMixin on GetAttributeValueMixin, GetDeviceMixin {
-  /// the relevant descriptor
-  BluetoothDescriptor get descriptor => device.descriptorForIdentifier(_response.identifier);
-
-  /// the relevant attribute
-  @override
-  BluetoothAttribute get attribute => descriptor;
-}
-
-//
 // Event Classes
 //
 
 // On Detached From Engine
 class OnDetachedFromEngineEvent {
-  static const String method = "OnDetachedFromEngine";
-}
-
-// On Turn On Response
-class OnTurnOnResponseEvent {
-  static const String method = "OnTurnOnResponse";
-
-  final BmTurnOnResponse _response;
-
-  OnTurnOnResponseEvent(this._response);
-  OnTurnOnResponseEvent.fromMap(Map<String, dynamic> map) : _response = BmTurnOnResponse.fromMap(map);
-
-  /// user accepted response
-  bool get userAccepted => _response.userAccepted;
+  @internal
+  OnDetachedFromEngineEvent();
 }
 
 // On Scan Response
 class OnScanResponseEvent {
-  static const String method = "OnScanResponse";
+  /// the newly received advertisements
+  final List<ScanResult> advertisements;
 
-  final BmScanResponse _response;
-
-  OnScanResponseEvent(this._response);
-  OnScanResponseEvent.fromMap(Map<String, dynamic> map) : _response = BmScanResponse.fromMap(map);
-
-  /// the new scan state
-  List<ScanResult> get advertisements => _response.advertisements.map((a) => ScanResult.fromProto(a)).toList();
+  @internal
+  OnScanResponseEvent(this.advertisements);
 }
 
 // On Connection State Changed
-class OnConnectionStateChangedEvent with GetDeviceMixin {
-  static const String method = "OnConnectionStateChanged";
-
-  @override
-  final BmConnectionStateResponse _response;
-
-  OnConnectionStateChangedEvent(this._response);
-  OnConnectionStateChangedEvent.fromMap(Map<String, dynamic> map) : _response = BmConnectionStateResponse.fromMap(map);
+class OnConnectionStateChangedEvent {
+  /// the relevant device
+  final BluetoothDevice device;
 
   /// the new connection state
-  BluetoothConnectionState get connectionState => bmToConnectionState(_response.connectionState);
+  final BluetoothConnectionState connectionState;
 
-  /// the disconnect reason
-  DisconnectReason? get disconnectReason => connectionState == BluetoothConnectionState.disconnected
-      ? DisconnectReason(_response.disconnectReasonCode, _response.disconnectReasonString)
-      : null;
+  /// the disconnect reason, if [connectionState] is disconnected
+  final DisconnectReason? disconnectReason;
+
+  @internal
+  OnConnectionStateChangedEvent(this.device, this.connectionState, this.disconnectReason);
 }
 
 // On Adapter State Changed
 class OnAdapterStateChangedEvent {
-  static const String method = "OnAdapterStateChanged";
-
-  final BmBluetoothAdapterState _response;
-
-  OnAdapterStateChangedEvent(this._response);
-  OnAdapterStateChangedEvent.fromMap(Map<String, dynamic> map) : _response = BmBluetoothAdapterState.fromMap(map);
-
   /// the new adapter state
-  BluetoothAdapterState get adapterState => bmToAdapterState(_response.adapterState);
+  final BluetoothAdapterState adapterState;
+
+  @internal
+  OnAdapterStateChangedEvent(this.adapterState);
 }
 
 // On Mtu Changed
-class OnMtuChangedEvent with GetDeviceMixin {
-  static const String method = "OnMtuChanged";
-
-  @override
-  final BmMtuChangedResponse _response;
-
-  OnMtuChangedEvent(this._response);
-  OnMtuChangedEvent.fromMap(Map<String, dynamic> map) : _response = BmMtuChangedResponse.fromMap(map);
+class OnMtuChangedEvent {
+  /// the relevant device
+  final BluetoothDevice device;
 
   /// the new mtu
-  int get mtu => _response.mtu;
+  final int mtu;
+
+  @internal
+  OnMtuChangedEvent(this.device, this.mtu);
 }
 
 // On Services Reset
-class OnServicesResetEvent with GetDeviceMixin {
-  static const String method = "OnServicesReset";
+class OnServicesResetEvent {
+  /// the relevant device
+  final BluetoothDevice device;
 
-  @override
-  final BmBluetoothDevice _response;
-
-  OnServicesResetEvent(this._response);
-  OnServicesResetEvent.fromMap(Map<String, dynamic> map) : _response = BmBluetoothDevice.fromMap(map);
+  @internal
+  OnServicesResetEvent(this.device);
 }
 
 // On Characteristic Received
-class OnCharacteristicReceivedEvent with GetDeviceMixin, GetAttributeValueMixin, GetCharacteristicMixin {
-  static const String method = "OnCharacteristicReceived";
+//  - a value received via notify/indicate, or the result of a read
+class OnCharacteristicReceivedEvent {
+  /// the relevant characteristic
+  final BluetoothCharacteristic characteristic;
 
-  @override
-  final BmCharacteristicData _response;
+  /// the new data
+  final List<int> value;
 
-  OnCharacteristicReceivedEvent(this._response);
-  OnCharacteristicReceivedEvent.fromMap(Map<String, dynamic> map) : _response = BmCharacteristicData.fromMap(map);
+  @internal
+  OnCharacteristicReceivedEvent(this.characteristic, this.value);
+
+  /// the relevant device
+  BluetoothDevice get device => characteristic.device;
 }
 
 // On Name Changed
-class OnNameChangedEvent with GetDeviceMixin {
-  static const String method = "OnNameChanged";
-
-  @override
-  final BmNameChanged _response; // TODO: Used to be BmBluetoothDevice??
-
-  OnNameChangedEvent(this._response);
-  OnNameChangedEvent.fromMap(Map<String, dynamic> map) : _response = BmNameChanged.fromMap(map);
+class OnNameChangedEvent {
+  /// the relevant device
+  final BluetoothDevice device;
 
   /// the new name
-  String? get name => _response.name; // TODO: Used to be BmBluetoothDevice??
+  final String name;
+
+  @internal
+  OnNameChangedEvent(this.device, this.name);
 }
 
 // On Bond State Changed
-class OnBondStateChangedEvent with GetDeviceMixin {
-  static const String method = "OnBondStateChanged";
-
-  @override
-  final BmBondStateResponse _response;
-
-  OnBondStateChangedEvent(this._response);
-  OnBondStateChangedEvent.fromMap(Map<String, dynamic> map) : _response = BmBondStateResponse.fromMap(map);
+class OnBondStateChangedEvent {
+  /// the relevant device
+  final BluetoothDevice device;
 
   /// the new bond state
-  BluetoothBondState get bondState => bmToBondState(_response.bondState);
-  BluetoothBondState? get prevState => _response.prevState == null ? null : bmToBondState(_response.prevState!);
+  final BluetoothBondState bondState;
+
+  /// the previous bond state, if known
+  final BluetoothBondState? prevState;
+
+  @internal
+  OnBondStateChangedEvent(this.device, this.bondState, this.prevState);
 }

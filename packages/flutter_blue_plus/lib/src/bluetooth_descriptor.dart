@@ -2,6 +2,7 @@
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus_platform_interface/flutter_blue_plus_platform_interface.dart';
 
 import 'bluetooth_attribute.dart';
@@ -13,10 +14,10 @@ class BluetoothDescriptor extends BluetoothAttribute {
   final BluetoothCharacteristic characteristic;
 
   BluetoothDescriptor.fromProto(BmBluetoothDescriptor p, this.characteristic)
-      : super(device: characteristic.device, uuid: p.uuid);
+      : super(device: characteristic.device, uuid: Uuid(p.uuid));
 
-  @override
-  BluetoothAttribute? get parentAttribute => characteristic;
+  @internal
+  BmDescriptorRef get ref => BmDescriptorRef(characteristic: characteristic.ref, uuid: uuid.string);
 
   /// Retrieves the value of a specified descriptor
   Future<List<int>> read({Duration timeout = const Duration(seconds: 15)}) async {
@@ -24,17 +25,10 @@ class BluetoothDescriptor extends BluetoothAttribute {
 
     // Only allow a single ble operation to be underway at a time
     return Mutex.global.protect(() async {
-      final request = BmReadDescriptorRequest(
-        address: device.remoteId,
-        identifier: identifierPath,
-      );
-
-      final response = await FlutterBluePlus.invoke((p) => p.readDescriptor(request))
+      return await FlutterBluePlus.invoke((p) => p.readDescriptor(device.remoteId, ref))
           .fbpEnsureAdapterIsOn("readDescriptor")
           .fbpEnsureDeviceIsConnected(device, "readDescriptor")
           .fbpTimeout(timeout, "readDescriptor");
-
-      return response.value;
     });
   }
 
@@ -44,13 +38,7 @@ class BluetoothDescriptor extends BluetoothAttribute {
 
     // Only allow a single ble operation to be underway at a time
     await Mutex.global.protect(() async {
-      final request = BmWriteDescriptorRequest(
-        address: device.remoteId,
-        identifier: identifierPath,
-        value: value,
-      );
-
-      FlutterBluePlus.invoke((p) => p.writeDescriptor(request))
+      await FlutterBluePlus.invoke((p) => p.writeDescriptor(device.remoteId, ref, Uint8List.fromList(value)))
           .fbpEnsureAdapterIsOn("writeDescriptor")
           .fbpEnsureDeviceIsConnected(device, "writeDescriptor")
           .fbpTimeout(timeout, "writeDescriptor");

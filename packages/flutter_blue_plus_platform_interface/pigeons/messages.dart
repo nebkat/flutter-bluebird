@@ -253,7 +253,7 @@ class BmDetachedFromEngineEvent extends BmEvent {
 
 @EventChannelApi()
 abstract class FlutterBluePlusEventChannelApi {
-  BmEvent events();
+  BmEvent nativeEvents();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

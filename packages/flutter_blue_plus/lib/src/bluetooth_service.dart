@@ -15,19 +15,27 @@ class BluetoothService extends BluetoothAttribute {
   late final List<BluetoothService> includedServices;
   late final List<BluetoothCharacteristic> characteristics;
 
+  /// The primary service that includes this one (secondary services only).
+  BluetoothService? _parentService;
+
   bool get isSecondary => !isPrimary;
 
   @internal
   BluetoothService.fromProto(BluetoothDevice device, BmBluetoothService p)
       : isPrimary = p.isPrimary,
-        super(device: device, uuid: p.uuid, index: p.index) {
+        super(device: device, uuid: Uuid(p.id.uuid), index: p.id.instance) {
     characteristics = p.characteristics.map((c) => BluetoothCharacteristic.fromProto(c, this)).toList();
   }
 
   @internal
+  BmServiceRef get ref => BmServiceRef(service: id, parentService: _parentService?.id);
+
+  bool _matchesId(BmAttributeId id) => uuid == Uuid(id.uuid) && index == id.instance;
+
+  @internal
   static List<BluetoothService> constructServices(BluetoothDevice device, List<BmBluetoothService> protos) {
     final List<BluetoothService> services = [];
-    Map<BluetoothService, List<String>> includedServicesMap = {};
+    Map<BluetoothService, List<BmServiceRef>> includedServicesMap = {};
     for (final bmService in protos) {
       final service = BluetoothService.fromProto(device, bmService);
       services.add(service);
@@ -36,12 +44,15 @@ class BluetoothService extends BluetoothAttribute {
 
     for (final entry in includedServicesMap.entries) {
       final service = entry.key;
-      final includedServices = entry.value;
-      service.includedServices = includedServices.map((identifier) {
-        final includedService = services.where((s) => s.identifier == identifier).firstOrNull;
+      final includedRefs = entry.value;
+      service.includedServices = includedRefs.map((included) {
+        final includedService = services.where((s) => s._matchesId(included.service)).firstOrNull;
         if (includedService == null) {
           throw FlutterBluePlusException(
-              "constructServices", FbpErrorCode.serviceNotFound, "service not found: $identifier");
+              "constructServices", FbpErrorCode.serviceNotFound, "service not found: ${included.service.uuid}");
+        }
+        if (includedService.isSecondary) {
+          includedService._parentService ??= service;
         }
         return includedService;
       }).toList();

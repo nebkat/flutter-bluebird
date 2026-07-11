@@ -1,474 +1,156 @@
 import 'dart:async';
-import 'dart:convert';
+import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus_platform_interface/flutter_blue_plus_platform_interface.dart';
 
 final class FlutterBluePlusAndroid extends FlutterBluePlusPlatform {
-  @visibleForTesting
-  final methodChannel = const MethodChannel('flutter_blue_plus/methods');
+  final _api = FlutterBluePlusHostApi();
 
-  var _didRestart = false;
+  Future<void>? _restartFuture;
   var _logLevel = LogLevel.none;
   var _logColor = true;
 
-  final _onAdapterStateChangedController = StreamController<BmBluetoothAdapterState>.broadcast();
-  final _onBondStateChangedController = StreamController<BmBondStateResponse>.broadcast();
-  final _onCharacteristicReceivedController = StreamController<BmCharacteristicData>.broadcast();
-  final _onConnectionStateChangedController = StreamController<BmConnectionStateResponse>.broadcast();
-  final _onDetachedFromEngineController = StreamController<BmDetachedFromEngineResponse>.broadcast();
-  final _onMtuChangedController = StreamController<BmMtuChangedResponse>.broadcast();
-  final _onNameChangedController = StreamController<BmNameChanged>.broadcast();
-  final _onScanResponseController = StreamController<BmScanResponse>.broadcast();
-  final _onServicesResetController = StreamController<BmBluetoothDevice>.broadcast();
+  late final Stream<BmEvent> _events = nativeEvents().asBroadcastStream();
 
   @override
-  Stream<BmBluetoothAdapterState> get onAdapterStateChanged {
-    return _onAdapterStateChangedController.stream;
-  }
-
-  @override
-  Stream<BmBondStateResponse> get onBondStateChanged {
-    return _onBondStateChangedController.stream;
-  }
-
-  @override
-  Stream<BmCharacteristicData> get onCharacteristicReceived {
-    return _onCharacteristicReceivedController.stream;
-  }
-
-  @override
-  Stream<BmConnectionStateResponse> get onConnectionStateChanged {
-    return _onConnectionStateChangedController.stream;
-  }
-
-  @override
-  Stream<BmDetachedFromEngineResponse> get onDetachedFromEngine {
-    return _onDetachedFromEngineController.stream;
-  }
-
-  @override
-  Stream<BmMtuChangedResponse> get onMtuChanged {
-    return _onMtuChangedController.stream;
-  }
-
-  @override
-  Stream<BmNameChanged> get onNameChanged {
-    return _onNameChangedController.stream;
-  }
-
-  @override
-  Stream<BmScanResponse> get onScanResponse {
-    return _onScanResponseController.stream;
-  }
-
-  @override
-  Stream<BmBluetoothDevice> get onServicesReset {
-    return _onServicesResetController.stream;
-  }
+  Stream<BmEvent> get events => _events;
 
   static void registerWith() {
     FlutterBluePlusPlatform.instance = FlutterBluePlusAndroid();
   }
 
   @override
-  Future<bool> clearGattCache(
-    BmClearGattCacheRequest request,
-  ) async =>
-      await _callAndroidMethod<bool>(
-        'clearGattCache',
-        request.address,
-      );
+  Future<void> clearGattCache(String address) => _call('clearGattCache', () => _api.clearGattCache(address));
 
   @override
-  Future<bool> connect(
-    BmConnectRequest request,
-  ) async =>
-      await _callAndroidMethod<bool>(
-        'connect',
-        request.toMap(),
-      );
+  Future<void> connect(String address) => _call('connect', () => _api.connect(address));
 
   @override
-  Future<BmBondStateResponse> createBond(
-    BmCreateBondRequest request,
-  ) async =>
-      await _callAndroidMethod<BmBondStateResponse>(
-        'createBond',
-        request.toMap(),
-      );
+  Future<bool> createBond(String address, Uint8List? pin) => _call('createBond', () => _api.createBond(address, pin));
 
   @override
-  Future<bool> disconnect(
-    BmDisconnectRequest request,
-  ) async =>
-      await _callAndroidMethod<bool>(
-        'disconnect',
-        request.address,
-      );
+  Future<void> disconnect(String address) => _call('disconnect', () => _api.disconnect(address));
 
   @override
-  Future<BmDiscoverServicesResponse> discoverServices(
-    BmDiscoverServicesRequest request,
-  ) async =>
-      await _callAndroidMethod<BmDiscoverServicesResponse>(
-        'discoverServices',
-        request.address,
-      );
+  Future<List<BmBluetoothService>> discoverServices(String address) =>
+      _call('discoverServices', () => _api.discoverServices(address));
 
   @override
-  Future<BmBluetoothAdapterName> getAdapterName(
-    BmBluetoothAdapterNameRequest request,
-  ) async =>
-      BmBluetoothAdapterName(
-        adapterName: await _callAndroidMethod(
-          'getAdapterName',
-        ),
-      );
+  Future<String> getAdapterName() => _call('getAdapterName', () => _api.getAdapterName());
 
   @override
-  Future<BmBluetoothAdapterState> getAdapterState(
-    BmBluetoothAdapterStateRequest request,
-  ) async =>
-      BmBluetoothAdapterState.fromMap(
-        await _callAndroidMethod(
-          'getAdapterState',
-        ),
-      );
+  Future<BmAdapterStateEnum> getAdapterState() => _call('getAdapterState', () => _api.getAdapterState());
 
   @override
-  Future<BmBondStateResponse> getBondState(
-    BmBondStateRequest request,
-  ) async =>
-      BmBondStateResponse.fromMap(
-        await _callAndroidMethod(
-          'getBondState',
-          request.address,
-        ),
-      );
+  Future<BmBondStateEnum> getBondState(String address) => _call('getBondState', () => _api.getBondState(address));
 
   @override
-  Future<BmDevicesList> getBondedDevices(
-    BmBondedDevicesRequest request,
-  ) async =>
-      BmDevicesList.fromMap(
-        await _callAndroidMethod(
-          'getBondedDevices',
-        ),
-      );
+  Future<List<BmBluetoothDevice>> getBondedDevices() => _call('getBondedDevices', () => _api.getBondedDevices());
 
   @override
-  Future<BmPhySupport> getPhySupport(
-    BmPhySupportRequest request,
-  ) async =>
-      BmPhySupport.fromMap(
-        await _callAndroidMethod(
-          'getPhySupport',
-        ),
-      );
+  Future<BmPhySupport> getPhySupport() => _call('getPhySupport', () => _api.getPhySupport());
 
   @override
-  Future<BmDevicesList> getSystemDevices(
-    BmSystemDevicesRequest request,
-  ) async =>
-      BmDevicesList.fromMap(
-        await _callAndroidMethod(
-          'getSystemDevices',
-        ),
-      );
+  Future<List<BmBluetoothDevice>> getSystemDevices(List<String> withServices) =>
+      _call('getSystemDevices', () => _api.getSystemDevices(withServices));
 
   @override
-  Future<bool> isSupported(
-    BmIsSupportedRequest request,
-  ) async =>
-      await _callAndroidMethod<bool>(
-        'isSupported',
-      ) ==
-      true;
+  Future<bool> isSupported() => _call('isSupported', () => _api.isSupported());
 
   @override
-  Future<BmCharacteristicData> readCharacteristic(
-    BmReadCharacteristicRequest request,
-  ) async =>
-      await _callAndroidMethod<BmCharacteristicData>(
-        'readCharacteristic',
-        request.toMap(),
-      );
+  Future<Uint8List> readCharacteristic(String address, BmCharacteristicRef characteristic) =>
+      _call('readCharacteristic', () => _api.readCharacteristic(address, characteristic));
 
   @override
-  Future<BmDescriptorData> readDescriptor(
-    BmReadDescriptorRequest request,
-  ) async =>
-      await _callAndroidMethod<BmDescriptorData>(
-        'readDescriptor',
-        request.toMap(),
-      );
+  Future<Uint8List> readDescriptor(String address, BmDescriptorRef descriptor) =>
+      _call('readDescriptor', () => _api.readDescriptor(address, descriptor));
 
   @override
-  Future<BmReadRssiResult> readRssi(
-    BmReadRssiRequest request,
-  ) async =>
-      await _callAndroidMethod<BmReadRssiResult>(
-        'readRssi',
-        request.address,
-      );
+  Future<int> readRssi(String address) => _call('readRssi', () => _api.readRssi(address));
 
   @override
-  Future<BmBondStateResponse> removeBond(
-    BmRemoveBondRequest request,
-  ) async =>
-      await _callAndroidMethod<BmBondStateResponse>(
-        'removeBond',
-        request.address,
-      );
+  Future<bool> removeBond(String address) => _call('removeBond', () => _api.removeBond(address));
 
   @override
-  Future<bool> requestConnectionPriority(
-    BmConnectionPriorityRequest request,
-  ) async =>
-      await _callAndroidMethod<bool>(
-        'requestConnectionPriority',
-        request.toMap(),
-      );
+  Future<void> requestConnectionPriority(String address, BmConnectionPriorityEnum connectionPriority) =>
+      _call('requestConnectionPriority', () => _api.requestConnectionPriority(address, connectionPriority));
 
   @override
-  Future<BmMtuChangedResponse> requestMtu(
-    BmMtuChangeRequest request,
-  ) async =>
-      await _callAndroidMethod<BmMtuChangedResponse>(
-        'requestMtu',
-        request.toMap(),
-      );
+  Future<int> requestMtu(String address, int mtu) => _call('requestMtu', () => _api.requestMtu(address, mtu));
 
   @override
-  Future<bool> setLogLevel(
-    BmSetLogLevelRequest request,
-  ) async {
-    _logLevel = request.level;
-    _logColor = request.color;
-
-    return await _callAndroidMethod<bool>(
-      'setLogLevel',
-      request.level.index,
-    );
+  Future<void> setLogLevel(LogLevel level, {bool color = true}) async {
+    _logLevel = level;
+    _logColor = color;
+    await _api.setLogLevel(level);
   }
 
   @override
-  Future<bool> setNotifyValue(
-    BmSetNotifyValueRequest request,
-  ) async =>
-      await _callAndroidMethod<bool>(
-        'setNotifyValue',
-        request.toMap(),
-      );
+  Future<bool> setNotifyValue(String address, BmCharacteristicRef characteristic, bool forceIndications, bool enable) =>
+      _call('setNotifyValue', () => _api.setNotifyValue(address, characteristic, forceIndications, enable));
 
   @override
-  Future<bool> setOptions(
-    BmSetOptionsRequest request,
-  ) async =>
-      await _callAndroidMethod<bool>(
-        'setOptions',
-        request.toMap(),
-      ) ==
-      true;
+  Future<void> setOptions(bool showPowerAlert, bool restoreState) =>
+      _call('setOptions', () => _api.setOptions(showPowerAlert, restoreState));
 
   @override
-  Future<bool> setPreferredPhy(
-    BmPreferredPhy request,
-  ) async =>
-      await _callAndroidMethod<bool>(
-        'setPreferredPhy',
-        request.toMap(),
-      );
+  Future<void> setPreferredPhy(String address, int txPhy, int rxPhy, int phyOptions) =>
+      _call('setPreferredPhy', () => _api.setPreferredPhy(address, txPhy, rxPhy, phyOptions));
 
   @override
-  Future<bool> startScan(
-    BmScanSettings request,
-  ) async =>
-      await _callAndroidMethod<bool>(
-        'startScan',
-        request.toMap(),
-      );
+  Future<void> startScan(BmScanSettings settings) => _call('startScan', () => _api.startScan(settings));
 
   @override
-  Future<bool> stopScan(
-    BmStopScanRequest request,
-  ) async =>
-      await _callAndroidMethod<bool>(
-        'stopScan',
-      );
+  Future<void> stopScan() => _call('stopScan', () => _api.stopScan());
 
   @override
-  Future<bool> turnOff(
-    BmTurnOffRequest request,
-  ) async =>
-      await _callAndroidMethod<bool>(
-        'turnOff',
-      );
+  Future<bool> turnOff() => _call('turnOff', () => _api.turnOff());
 
   @override
-  Future<BmTurnOnResponse> turnOn(
-    BmTurnOnRequest request,
-  ) async =>
-      await _callAndroidMethod<BmTurnOnResponse>('turnOn');
+  Future<bool> turnOn() => _call('turnOn', () => _api.turnOn());
 
   @override
-  Future<bool> writeCharacteristic(
-    BmWriteCharacteristicRequest request,
-  ) async =>
-      await _callAndroidMethod<bool>(
-        'writeCharacteristic',
-        request.toMap(),
-      );
+  Future<void> writeCharacteristic(
+    String address,
+    BmCharacteristicRef characteristic,
+    BmWriteType writeType,
+    bool allowLongWrite,
+    Uint8List value,
+  ) =>
+      _call('writeCharacteristic', () => _api.writeCharacteristic(address, characteristic, writeType, allowLongWrite, value));
 
   @override
-  Future<void> writeDescriptor(
-    BmWriteDescriptorRequest request,
-  ) async =>
-      await _callAndroidMethod<void>(
-        'writeDescriptor',
-        request.toMap(),
-      );
+  Future<void> writeDescriptor(String address, BmDescriptorRef descriptor, Uint8List value) =>
+      _call('writeDescriptor', () => _api.writeDescriptor(address, descriptor, value));
 
-  Future<T> _callAndroidMethod<T>(
-    String method, [
-    dynamic arguments,
-  ]) async {
-    // restart platform
-    if (!_didRestart && method != "setLogLevel") {
-      await _flutterRestart();
-    }
+  Future<T> _call<T>(String method, Future<T> Function() fn) async {
+    await (_restartFuture ??= _flutterRestart());
 
-    // set platform method handler
-    methodChannel.setMethodCallHandler(_methodCallHandler);
-
-    // log args
     if (_logLevel == LogLevel.verbose) {
-      var func = '<$method>';
-      var args = arguments.toString();
-      func = _logColor ? '\x1B[1;30m$func\x1B[0m' : func;
-      args = _logColor ? '\x1B[1;35m$args\x1B[0m' : args;
-      FlutterBluePlusPlatform.log('[FBP] $func args: $args');
+      _log('<$method>');
     }
 
-    // invoke
-    final out = await methodChannel.invokeMethod<T>(method, arguments);
+    final result = await fn();
 
-    // log result
     if (_logLevel == LogLevel.verbose) {
-      var func = '($method)';
-      var result = out.toString();
-      func = _logColor ? '\x1B[1;30m$func\x1B[0m' : func;
-      result = _logColor ? '\x1B[1;33m$result\x1B[0m' : result;
-      FlutterBluePlusPlatform.log('[FBP] $func result: $result');
+      _log('($method) result: $result');
     }
 
-    return out!;
+    return result;
   }
 
+  /// Hot-restart handshake: the native side may still hold connections from a
+  /// previous isolate; ask it to close everything and wait until it has.
   Future<void> _flutterRestart() async {
-    // wait for all devices to disconnect
-    if ((await methodChannel.invokeMethod('flutterRestart')) != 0) {
-      await Future.delayed(Duration(milliseconds: 50));
-      while ((await methodChannel.invokeMethod('connectedCount')) != 0) {
-        await Future.delayed(Duration(milliseconds: 50));
+    if (await _api.flutterRestart() != 0) {
+      await Future.delayed(const Duration(milliseconds: 50));
+      while (await _api.connectedCount() != 0) {
+        await Future.delayed(const Duration(milliseconds: 50));
       }
     }
-    _didRestart = true;
   }
 
-  Future<void> _methodCallHandler(
-    MethodCall call,
-  ) async {
-    // log result
-    if (_logLevel == LogLevel.verbose) {
-      var func = '[[ ${call.method} ]]';
-      var result = switch (call.method) {
-        'OnDiscoveredServices' => _prettyPrint(call.arguments),
-        _ => call.arguments.toString(),
-      };
-      func = _logColor ? '\x1B[1;30m$func\x1B[0m' : func;
-      result = _logColor ? '\x1B[1;33m$result\x1B[0m' : result;
-      FlutterBluePlusPlatform.log('[FBP] $func result: $result');
-    }
-
-    // handle method call
-    switch (call.method) {
-      case 'OnAdapterStateChanged':
-        return _onAdapterStateChangedController.add(
-          BmBluetoothAdapterState.fromMap(
-            call.arguments,
-          ),
-        );
-      case 'OnBondStateChanged':
-        return _onBondStateChangedController.add(
-          BmBondStateResponse.fromMap(
-            call.arguments,
-          ),
-        );
-      case 'OnCharacteristicReceived':
-        return _onCharacteristicReceivedController.add(
-          BmCharacteristicData.fromMap(
-            call.arguments,
-          ),
-        );
-      case 'OnConnectionStateChanged':
-        return _onConnectionStateChangedController.add(
-          BmConnectionStateResponse.fromMap(
-            call.arguments,
-          ),
-        );
-      case 'OnDescriptorRead':
-        return _onDescriptorReadController.add(
-          BmDescriptorData.fromMap(
-            call.arguments,
-          ),
-        );
-      case 'OnDescriptorWritten':
-        return _onDescriptorWrittenController.add(
-          BmDescriptorData.fromMap(
-            call.arguments,
-          ),
-        );
-      case 'OnDetachedFromEngine':
-        return _onDetachedFromEngineController.add(
-          BmDetachedFromEngineResponse(),
-        );
-      case 'OnMtuChanged':
-        return _onMtuChangedController.add(
-          BmMtuChangedResponse.fromMap(
-            call.arguments,
-          ),
-        );
-      case 'OnNameChanged':
-        return _onNameChangedController.add(
-          BmNameChanged.fromMap(
-            call.arguments,
-          ),
-        );
-      case 'OnScanResponse':
-        return _onScanResponseController.add(
-          BmScanResponse.fromMap(
-            call.arguments,
-          ),
-        );
-      case 'OnServicesReset':
-        return _onServicesResetController.add(
-          BmBluetoothDevice.fromMap(
-            call.arguments,
-          ),
-        );
-    }
-  }
-
-  String _prettyPrint(
-    dynamic data,
-  ) {
-    if (data is Map || data is List) {
-      return JsonEncoder.withIndent('  ').convert(data);
-    } else {
-      return data.toString();
-    }
+  void _log(String s) {
+    FlutterBluePlusPlatform.log(_logColor ? '[FBP] \x1B[1;30m$s\x1B[0m' : '[FBP] $s');
   }
 }
