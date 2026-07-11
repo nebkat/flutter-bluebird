@@ -8,7 +8,7 @@ workspace:
   - packages/flutter_blue_plus_platform_interface
   - packages/flutter_blue_plus_android
   - packages/flutter_blue_plus_darwin
-  - packages/flutter_blue_plus_linux
   # parked until the platform interface stabilizes (see packages/flutter_blue_plus/pubspec.yaml)
+  # - packages/flutter_blue_plus_linux
   # - packages/flutter_blue_plus_web
   - packages/flutter_blue_plus/example
