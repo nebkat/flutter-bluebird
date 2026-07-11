@@ -33,7 +33,7 @@ final class PendingMap<Key: Hashable, Value> {
       completion(
         .failure(
           PigeonError(
-            code: "operation_in_progress",
+            code: FbpErrorCode.operationInProgress.wire,
             message: "this operation is already in progress",
             details: nil)))
       return false

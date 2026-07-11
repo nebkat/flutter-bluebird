@@ -15,30 +15,47 @@ import Foundation
 // Errors
 // ─────────────────────────────────────────────────────────────────────────────
 
+extension FbpErrorCode {
+  /// The snake_case wire form of this error code (crosses the channel as
+  /// `PlatformException.code`).
+  var wire: String {
+    var out = ""
+    for c in String(describing: self) {
+      if c.isUppercase {
+        out.append("_")
+        out.append(contentsOf: c.lowercased())
+      } else {
+        out.append(c)
+      }
+    }
+    return out
+  }
+}
+
 /// Wraps a CoreBluetooth NSError as a stable "cb_error" with the raw native
 /// code as details.
 func cbError(_ error: Error) -> PigeonError {
   let ns = error as NSError
-  return PigeonError(code: "cb_error", message: ns.localizedDescription, details: Int64(ns.code))
+  return PigeonError(code: FbpErrorCode.cbError.wire, message: ns.localizedDescription, details: Int64(ns.code))
 }
 
 func notConnectedError() -> PigeonError {
-  return PigeonError(code: "not_connected", message: "device is disconnected", details: nil)
+  return PigeonError(code: FbpErrorCode.notConnected.wire, message: "device is disconnected", details: nil)
 }
 
 func deviceDisconnectedError() -> PigeonError {
-  return PigeonError(code: "device_disconnected", message: "device is disconnected", details: nil)
+  return PigeonError(code: FbpErrorCode.deviceDisconnected.wire, message: "device is disconnected", details: nil)
 }
 
 func adapterOffError(_ state: CBManagerState) -> PigeonError {
   return PigeonError(
-    code: "adapter_off",
+    code: FbpErrorCode.adapterOff.wire,
     message: "bluetooth must be turned on. (\(cbManagerStateString(state)))",
     details: nil)
 }
 
 func unsupportedError(_ message: String) -> PigeonError {
-  return PigeonError(code: "unsupported", message: message, details: nil)
+  return PigeonError(code: FbpErrorCode.unsupported.wire, message: message, details: nil)
 }
 
 func cbManagerStateString(_ state: CBManagerState) -> String {

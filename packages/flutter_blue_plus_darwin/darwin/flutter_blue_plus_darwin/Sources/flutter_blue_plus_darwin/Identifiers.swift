@@ -73,7 +73,7 @@ func descriptorRef(for descriptor: CBDescriptor, in peripheral: CBPeripheral) ->
 // ─────────────────────────────────────────────────────────────────────────────
 
 private func invalidIdentifier(_ message: String) -> PigeonError {
-  return PigeonError(code: "invalid_identifier", message: message, details: nil)
+  return PigeonError(code: FbpErrorCode.invalidIdentifier.wire, message: message, details: nil)
 }
 
 func locateService(_ ref: BmServiceRef, in peripheral: CBPeripheral) throws -> CBService {

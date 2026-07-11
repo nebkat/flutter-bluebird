@@ -125,7 +125,7 @@ class FlutterBluePlusPlugin :
     }
 
     private fun bluetoothUnavailable() =
-        FlutterError("unsupported", "the device does not support bluetooth", null)
+        FlutterError(FbpErrorCode.UNSUPPORTED.wire, "the device does not support bluetooth", null)
 
     private fun requireAdapter(): BluetoothAdapter = adapter() ?: throw bluetoothUnavailable()
 
@@ -149,13 +149,13 @@ class FlutterBluePlusPlugin :
     private fun connectedGatt(address: String): BluetoothGatt? =
         connections[address]?.takeIf { it.isConnected }?.gatt
 
-    private fun notConnected() = FlutterError("not_connected", "device is not connected", null)
+    private fun notConnected() = FlutterError(FbpErrorCode.NOT_CONNECTED.wire, "device is not connected", null)
 
     private fun invalidIdentifier(detail: String) =
-        FlutterError("invalid_identifier", "could not locate attribute: $detail", null)
+        FlutterError(FbpErrorCode.INVALID_IDENTIFIER.wire, "could not locate attribute: $detail", null)
 
     private fun gattError(status: Int, message: String? = null) =
-        FlutterError("gatt_error", message ?: Proto.gattErrorString(status), status)
+        FlutterError(FbpErrorCode.GATT_ERROR.wire, message ?: Proto.gattErrorString(status), status)
 
     private fun ensurePermissions(perms: List<String>, operation: (Boolean, String?) -> Unit) {
         permissions.ensurePermissions(context, activityBinding?.activity, perms, operation)
@@ -420,7 +420,7 @@ class FlutterBluePlusPlugin :
         val a = adapterOr(callback) ?: return
         ensurePermissions(connectPermissions()) { granted, perm ->
             if (!granted) {
-                callback(Result.failure(FlutterError("permission_denied",
+                callback(Result.failure(FlutterError(FbpErrorCode.PERMISSION_DENIED.wire,
                     "Permission $perm required to turn Bluetooth on", null)))
                 return@ensurePermissions
             }
@@ -432,7 +432,7 @@ class FlutterBluePlusPlugin :
 
             val binding = activityBinding
             if (binding == null) {
-                callback(Result.failure(FlutterError("unsupported",
+                callback(Result.failure(FlutterError(FbpErrorCode.UNSUPPORTED.wire,
                     "no foreground activity available to request Bluetooth enable", null)))
                 return@ensurePermissions
             }
@@ -452,7 +452,7 @@ class FlutterBluePlusPlugin :
         val a = adapterOr(callback) ?: return
 
         if (Build.VERSION.SDK_INT >= 33) { // Android 13 (August 2022)
-            callback(Result.failure(FlutterError("unsupported",
+            callback(Result.failure(FlutterError(FbpErrorCode.UNSUPPORTED.wire,
                 "turnOff is not supported on Android 13 (API 33) and above", null)))
             return
         }
@@ -483,21 +483,21 @@ class FlutterBluePlusPlugin :
 
         ensurePermissions(perms) { granted, perm ->
             if (!granted) {
-                callback(Result.failure(FlutterError("permission_denied",
+                callback(Result.failure(FlutterError(FbpErrorCode.PERMISSION_DENIED.wire,
                     "Permission $perm required to scan devices", null)))
                 return@ensurePermissions
             }
 
             // check adapter
             if (!isAdapterOn()) {
-                callback(Result.failure(FlutterError("adapter_off", "Bluetooth must be turned on", null)))
+                callback(Result.failure(FlutterError(FbpErrorCode.ADAPTER_OFF.wire, "Bluetooth must be turned on", null)))
                 return@ensurePermissions
             }
 
             // get scanner
             val scanner = a.bluetoothLeScanner
             if (scanner == null) {
-                callback(Result.failure(FlutterError("adapter_off",
+                callback(Result.failure(FlutterError(FbpErrorCode.ADAPTER_OFF.wire,
                     "getBluetoothLeScanner() is null. Is the Adapter on?", null)))
                 return@ensurePermissions
             }
@@ -592,7 +592,7 @@ class FlutterBluePlusPlugin :
         val perms = if (Build.VERSION.SDK_INT >= 31) connectPermissions() else emptyList()
         ensurePermissions(perms) { granted, perm ->
             if (!granted) {
-                callback(Result.failure(FlutterError("permission_denied",
+                callback(Result.failure(FlutterError(FbpErrorCode.PERMISSION_DENIED.wire,
                     "Permission $perm required to get system devices", null)))
                 return@ensurePermissions
             }
@@ -608,7 +608,7 @@ class FlutterBluePlusPlugin :
         val perms = if (Build.VERSION.SDK_INT >= 31) connectPermissions() else emptyList()
         ensurePermissions(perms) { granted, perm ->
             if (!granted) {
-                callback(Result.failure(FlutterError("permission_denied",
+                callback(Result.failure(FlutterError(FbpErrorCode.PERMISSION_DENIED.wire,
                     "Permission $perm required to get bonded devices", null)))
                 return@ensurePermissions
             }
@@ -622,14 +622,14 @@ class FlutterBluePlusPlugin :
         val a = adapterOr(callback) ?: return
         ensurePermissions(connectPermissions()) { granted, perm ->
             if (!granted) {
-                callback(Result.failure(FlutterError("permission_denied",
+                callback(Result.failure(FlutterError(FbpErrorCode.PERMISSION_DENIED.wire,
                     "Permission $perm required for new connection", null)))
                 return@ensurePermissions
             }
 
             // check adapter
             if (!isAdapterOn()) {
-                callback(Result.failure(FlutterError("adapter_off", "Bluetooth must be turned on", null)))
+                callback(Result.failure(FlutterError(FbpErrorCode.ADAPTER_OFF.wire, "Bluetooth must be turned on", null)))
                 return@ensurePermissions
             }
 
@@ -662,7 +662,7 @@ class FlutterBluePlusPlugin :
                 // error check
                 if (gatt == null) {
                     pending.fail(OpKey.Connect(address),
-                        FlutterError("gatt_error", "device.connectGatt returned null", null))
+                        FlutterError(FbpErrorCode.GATT_ERROR.wire, "device.connectGatt returned null", null))
                     return@ensurePermissions
                 }
 
@@ -694,7 +694,7 @@ class FlutterBluePlusPlugin :
 
                 // fail the pending connect
                 pending.fail(OpKey.Connect(address),
-                    FlutterError("user_canceled", "connection canceled", null))
+                    FlutterError(FbpErrorCode.USER_CANCELED.wire, "connection canceled", null))
 
                 emitEvent(BmConnectionStateEvent(
                     address = address,
@@ -729,7 +729,7 @@ class FlutterBluePlusPlugin :
         }
 
         if (!gatt.discoverServices()) {
-            pending.fail(key, FlutterError("gatt_error", "gatt.discoverServices() returned false", null))
+            pending.fail(key, FlutterError(FbpErrorCode.GATT_ERROR.wire, "gatt.discoverServices() returned false", null))
         }
     }
 
@@ -752,7 +752,7 @@ class FlutterBluePlusPlugin :
 
         // check readable
         if ((chr.properties and BluetoothGattCharacteristic.PROPERTY_READ) == 0) {
-            callback(Result.failure(FlutterError("unsupported",
+            callback(Result.failure(FlutterError(FbpErrorCode.UNSUPPORTED.wire,
                 "The READ property is not supported by this BLE characteristic", null)))
             return
         }
@@ -763,7 +763,7 @@ class FlutterBluePlusPlugin :
         }
 
         if (!gatt.readCharacteristic(chr)) {
-            pending.fail(key, FlutterError("gatt_error", "gatt.readCharacteristic() returned false", null))
+            pending.fail(key, FlutterError(FbpErrorCode.GATT_ERROR.wire, "gatt.readCharacteristic() returned false", null))
         }
     }
 
@@ -796,13 +796,13 @@ class FlutterBluePlusPlugin :
         // check writeable
         if (writeTypeInt == BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE) {
             if ((chr.properties and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE) == 0) {
-                callback(Result.failure(FlutterError("unsupported",
+                callback(Result.failure(FlutterError(FbpErrorCode.UNSUPPORTED.wire,
                     "The WRITE_NO_RESPONSE property is not supported by this BLE characteristic", null)))
                 return
             }
         } else {
             if ((chr.properties and BluetoothGattCharacteristic.PROPERTY_WRITE) == 0) {
-                callback(Result.failure(FlutterError("unsupported",
+                callback(Result.failure(FlutterError(FbpErrorCode.UNSUPPORTED.wire,
                     "The WRITE property is not supported by this BLE characteristic", null)))
                 return
             }
@@ -817,7 +817,7 @@ class FlutterBluePlusPlugin :
             } else {
                 ""
             }
-            callback(Result.failure(FlutterError("invalid_argument",
+            callback(Result.failure(FlutterError(FbpErrorCode.INVALID_ARGUMENT.wire,
                 "data longer than allowed. value.length: ${value.size} > max: $maxLen ($a$b)", null)))
             return
         }
@@ -831,13 +831,13 @@ class FlutterBluePlusPlugin :
         if (Build.VERSION.SDK_INT >= 33) { // Android 13 (August 2022)
             val rv = gatt.writeCharacteristic(chr, value, writeTypeInt)
             if (rv != BluetoothStatusCodes.SUCCESS) {
-                pending.fail(key, FlutterError("gatt_error",
+                pending.fail(key, FlutterError(FbpErrorCode.GATT_ERROR.wire,
                     "gatt.writeCharacteristic() returned $rv : ${Proto.bluetoothStatusString(rv)}", rv))
             }
         } else {
             // set value
             if (!chr.setValue(value)) {
-                pending.fail(key, FlutterError("gatt_error", "characteristic.setValue() returned false", null))
+                pending.fail(key, FlutterError(FbpErrorCode.GATT_ERROR.wire, "characteristic.setValue() returned false", null))
                 return
             }
 
@@ -846,7 +846,7 @@ class FlutterBluePlusPlugin :
 
             // write char
             if (!gatt.writeCharacteristic(chr)) {
-                pending.fail(key, FlutterError("gatt_error", "gatt.writeCharacteristic() returned false", null))
+                pending.fail(key, FlutterError(FbpErrorCode.GATT_ERROR.wire, "gatt.writeCharacteristic() returned false", null))
             }
         }
     }
@@ -874,7 +874,7 @@ class FlutterBluePlusPlugin :
         }
 
         if (!gatt.readDescriptor(desc)) {
-            pending.fail(key, FlutterError("gatt_error", "gatt.readDescriptor() returned false", null))
+            pending.fail(key, FlutterError(FbpErrorCode.GATT_ERROR.wire, "gatt.readDescriptor() returned false", null))
         }
     }
 
@@ -900,7 +900,7 @@ class FlutterBluePlusPlugin :
         // check mtu
         val mtu = connections[address]?.mtu ?: 23
         if ((mtu - 3) < value.size) {
-            callback(Result.failure(FlutterError("invalid_argument",
+            callback(Result.failure(FlutterError(FbpErrorCode.INVALID_ARGUMENT.wire,
                 "data longer than mtu allows. dataLength: ${value.size} > max: ${mtu - 3}", null)))
             return
         }
@@ -914,19 +914,19 @@ class FlutterBluePlusPlugin :
         if (Build.VERSION.SDK_INT >= 33) { // Android 13 (August 2022)
             val rv = gatt.writeDescriptor(desc, value)
             if (rv != BluetoothStatusCodes.SUCCESS) {
-                pending.fail(key, FlutterError("gatt_error",
+                pending.fail(key, FlutterError(FbpErrorCode.GATT_ERROR.wire,
                     "gatt.writeDescriptor() returned $rv : ${Proto.bluetoothStatusString(rv)}", rv))
             }
         } else {
             // set descriptor
             if (!desc.setValue(value)) {
-                pending.fail(key, FlutterError("gatt_error", "descriptor.setValue() returned false", null))
+                pending.fail(key, FlutterError(FbpErrorCode.GATT_ERROR.wire, "descriptor.setValue() returned false", null))
                 return
             }
 
             // write descriptor
             if (!gatt.writeDescriptor(desc)) {
-                pending.fail(key, FlutterError("gatt_error", "gatt.writeDescriptor() returned false", null))
+                pending.fail(key, FlutterError(FbpErrorCode.GATT_ERROR.wire, "gatt.writeDescriptor() returned false", null))
             }
         }
     }
@@ -956,7 +956,7 @@ class FlutterBluePlusPlugin :
 
         // configure local Android device to listen for characteristic changes
         if (!gatt.setCharacteristicNotification(chr, enable)) {
-            callback(Result.failure(FlutterError("gatt_error",
+            callback(Result.failure(FlutterError(FbpErrorCode.GATT_ERROR.wire,
                 "gatt.setCharacteristicNotification($enable) returned false", null)))
             return
         }
@@ -979,13 +979,13 @@ class FlutterBluePlusPlugin :
             val canIndicate = (chr.properties and BluetoothGattCharacteristic.PROPERTY_INDICATE) > 0
 
             if (!canIndicate && !canNotify) {
-                callback(Result.failure(FlutterError("unsupported",
+                callback(Result.failure(FlutterError(FbpErrorCode.UNSUPPORTED.wire,
                     "neither NOTIFY nor INDICATE properties are supported by this BLE characteristic", null)))
                 return
             }
 
             if (forceIndications && !canIndicate) {
-                callback(Result.failure(FlutterError("unsupported",
+                callback(Result.failure(FlutterError(FbpErrorCode.UNSUPPORTED.wire,
                     "INDICATE not supported by this BLE characteristic", null)))
                 return
             }
@@ -1012,19 +1012,19 @@ class FlutterBluePlusPlugin :
         if (Build.VERSION.SDK_INT >= 33) { // Android 13 (August 2022)
             val rv = gatt.writeDescriptor(cccd, descriptorValue)
             if (rv != BluetoothStatusCodes.SUCCESS) {
-                pending.fail(key, FlutterError("gatt_error",
+                pending.fail(key, FlutterError(FbpErrorCode.GATT_ERROR.wire,
                     "gatt.writeDescriptor() returned $rv : ${Proto.bluetoothStatusString(rv)}", rv))
             }
         } else {
             // set new value
             if (!cccd.setValue(descriptorValue)) {
-                pending.fail(key, FlutterError("gatt_error", "cccd.setValue() returned false", null))
+                pending.fail(key, FlutterError(FbpErrorCode.GATT_ERROR.wire, "cccd.setValue() returned false", null))
                 return
             }
 
             // update notifications on remote BLE device
             if (!gatt.writeDescriptor(cccd)) {
-                pending.fail(key, FlutterError("gatt_error", "gatt.writeDescriptor() returned false", null))
+                pending.fail(key, FlutterError(FbpErrorCode.GATT_ERROR.wire, "gatt.writeDescriptor() returned false", null))
             }
         }
     }
@@ -1042,7 +1042,7 @@ class FlutterBluePlusPlugin :
         }
 
         if (!gatt.requestMtu(mtu.toInt())) {
-            pending.fail(key, FlutterError("gatt_error", "gatt.requestMtu() returned false", null))
+            pending.fail(key, FlutterError(FbpErrorCode.GATT_ERROR.wire, "gatt.requestMtu() returned false", null))
         }
     }
 
@@ -1059,7 +1059,7 @@ class FlutterBluePlusPlugin :
         }
 
         if (!gatt.readRemoteRssi()) {
-            pending.fail(key, FlutterError("gatt_error", "gatt.readRemoteRssi() returned false", null))
+            pending.fail(key, FlutterError(FbpErrorCode.GATT_ERROR.wire, "gatt.readRemoteRssi() returned false", null))
         }
     }
 
@@ -1067,13 +1067,13 @@ class FlutterBluePlusPlugin :
         val gatt = connectedGatt(address) ?: throw notConnected()
 
         if (!gatt.requestConnectionPriority(Proto.bmConnectionPriorityParse(connectionPriority))) {
-            throw FlutterError("gatt_error", "gatt.requestConnectionPriority() returned false", null)
+            throw FlutterError(FbpErrorCode.GATT_ERROR.wire, "gatt.requestConnectionPriority() returned false", null)
         }
     }
 
     override fun getPhySupport(): BmPhySupport {
         if (Build.VERSION.SDK_INT < 26) { // Android 8.0 (August 2017)
-            throw FlutterError("unsupported",
+            throw FlutterError(FbpErrorCode.UNSUPPORTED.wire,
                 "Only supported on devices >= API 26. This device == ${Build.VERSION.SDK_INT}", null)
         }
         val a = requireAdapter()
@@ -1088,7 +1088,7 @@ class FlutterBluePlusPlugin :
         callback: (Result<Unit>) -> Unit,
     ) {
         if (Build.VERSION.SDK_INT < 26) { // Android 8.0 (August 2017)
-            callback(Result.failure(FlutterError("unsupported",
+            callback(Result.failure(FlutterError(FbpErrorCode.UNSUPPORTED.wire,
                 "Only supported on devices >= API 26. This device == ${Build.VERSION.SDK_INT}", null)))
             return
         }
@@ -1148,7 +1148,7 @@ class FlutterBluePlusPlugin :
 
         // bond
         if (!device.createBond()) {
-            pending.fail(key, FlutterError("bond_failed", "device.createBond() returned false", null))
+            pending.fail(key, FlutterError(FbpErrorCode.BOND_FAILED.wire, "device.createBond() returned false", null))
         }
     }
 
@@ -1174,10 +1174,10 @@ class FlutterBluePlusPlugin :
             val removeBondMethod = device.javaClass.getMethod("removeBond")
             val rv = removeBondMethod.invoke(device) as Boolean
             if (!rv) {
-                pending.fail(key, FlutterError("bond_failed", "device.removeBond() returned false", null))
+                pending.fail(key, FlutterError(FbpErrorCode.BOND_FAILED.wire, "device.removeBond() returned false", null))
             }
         } catch (e: Exception) {
-            pending.fail(key, FlutterError("bond_failed", "device.removeBond() failed: $e", null))
+            pending.fail(key, FlutterError(FbpErrorCode.BOND_FAILED.wire, "device.removeBond() failed: $e", null))
         }
     }
 
@@ -1194,7 +1194,7 @@ class FlutterBluePlusPlugin :
             // mirror the Java plugin: complete immediately after invoking
             callback(Result.success(Unit))
         } catch (e: Exception) {
-            callback(Result.failure(FlutterError("unsupported",
+            callback(Result.failure(FlutterError(FbpErrorCode.UNSUPPORTED.wire,
                 "gatt.refresh() unsupported on this android version: $e", null)))
         }
     }
@@ -1228,7 +1228,7 @@ class FlutterBluePlusPlugin :
             if (adapterState == BluetoothAdapter.STATE_TURNING_OFF ||
                 adapterState == BluetoothAdapter.STATE_OFF
             ) {
-                pending.failAll(FlutterError("adapter_off", "the bluetooth adapter was turned off", null))
+                pending.failAll(FlutterError(FbpErrorCode.ADAPTER_OFF.wire, "the bluetooth adapter was turned off", null))
                 synchronized(stateLock) {
                     disconnectAllDevices("adapterTurnOff")
                 }
@@ -1311,7 +1311,7 @@ class FlutterBluePlusPlugin :
                 }
                 BluetoothDevice.BOND_NONE -> {
                     pending.fail(OpKey.CreateBond(remoteId),
-                        FlutterError("bond_failed", "bond attempt failed (final state: bond-none)", null))
+                        FlutterError(FbpErrorCode.BOND_FAILED.wire, "bond attempt failed (final state: bond-none)", null))
                     pending.succeed(OpKey.RemoveBond(remoteId), true)
                     bondingPins.remove(remoteId)
                 }
@@ -1436,9 +1436,9 @@ class FlutterBluePlusPlugin :
                     // complete pending ops for this device
                     pending.succeed(OpKey.Disconnect(remoteId), Unit)
                     pending.fail(OpKey.Connect(remoteId),
-                        FlutterError("gatt_error", Proto.hciStatusString(status), status))
+                        FlutterError(FbpErrorCode.GATT_ERROR.wire, Proto.hciStatusString(status), status))
                     pending.failAllForDevice(remoteId,
-                        FlutterError("device_disconnected", "device is disconnected", null))
+                        FlutterError(FbpErrorCode.DEVICE_DISCONNECTED.wire, "device is disconnected", null))
 
                     emitEvent(BmConnectionStateEvent(
                         address = remoteId,

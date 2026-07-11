@@ -223,7 +223,7 @@ public class FlutterBluePlusPlugin: NSObject, FlutterPlugin, CBCentralManagerDel
       stopMtuPollingIfIdle()
 
       pending.failAll(
-        error: PigeonError(code: "adapter_off", message: "the adapter is turned off", details: nil))
+        error: PigeonError(code: FbpErrorCode.adapterOff.wire, message: "the adapter is turned off", details: nil))
     }
   }
 
@@ -338,7 +338,7 @@ public class FlutterBluePlusPlugin: NSObject, FlutterPlugin, CBCentralManagerDel
 
     let failure =
       error.map(cbError)
-      ?? PigeonError(code: "cb_error", message: "failed to connect", details: nil)
+      ?? PigeonError(code: FbpErrorCode.cbError.wire, message: "failed to connect", details: nil)
     pending.connect.take(address)?(.failure(failure))
   }
 
@@ -370,7 +370,7 @@ public class FlutterBluePlusPlugin: NSObject, FlutterPlugin, CBCentralManagerDel
     if let connect = pending.connect.take(address) {
       let failure =
         error.map(cbError)
-        ?? PigeonError(code: "user_canceled", message: "connection canceled", details: nil)
+        ?? PigeonError(code: FbpErrorCode.userCanceled.wire, message: "connection canceled", details: nil)
       connect(.failure(failure))
     }
 
@@ -846,7 +846,7 @@ extension FlutterBluePlusPlugin: FlutterBluePlusHostApi {
     guard let uuid = UUID(uuidString: address) else {
       pending.connect.take(address)?(
         .failure(
-          PigeonError(code: "invalid_identifier", message: "invalid remoteId", details: address)))
+          PigeonError(code: FbpErrorCode.invalidIdentifier.wire, message: "invalid remoteId", details: address)))
       return
     }
 
@@ -858,7 +858,7 @@ extension FlutterBluePlusPlugin: FlutterBluePlusHostApi {
       pending.connect.take(address)?(
         .failure(
           PigeonError(
-            code: "invalid_identifier", message: "peripheral not found", details: address)))
+            code: FbpErrorCode.invalidIdentifier.wire, message: "peripheral not found", details: address)))
       return
     }
 
@@ -885,7 +885,7 @@ extension FlutterBluePlusPlugin: FlutterBluePlusHostApi {
       // didDisconnectPeripheral, so complete everything here
       pending.connect.take(address)?(
         .failure(
-          PigeonError(code: "user_canceled", message: "connection canceled", details: nil)))
+          PigeonError(code: FbpErrorCode.userCanceled.wire, message: "connection canceled", details: nil)))
 
       sink?.success(
         BmConnectionStateEvent(

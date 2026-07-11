@@ -7,6 +7,12 @@ package com.lib.flutter_blue_plus
 import android.os.Handler
 
 /**
+ * The snake_case wire form of this error code (crosses the channel as
+ * `PlatformException.code`).
+ */
+val FbpErrorCode.wire: String get() = name.lowercase()
+
+/**
  * Identifies one in-flight request awaiting completion from a native
  * callback (GATT callback, broadcast receiver, activity result, ...).
  */
@@ -92,7 +98,7 @@ class PendingOperations(private val mainHandler: Handler) {
         }
         if (conflict) {
             dispatch(cb, Result.failure(FlutterError(
-                "operation_in_progress",
+                FbpErrorCode.OPERATION_IN_PROGRESS.wire,
                 "an operation of this type is already in progress for this device", null)))
         }
         return !conflict
