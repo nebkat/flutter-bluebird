@@ -17,7 +17,7 @@ class BluetoothDescriptor extends BluetoothAttribute {
       : super(device: characteristic.device, id: BluetoothAttributeId(Uuid(p.uuid)));
 
   @internal
-  BmDescriptorRef get ref => BmDescriptorRef(characteristic: characteristic.ref, uuid: uuid.string);
+  BmDescriptorRef get bm => BmDescriptorRef(characteristic: characteristic.bm, uuid: uuid.string);
 
   /// Retrieves the value of a specified descriptor
   Future<List<int>> read({Duration timeout = const Duration(seconds: 15)}) async {
@@ -25,7 +25,7 @@ class BluetoothDescriptor extends BluetoothAttribute {
 
     // Only allow a single ble operation to be underway at a time
     return Mutex.global.protect(() async {
-      return await FlutterBluePlus.invoke((p) => p.readDescriptor(device.remoteId, ref))
+      return await FlutterBluePlus.invoke((p) => p.readDescriptor(device.remoteId, bm))
           .fbpEnsureAdapterIsOn("readDescriptor")
           .fbpEnsureDeviceIsConnected(device, "readDescriptor")
           .fbpTimeout(timeout, "readDescriptor");
@@ -38,7 +38,7 @@ class BluetoothDescriptor extends BluetoothAttribute {
 
     // Only allow a single ble operation to be underway at a time
     await Mutex.global.protect(() async {
-      await FlutterBluePlus.invoke((p) => p.writeDescriptor(device.remoteId, ref, Uint8List.fromList(value)))
+      await FlutterBluePlus.invoke((p) => p.writeDescriptor(device.remoteId, bm, Uint8List.fromList(value)))
           .fbpEnsureAdapterIsOn("writeDescriptor")
           .fbpEnsureDeviceIsConnected(device, "writeDescriptor")
           .fbpTimeout(timeout, "writeDescriptor");

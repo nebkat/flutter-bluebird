@@ -28,7 +28,7 @@ class BluetoothService extends BluetoothAttribute {
   }
 
   @internal
-  BmServiceRef get ref => BmServiceRef(service: id.bm, parentService: _parentService?.id.bm);
+  BmServiceRef get bm => BmServiceRef(service: id.bm, parentService: _parentService?.id.bm);
 
   @internal
   static List<BluetoothService> constructServices(BluetoothDevice device, List<BmBluetoothService> protos) {

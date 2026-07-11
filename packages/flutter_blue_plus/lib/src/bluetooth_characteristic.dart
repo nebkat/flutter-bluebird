@@ -27,7 +27,7 @@ class BluetoothCharacteristic extends BluetoothAttribute {
   }
 
   @internal
-  BmCharacteristicRef get ref => BmCharacteristicRef(service: service.ref, characteristic: id.bm);
+  BmCharacteristicRef get bm => BmCharacteristicRef(service: service.bm, characteristic: id.bm);
 
   late final StreamController<List<int>> _streamController = StreamController<List<int>>.broadcast(
     onListen: () async {
@@ -65,7 +65,7 @@ class BluetoothCharacteristic extends BluetoothAttribute {
 
     // Only allow a single ble operation to be underway at a time
     return Mutex.global.protect(() async {
-      final value = await FlutterBluePlus.invoke((p) => p.readCharacteristic(device.remoteId, ref))
+      final value = await FlutterBluePlus.invoke((p) => p.readCharacteristic(device.remoteId, bm))
           .fbpEnsureAdapterIsOn("readCharacteristic")
           .fbpEnsureDeviceIsConnected(device, "readCharacteristic")
           .fbpTimeout(timeout, "readCharacteristic");
@@ -104,7 +104,7 @@ class BluetoothCharacteristic extends BluetoothAttribute {
       final writeType = withoutResponse ? BmWriteType.withoutResponse : BmWriteType.withResponse;
 
       await FlutterBluePlus.invoke(
-              (p) => p.writeCharacteristic(device.remoteId, ref, writeType, allowLongWrite, Uint8List.fromList(value)))
+              (p) => p.writeCharacteristic(device.remoteId, bm, writeType, allowLongWrite, Uint8List.fromList(value)))
           .fbpEnsureAdapterIsOn("writeCharacteristic")
           .fbpEnsureDeviceIsConnected(device, "writeCharacteristic")
           .fbpTimeout(timeout, "writeCharacteristic");
@@ -127,7 +127,7 @@ class BluetoothCharacteristic extends BluetoothAttribute {
     device.ensureConnected("setNotifyValue");
 
     await Mutex.global.protect(() async {
-      await FlutterBluePlus.invoke((p) => p.setNotifyValue(device.remoteId, ref, forceIndications, notify))
+      await FlutterBluePlus.invoke((p) => p.setNotifyValue(device.remoteId, bm, forceIndications, notify))
           .fbpEnsureAdapterIsOn("setNotifyValue")
           .fbpEnsureDeviceIsConnected(device, "setNotifyValue")
           .fbpTimeout(timeout, "setNotifyValue");
