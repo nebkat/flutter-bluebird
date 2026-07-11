@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
@@ -222,10 +224,14 @@ class _DeviceScreenState extends State<DeviceScreen> {
     return ListTile(
         title: const Text('MTU Size'),
         subtitle: Text('$_mtuSize bytes'),
-        trailing: IconButton(
-          icon: const Icon(Icons.edit),
-          onPressed: onRequestMtuPressed,
-        ));
+        // requestMtu is only supported on Android; other platforms
+        // negotiate the MTU automatically
+        trailing: (!kIsWeb && Platform.isAndroid)
+            ? IconButton(
+                icon: const Icon(Icons.edit),
+                onPressed: onRequestMtuPressed,
+              )
+            : null);
   }
 
   Widget buildConnectButton(BuildContext context) {
