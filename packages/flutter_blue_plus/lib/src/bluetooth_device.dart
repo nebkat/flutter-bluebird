@@ -299,7 +299,7 @@ class BluetoothDevice {
     ensureConnected("requestConnectionPriority");
 
     await FlutterBluePlus.invoke(
-            (p) => p.requestConnectionPriority(remoteId, bmFromConnectionPriority(connectionPriorityRequest)))
+            (p) => p.requestConnectionPriority(remoteId, connectionPriorityRequest))
         .fbpEnsureAdapterIsOn("requestConnectionPriority")
         .fbpEnsureDeviceIsConnected(this, "requestConnectionPriority")
         .fbpTimeout(timeout, "requestConnectionPriority");
@@ -385,8 +385,7 @@ class BluetoothDevice {
 
     // get current state if needed
     _bondState ??= await FlutterBluePlus.invoke((p) => p.getBondState(remoteId))
-        .fbpEnsureAdapterIsOn('getBondState')
-        .then(bmToBondState);
+        .fbpEnsureAdapterIsOn('getBondState');
 
     return _bondState!;
   }
@@ -436,7 +435,7 @@ class BluetoothDevice {
 
   @internal
   OnConnectionStateChangedEvent handleConnectionStateEvent(BmConnectionStateEvent event) {
-    final connectionState = bmToConnectionState(event.connectionState);
+    final connectionState = event.connectionState;
     _connectionState = connectionState;
 
     if (connectionState == BluetoothConnectionState.disconnected) {
@@ -498,8 +497,8 @@ class BluetoothDevice {
 
   @internal
   OnBondStateChangedEvent handleBondStateEvent(BmBondStateEvent event) {
-    _prevBondState = event.prevState != null ? bmToBondState(event.prevState!) : _bondState;
-    _bondState = bmToBondState(event.bondState);
+    _prevBondState = event.prevState ?? _bondState;
+    _bondState = event.bondState;
     return OnBondStateChangedEvent(this, _bondState!, _prevBondState);
   }
 

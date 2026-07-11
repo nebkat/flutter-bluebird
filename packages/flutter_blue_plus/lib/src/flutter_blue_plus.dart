@@ -123,7 +123,7 @@ class FlutterBluePlus {
       final state = await invoke((p) => p.getAdapterState());
       // update _adapterStateNow if it is still null after the await
       // (an adapter state event may have arrived first — prefer it)
-      _adapterStateNow ??= bmToAdapterState(state);
+      _adapterStateNow ??= state;
     }
 
     yield* FlutterBluePlus.extractEventStream<OnAdapterStateChangedEvent>()
@@ -351,7 +351,7 @@ class FlutterBluePlus {
   static void _onPlatformEvent(BmEvent event) {
     switch (event) {
       case BmAdapterStateEvent():
-        final adapterState = bmToAdapterState(event.adapterState);
+        final adapterState = event.adapterState;
         _adapterStateNow = adapterState;
         if (isScanningNow && adapterState != BluetoothAdapterState.on) {
           _stopScan(invokePlatform: false);
