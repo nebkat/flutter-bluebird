@@ -1897,6 +1897,7 @@ class FlutterBluePlusHostApi {
     return pigeonVar_replyValue! as bool;
   }
 
+  /// @async: may need to request runtime permissions before answering.
   Future<String> getAdapterName() async {
     final pigeonVar_channelName =
         'dev.flutter.pigeon.flutter_blue_plus.FlutterBluePlusHostApi.getAdapterName$pigeonVar_messageChannelSuffix';

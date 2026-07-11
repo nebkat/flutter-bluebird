@@ -17,8 +17,8 @@ dependencies:
   #  - unified changelog
   #  - users can still manually override
   flutter_blue_plus_platform_interface: 7.0.0
-#  flutter_blue_plus_android: 7.0.4
-#  flutter_blue_plus_darwin: 7.0.3
+  flutter_blue_plus_android: 7.0.4
+  flutter_blue_plus_darwin: 7.0.3
 #  flutter_blue_plus_linux: 7.0.3
 #  flutter_blue_plus_web: 7.0.2
 
@@ -27,19 +27,17 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
 
-# NOTE: all platform endorsements are temporarily parked while the platform
-# interface is refactored. The flutter tool rejects an empty `platforms:` map,
-# so the whole block is commented until the first platform package is re-wired.
-#flutter:
-#  plugin:
-#    platforms:
-#      android:
-#        default_package: flutter_blue_plus_android
-#      ios:
-#        default_package: flutter_blue_plus_darwin
-#      linux:
-#        default_package: flutter_blue_plus_linux
-#      macos:
-#        default_package: flutter_blue_plus_darwin
-#      web:
-#        default_package: flutter_blue_plus_web
+flutter:
+  plugin:
+    platforms:
+      android:
+        default_package: flutter_blue_plus_android
+      ios:
+        default_package: flutter_blue_plus_darwin
+      macos:
+        default_package: flutter_blue_plus_darwin
+      # parked:
+      # linux:
+      #   default_package: flutter_blue_plus_linux
+      # web:
+      #   default_package: flutter_blue_plus_web

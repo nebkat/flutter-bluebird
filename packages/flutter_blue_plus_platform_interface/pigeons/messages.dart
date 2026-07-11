@@ -276,6 +276,9 @@ abstract class FlutterBluePlusHostApi {
   void setLogLevel(LogLevel level);
   void setOptions(bool showPowerAlert, bool restoreState);
   bool isSupported();
+
+  /// @async: may need to request runtime permissions before answering.
+  @async
   String getAdapterName();
   BmAdapterStateEnum getAdapterState();
 
@@ -285,10 +288,15 @@ abstract class FlutterBluePlusHostApi {
   @async
   bool turnOff();
 
-  // scanning — quick return; advertisements/errors arrive on the event stream
+  // scanning — startScan completes once the scan is running (it may first
+  // need to request runtime permissions); advertisements/errors arrive on the
+  // event stream
+  @async
   void startScan(BmScanSettings settings);
   void stopScan();
+  @async
   List<BmBluetoothDevice> getSystemDevices(List<String> withServices);
+  @async
   List<BmBluetoothDevice> getBondedDevices();
 
   // connection

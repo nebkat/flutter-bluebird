@@ -1637,15 +1637,16 @@ protocol FlutterBluePlusHostApi {
   func setLogLevel(level: LogLevel) throws
   func setOptions(showPowerAlert: Bool, restoreState: Bool) throws
   func isSupported() throws -> Bool
-  func getAdapterName() throws -> String
+  /// @async: may need to request runtime permissions before answering.
+  func getAdapterName(completion: @escaping (Result<String, Error>) -> Void)
   func getAdapterState() throws -> BmAdapterStateEnum
   /// Android: shows the enable-bluetooth dialog; completes with user consent.
   func turnOn(completion: @escaping (Result<Bool, Error>) -> Void)
   func turnOff(completion: @escaping (Result<Bool, Error>) -> Void)
-  func startScan(settings: BmScanSettings) throws
+  func startScan(settings: BmScanSettings, completion: @escaping (Result<Void, Error>) -> Void)
   func stopScan() throws
-  func getSystemDevices(withServices: [String]) throws -> [BmBluetoothDevice]
-  func getBondedDevices() throws -> [BmBluetoothDevice]
+  func getSystemDevices(withServices: [String], completion: @escaping (Result<[BmBluetoothDevice], Error>) -> Void)
+  func getBondedDevices(completion: @escaping (Result<[BmBluetoothDevice], Error>) -> Void)
   func connect(address: String, completion: @escaping (Result<Void, Error>) -> Void)
   func disconnect(address: String, completion: @escaping (Result<Void, Error>) -> Void)
   func discoverServices(address: String, completion: @escaping (Result<[BmBluetoothService], Error>) -> Void)
@@ -1744,14 +1745,17 @@ class FlutterBluePlusHostApiSetup {
     } else {
       isSupportedChannel.setMessageHandler(nil)
     }
+    /// @async: may need to request runtime permissions before answering.
     let getAdapterNameChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.flutter_blue_plus.FlutterBluePlusHostApi.getAdapterName\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       getAdapterNameChannel.setMessageHandler { _, reply in
-        do {
-          let result = try api.getAdapterName()
-          reply(wrapResult(result))
-        } catch {
-          reply(wrapError(error))
+        api.getAdapterName { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
         }
       }
     } else {
@@ -1806,11 +1810,13 @@ class FlutterBluePlusHostApiSetup {
       startScanChannel.setMessageHandler { message, reply in
         let args = message as! [Any?]
         let settingsArg = args[0] as! BmScanSettings
-        do {
-          try api.startScan(settings: settingsArg)
-          reply(wrapResult(nil))
-        } catch {
-          reply(wrapError(error))
+        api.startScan(settings: settingsArg) { result in
+          switch result {
+          case .success:
+            reply(wrapResult(nil))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
         }
       }
     } else {
@@ -1834,11 +1840,13 @@ class FlutterBluePlusHostApiSetup {
       getSystemDevicesChannel.setMessageHandler { message, reply in
         let args = message as! [Any?]
         let withServicesArg = args[0] as! [String]
-        do {
-          let result = try api.getSystemDevices(withServices: withServicesArg)
-          reply(wrapResult(result))
-        } catch {
-          reply(wrapError(error))
+        api.getSystemDevices(withServices: withServicesArg) { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
         }
       }
     } else {
@@ -1847,11 +1855,13 @@ class FlutterBluePlusHostApiSetup {
     let getBondedDevicesChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.flutter_blue_plus.FlutterBluePlusHostApi.getBondedDevices\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       getBondedDevicesChannel.setMessageHandler { _, reply in
-        do {
-          let result = try api.getBondedDevices()
-          reply(wrapResult(result))
-        } catch {
-          reply(wrapError(error))
+        api.getBondedDevices { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
         }
       }
     } else {

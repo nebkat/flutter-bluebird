@@ -1749,15 +1749,16 @@ interface FlutterBluePlusHostApi {
   fun setLogLevel(level: LogLevel)
   fun setOptions(showPowerAlert: Boolean, restoreState: Boolean)
   fun isSupported(): Boolean
-  fun getAdapterName(): String
+  /** @async: may need to request runtime permissions before answering. */
+  fun getAdapterName(callback: (Result<String>) -> Unit)
   fun getAdapterState(): BmAdapterStateEnum
   /** Android: shows the enable-bluetooth dialog; completes with user consent. */
   fun turnOn(callback: (Result<Boolean>) -> Unit)
   fun turnOff(callback: (Result<Boolean>) -> Unit)
-  fun startScan(settings: BmScanSettings)
+  fun startScan(settings: BmScanSettings, callback: (Result<Unit>) -> Unit)
   fun stopScan()
-  fun getSystemDevices(withServices: List<String>): List<BmBluetoothDevice>
-  fun getBondedDevices(): List<BmBluetoothDevice>
+  fun getSystemDevices(withServices: List<String>, callback: (Result<List<BmBluetoothDevice>>) -> Unit)
+  fun getBondedDevices(callback: (Result<List<BmBluetoothDevice>>) -> Unit)
   fun connect(address: String, callback: (Result<Unit>) -> Unit)
   fun disconnect(address: String, callback: (Result<Unit>) -> Unit)
   fun discoverServices(address: String, callback: (Result<List<BmBluetoothService>>) -> Unit)
@@ -1872,12 +1873,15 @@ interface FlutterBluePlusHostApi {
         val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.flutter_blue_plus.FlutterBluePlusHostApi.getAdapterName$separatedMessageChannelSuffix", codec)
         if (api != null) {
           channel.setMessageHandler { _, reply ->
-            val wrapped: List<Any?> = try {
-              listOf(api.getAdapterName())
-            } catch (exception: Throwable) {
-              MessagesPigeonUtils.wrapError(exception)
+            api.getAdapterName{ result: Result<String> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(MessagesPigeonUtils.wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(MessagesPigeonUtils.wrapResult(data))
+              }
             }
-            reply.reply(wrapped)
           }
         } else {
           channel.setMessageHandler(null)
@@ -1940,13 +1944,14 @@ interface FlutterBluePlusHostApi {
           channel.setMessageHandler { message, reply ->
             val args = message as List<Any?>
             val settingsArg = args[0] as BmScanSettings
-            val wrapped: List<Any?> = try {
-              api.startScan(settingsArg)
-              listOf(null)
-            } catch (exception: Throwable) {
-              MessagesPigeonUtils.wrapError(exception)
+            api.startScan(settingsArg) { result: Result<Unit> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(MessagesPigeonUtils.wrapError(error))
+              } else {
+                reply.reply(MessagesPigeonUtils.wrapResult(null))
+              }
             }
-            reply.reply(wrapped)
           }
         } else {
           channel.setMessageHandler(null)
@@ -1974,12 +1979,15 @@ interface FlutterBluePlusHostApi {
           channel.setMessageHandler { message, reply ->
             val args = message as List<Any?>
             val withServicesArg = args[0] as List<String>
-            val wrapped: List<Any?> = try {
-              listOf(api.getSystemDevices(withServicesArg))
-            } catch (exception: Throwable) {
-              MessagesPigeonUtils.wrapError(exception)
+            api.getSystemDevices(withServicesArg) { result: Result<List<BmBluetoothDevice>> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(MessagesPigeonUtils.wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(MessagesPigeonUtils.wrapResult(data))
+              }
             }
-            reply.reply(wrapped)
           }
         } else {
           channel.setMessageHandler(null)
@@ -1989,12 +1997,15 @@ interface FlutterBluePlusHostApi {
         val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.flutter_blue_plus.FlutterBluePlusHostApi.getBondedDevices$separatedMessageChannelSuffix", codec)
         if (api != null) {
           channel.setMessageHandler { _, reply ->
-            val wrapped: List<Any?> = try {
-              listOf(api.getBondedDevices())
-            } catch (exception: Throwable) {
-              MessagesPigeonUtils.wrapError(exception)
+            api.getBondedDevices{ result: Result<List<BmBluetoothDevice>> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(MessagesPigeonUtils.wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(MessagesPigeonUtils.wrapResult(data))
+              }
             }
-            reply.reply(wrapped)
           }
         } else {
           channel.setMessageHandler(null)
