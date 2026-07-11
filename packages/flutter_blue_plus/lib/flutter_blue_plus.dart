@@ -5,7 +5,7 @@
 library;
 
 export 'package:flutter_blue_plus_platform_interface/flutter_blue_plus_platform_interface.dart'
-    show Uuid, LogLevel, BmPhySupport;
+    show Uuid, LogLevel, BmPhySupport, FbpErrorCode;
 
 export 'src/bluetooth_attribute.dart';
 export 'src/bluetooth_characteristic.dart';

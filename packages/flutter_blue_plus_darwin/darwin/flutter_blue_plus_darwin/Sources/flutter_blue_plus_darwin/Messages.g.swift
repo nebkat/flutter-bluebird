@@ -225,6 +225,35 @@ enum LogLevel: Int, CaseIterable {
   case verbose = 5
 }
 
+/// Single source of truth for error codes, shared by every platform.
+///
+/// Errors cross the channel as `PlatformException.code` *strings* (pigeon
+/// cannot type that field), so the wire form of each code is, by convention,
+/// the snake_case of its name here (e.g. [FbpErrorCode.deviceDisconnected]
+/// crosses as `"device_disconnected"`). Each language has a small `wire`
+/// helper implementing that convention; never hand-write a code string.
+enum FbpErrorCode: Int, CaseIterable {
+  case success = 0
+  case timeout = 1
+  case platform = 2
+  case serviceNotFound = 3
+  case characteristicNotFound = 4
+  case userRejected = 5
+  case removeBondFailed = 6
+  case gattError = 7
+  case cbError = 8
+  case deviceDisconnected = 9
+  case adapterOff = 10
+  case notConnected = 11
+  case invalidIdentifier = 12
+  case bondFailed = 13
+  case userCanceled = 14
+  case unsupported = 15
+  case operationInProgress = 16
+  case permissionDenied = 17
+  case invalidArgument = 18
+}
+
 /// The universal uuid:instance pair identifying one attribute.
 ///
 /// Generated class from Pigeon that represents data sent in messages.
@@ -1398,52 +1427,58 @@ private class MessagesPigeonCodecReader: FlutterStandardReader {
       }
       return nil
     case 135:
-      return BmAttributeId.fromList(self.readValue() as! [Any?])
+      let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
+      if let enumResultAsInt = enumResultAsInt {
+        return FbpErrorCode(rawValue: enumResultAsInt)
+      }
+      return nil
     case 136:
-      return BmServiceRef.fromList(self.readValue() as! [Any?])
+      return BmAttributeId.fromList(self.readValue() as! [Any?])
     case 137:
-      return BmCharacteristicRef.fromList(self.readValue() as! [Any?])
+      return BmServiceRef.fromList(self.readValue() as! [Any?])
     case 138:
-      return BmDescriptorRef.fromList(self.readValue() as! [Any?])
+      return BmCharacteristicRef.fromList(self.readValue() as! [Any?])
     case 139:
-      return BmMsdFilter.fromList(self.readValue() as! [Any?])
+      return BmDescriptorRef.fromList(self.readValue() as! [Any?])
     case 140:
-      return BmServiceDataFilter.fromList(self.readValue() as! [Any?])
+      return BmMsdFilter.fromList(self.readValue() as! [Any?])
     case 141:
-      return BmScanSettings.fromList(self.readValue() as! [Any?])
+      return BmServiceDataFilter.fromList(self.readValue() as! [Any?])
     case 142:
-      return BmScanAdvertisement.fromList(self.readValue() as! [Any?])
+      return BmScanSettings.fromList(self.readValue() as! [Any?])
     case 143:
-      return BmBluetoothDevice.fromList(self.readValue() as! [Any?])
+      return BmScanAdvertisement.fromList(self.readValue() as! [Any?])
     case 144:
-      return BmBluetoothService.fromList(self.readValue() as! [Any?])
+      return BmBluetoothDevice.fromList(self.readValue() as! [Any?])
     case 145:
-      return BmBluetoothCharacteristic.fromList(self.readValue() as! [Any?])
+      return BmBluetoothService.fromList(self.readValue() as! [Any?])
     case 146:
-      return BmBluetoothDescriptor.fromList(self.readValue() as! [Any?])
+      return BmBluetoothCharacteristic.fromList(self.readValue() as! [Any?])
     case 147:
-      return BmCharacteristicProperties.fromList(self.readValue() as! [Any?])
+      return BmBluetoothDescriptor.fromList(self.readValue() as! [Any?])
     case 148:
-      return BmPhySupport.fromList(self.readValue() as! [Any?])
+      return BmCharacteristicProperties.fromList(self.readValue() as! [Any?])
     case 149:
-      return BmAdapterStateEvent.fromList(self.readValue() as! [Any?])
+      return BmPhySupport.fromList(self.readValue() as! [Any?])
     case 150:
-      return BmScanAdvertisementsEvent.fromList(self.readValue() as! [Any?])
+      return BmAdapterStateEvent.fromList(self.readValue() as! [Any?])
     case 151:
-      return BmScanFailedEvent.fromList(self.readValue() as! [Any?])
+      return BmScanAdvertisementsEvent.fromList(self.readValue() as! [Any?])
     case 152:
-      return BmConnectionStateEvent.fromList(self.readValue() as! [Any?])
+      return BmScanFailedEvent.fromList(self.readValue() as! [Any?])
     case 153:
-      return BmCharacteristicNotificationEvent.fromList(self.readValue() as! [Any?])
+      return BmConnectionStateEvent.fromList(self.readValue() as! [Any?])
     case 154:
-      return BmBondStateEvent.fromList(self.readValue() as! [Any?])
+      return BmCharacteristicNotificationEvent.fromList(self.readValue() as! [Any?])
     case 155:
-      return BmNameChangedEvent.fromList(self.readValue() as! [Any?])
+      return BmBondStateEvent.fromList(self.readValue() as! [Any?])
     case 156:
-      return BmServicesResetEvent.fromList(self.readValue() as! [Any?])
+      return BmNameChangedEvent.fromList(self.readValue() as! [Any?])
     case 157:
-      return BmMtuChangedEvent.fromList(self.readValue() as! [Any?])
+      return BmServicesResetEvent.fromList(self.readValue() as! [Any?])
     case 158:
+      return BmMtuChangedEvent.fromList(self.readValue() as! [Any?])
+    case 159:
       return BmDetachedFromEngineEvent.fromList(self.readValue() as! [Any?])
     default:
       return super.readValue(ofType: type)
@@ -1471,77 +1506,80 @@ private class MessagesPigeonCodecWriter: FlutterStandardWriter {
     } else if let value = value as? LogLevel {
       super.writeByte(134)
       super.writeValue(value.rawValue)
-    } else if let value = value as? BmAttributeId {
+    } else if let value = value as? FbpErrorCode {
       super.writeByte(135)
-      super.writeValue(value.toList())
-    } else if let value = value as? BmServiceRef {
+      super.writeValue(value.rawValue)
+    } else if let value = value as? BmAttributeId {
       super.writeByte(136)
       super.writeValue(value.toList())
-    } else if let value = value as? BmCharacteristicRef {
+    } else if let value = value as? BmServiceRef {
       super.writeByte(137)
       super.writeValue(value.toList())
-    } else if let value = value as? BmDescriptorRef {
+    } else if let value = value as? BmCharacteristicRef {
       super.writeByte(138)
       super.writeValue(value.toList())
-    } else if let value = value as? BmMsdFilter {
+    } else if let value = value as? BmDescriptorRef {
       super.writeByte(139)
       super.writeValue(value.toList())
-    } else if let value = value as? BmServiceDataFilter {
+    } else if let value = value as? BmMsdFilter {
       super.writeByte(140)
       super.writeValue(value.toList())
-    } else if let value = value as? BmScanSettings {
+    } else if let value = value as? BmServiceDataFilter {
       super.writeByte(141)
       super.writeValue(value.toList())
-    } else if let value = value as? BmScanAdvertisement {
+    } else if let value = value as? BmScanSettings {
       super.writeByte(142)
       super.writeValue(value.toList())
-    } else if let value = value as? BmBluetoothDevice {
+    } else if let value = value as? BmScanAdvertisement {
       super.writeByte(143)
       super.writeValue(value.toList())
-    } else if let value = value as? BmBluetoothService {
+    } else if let value = value as? BmBluetoothDevice {
       super.writeByte(144)
       super.writeValue(value.toList())
-    } else if let value = value as? BmBluetoothCharacteristic {
+    } else if let value = value as? BmBluetoothService {
       super.writeByte(145)
       super.writeValue(value.toList())
-    } else if let value = value as? BmBluetoothDescriptor {
+    } else if let value = value as? BmBluetoothCharacteristic {
       super.writeByte(146)
       super.writeValue(value.toList())
-    } else if let value = value as? BmCharacteristicProperties {
+    } else if let value = value as? BmBluetoothDescriptor {
       super.writeByte(147)
       super.writeValue(value.toList())
-    } else if let value = value as? BmPhySupport {
+    } else if let value = value as? BmCharacteristicProperties {
       super.writeByte(148)
       super.writeValue(value.toList())
-    } else if let value = value as? BmAdapterStateEvent {
+    } else if let value = value as? BmPhySupport {
       super.writeByte(149)
       super.writeValue(value.toList())
-    } else if let value = value as? BmScanAdvertisementsEvent {
+    } else if let value = value as? BmAdapterStateEvent {
       super.writeByte(150)
       super.writeValue(value.toList())
-    } else if let value = value as? BmScanFailedEvent {
+    } else if let value = value as? BmScanAdvertisementsEvent {
       super.writeByte(151)
       super.writeValue(value.toList())
-    } else if let value = value as? BmConnectionStateEvent {
+    } else if let value = value as? BmScanFailedEvent {
       super.writeByte(152)
       super.writeValue(value.toList())
-    } else if let value = value as? BmCharacteristicNotificationEvent {
+    } else if let value = value as? BmConnectionStateEvent {
       super.writeByte(153)
       super.writeValue(value.toList())
-    } else if let value = value as? BmBondStateEvent {
+    } else if let value = value as? BmCharacteristicNotificationEvent {
       super.writeByte(154)
       super.writeValue(value.toList())
-    } else if let value = value as? BmNameChangedEvent {
+    } else if let value = value as? BmBondStateEvent {
       super.writeByte(155)
       super.writeValue(value.toList())
-    } else if let value = value as? BmServicesResetEvent {
+    } else if let value = value as? BmNameChangedEvent {
       super.writeByte(156)
       super.writeValue(value.toList())
-    } else if let value = value as? BmMtuChangedEvent {
+    } else if let value = value as? BmServicesResetEvent {
       super.writeByte(157)
       super.writeValue(value.toList())
-    } else if let value = value as? BmDetachedFromEngineEvent {
+    } else if let value = value as? BmMtuChangedEvent {
       super.writeByte(158)
+      super.writeValue(value.toList())
+    } else if let value = value as? BmDetachedFromEngineEvent {
+      super.writeByte(159)
       super.writeValue(value.toList())
     } else {
       super.writeValue(value)

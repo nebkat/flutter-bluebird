@@ -137,6 +137,35 @@ enum LogLevel {
   verbose,
 }
 
+/// Single source of truth for error codes, shared by every platform.
+///
+/// Errors cross the channel as `PlatformException.code` *strings* (pigeon
+/// cannot type that field), so the wire form of each code is, by convention,
+/// the snake_case of its name here (e.g. [FbpErrorCode.deviceDisconnected]
+/// crosses as `"device_disconnected"`). Each language has a small `wire`
+/// helper implementing that convention; never hand-write a code string.
+enum FbpErrorCode {
+  success,
+  timeout,
+  platform,
+  serviceNotFound,
+  characteristicNotFound,
+  userRejected,
+  removeBondFailed,
+  gattError,
+  cbError,
+  deviceDisconnected,
+  adapterOff,
+  notConnected,
+  invalidIdentifier,
+  bondFailed,
+  userCanceled,
+  unsupported,
+  operationInProgress,
+  permissionDenied,
+  invalidArgument,
+}
+
 /// The universal uuid:instance pair identifying one attribute.
 class BmAttributeId {
   BmAttributeId({
@@ -1614,77 +1643,80 @@ class _PigeonCodec extends StandardMessageCodec {
     } else if (value is LogLevel) {
       buffer.putUint8(134);
       writeValue(buffer, value.index);
-    } else if (value is BmAttributeId) {
+    } else if (value is FbpErrorCode) {
       buffer.putUint8(135);
-      writeValue(buffer, value.encode());
-    } else if (value is BmServiceRef) {
+      writeValue(buffer, value.index);
+    } else if (value is BmAttributeId) {
       buffer.putUint8(136);
       writeValue(buffer, value.encode());
-    } else if (value is BmCharacteristicRef) {
+    } else if (value is BmServiceRef) {
       buffer.putUint8(137);
       writeValue(buffer, value.encode());
-    } else if (value is BmDescriptorRef) {
+    } else if (value is BmCharacteristicRef) {
       buffer.putUint8(138);
       writeValue(buffer, value.encode());
-    } else if (value is BmMsdFilter) {
+    } else if (value is BmDescriptorRef) {
       buffer.putUint8(139);
       writeValue(buffer, value.encode());
-    } else if (value is BmServiceDataFilter) {
+    } else if (value is BmMsdFilter) {
       buffer.putUint8(140);
       writeValue(buffer, value.encode());
-    } else if (value is BmScanSettings) {
+    } else if (value is BmServiceDataFilter) {
       buffer.putUint8(141);
       writeValue(buffer, value.encode());
-    } else if (value is BmScanAdvertisement) {
+    } else if (value is BmScanSettings) {
       buffer.putUint8(142);
       writeValue(buffer, value.encode());
-    } else if (value is BmBluetoothDevice) {
+    } else if (value is BmScanAdvertisement) {
       buffer.putUint8(143);
       writeValue(buffer, value.encode());
-    } else if (value is BmBluetoothService) {
+    } else if (value is BmBluetoothDevice) {
       buffer.putUint8(144);
       writeValue(buffer, value.encode());
-    } else if (value is BmBluetoothCharacteristic) {
+    } else if (value is BmBluetoothService) {
       buffer.putUint8(145);
       writeValue(buffer, value.encode());
-    } else if (value is BmBluetoothDescriptor) {
+    } else if (value is BmBluetoothCharacteristic) {
       buffer.putUint8(146);
       writeValue(buffer, value.encode());
-    } else if (value is BmCharacteristicProperties) {
+    } else if (value is BmBluetoothDescriptor) {
       buffer.putUint8(147);
       writeValue(buffer, value.encode());
-    } else if (value is BmPhySupport) {
+    } else if (value is BmCharacteristicProperties) {
       buffer.putUint8(148);
       writeValue(buffer, value.encode());
-    } else if (value is BmAdapterStateEvent) {
+    } else if (value is BmPhySupport) {
       buffer.putUint8(149);
       writeValue(buffer, value.encode());
-    } else if (value is BmScanAdvertisementsEvent) {
+    } else if (value is BmAdapterStateEvent) {
       buffer.putUint8(150);
       writeValue(buffer, value.encode());
-    } else if (value is BmScanFailedEvent) {
+    } else if (value is BmScanAdvertisementsEvent) {
       buffer.putUint8(151);
       writeValue(buffer, value.encode());
-    } else if (value is BmConnectionStateEvent) {
+    } else if (value is BmScanFailedEvent) {
       buffer.putUint8(152);
       writeValue(buffer, value.encode());
-    } else if (value is BmCharacteristicNotificationEvent) {
+    } else if (value is BmConnectionStateEvent) {
       buffer.putUint8(153);
       writeValue(buffer, value.encode());
-    } else if (value is BmBondStateEvent) {
+    } else if (value is BmCharacteristicNotificationEvent) {
       buffer.putUint8(154);
       writeValue(buffer, value.encode());
-    } else if (value is BmNameChangedEvent) {
+    } else if (value is BmBondStateEvent) {
       buffer.putUint8(155);
       writeValue(buffer, value.encode());
-    } else if (value is BmServicesResetEvent) {
+    } else if (value is BmNameChangedEvent) {
       buffer.putUint8(156);
       writeValue(buffer, value.encode());
-    } else if (value is BmMtuChangedEvent) {
+    } else if (value is BmServicesResetEvent) {
       buffer.putUint8(157);
       writeValue(buffer, value.encode());
-    } else if (value is BmDetachedFromEngineEvent) {
+    } else if (value is BmMtuChangedEvent) {
       buffer.putUint8(158);
+      writeValue(buffer, value.encode());
+    } else if (value is BmDetachedFromEngineEvent) {
+      buffer.putUint8(159);
       writeValue(buffer, value.encode());
     } else {
       super.writeValue(buffer, value);
@@ -1713,52 +1745,55 @@ class _PigeonCodec extends StandardMessageCodec {
         final value = readValue(buffer) as int?;
         return value == null ? null : LogLevel.values[value];
       case 135:
-        return BmAttributeId.decode(readValue(buffer)!);
+        final value = readValue(buffer) as int?;
+        return value == null ? null : FbpErrorCode.values[value];
       case 136:
-        return BmServiceRef.decode(readValue(buffer)!);
+        return BmAttributeId.decode(readValue(buffer)!);
       case 137:
-        return BmCharacteristicRef.decode(readValue(buffer)!);
+        return BmServiceRef.decode(readValue(buffer)!);
       case 138:
-        return BmDescriptorRef.decode(readValue(buffer)!);
+        return BmCharacteristicRef.decode(readValue(buffer)!);
       case 139:
-        return BmMsdFilter.decode(readValue(buffer)!);
+        return BmDescriptorRef.decode(readValue(buffer)!);
       case 140:
-        return BmServiceDataFilter.decode(readValue(buffer)!);
+        return BmMsdFilter.decode(readValue(buffer)!);
       case 141:
-        return BmScanSettings.decode(readValue(buffer)!);
+        return BmServiceDataFilter.decode(readValue(buffer)!);
       case 142:
-        return BmScanAdvertisement.decode(readValue(buffer)!);
+        return BmScanSettings.decode(readValue(buffer)!);
       case 143:
-        return BmBluetoothDevice.decode(readValue(buffer)!);
+        return BmScanAdvertisement.decode(readValue(buffer)!);
       case 144:
-        return BmBluetoothService.decode(readValue(buffer)!);
+        return BmBluetoothDevice.decode(readValue(buffer)!);
       case 145:
-        return BmBluetoothCharacteristic.decode(readValue(buffer)!);
+        return BmBluetoothService.decode(readValue(buffer)!);
       case 146:
-        return BmBluetoothDescriptor.decode(readValue(buffer)!);
+        return BmBluetoothCharacteristic.decode(readValue(buffer)!);
       case 147:
-        return BmCharacteristicProperties.decode(readValue(buffer)!);
+        return BmBluetoothDescriptor.decode(readValue(buffer)!);
       case 148:
-        return BmPhySupport.decode(readValue(buffer)!);
+        return BmCharacteristicProperties.decode(readValue(buffer)!);
       case 149:
-        return BmAdapterStateEvent.decode(readValue(buffer)!);
+        return BmPhySupport.decode(readValue(buffer)!);
       case 150:
-        return BmScanAdvertisementsEvent.decode(readValue(buffer)!);
+        return BmAdapterStateEvent.decode(readValue(buffer)!);
       case 151:
-        return BmScanFailedEvent.decode(readValue(buffer)!);
+        return BmScanAdvertisementsEvent.decode(readValue(buffer)!);
       case 152:
-        return BmConnectionStateEvent.decode(readValue(buffer)!);
+        return BmScanFailedEvent.decode(readValue(buffer)!);
       case 153:
-        return BmCharacteristicNotificationEvent.decode(readValue(buffer)!);
+        return BmConnectionStateEvent.decode(readValue(buffer)!);
       case 154:
-        return BmBondStateEvent.decode(readValue(buffer)!);
+        return BmCharacteristicNotificationEvent.decode(readValue(buffer)!);
       case 155:
-        return BmNameChangedEvent.decode(readValue(buffer)!);
+        return BmBondStateEvent.decode(readValue(buffer)!);
       case 156:
-        return BmServicesResetEvent.decode(readValue(buffer)!);
+        return BmNameChangedEvent.decode(readValue(buffer)!);
       case 157:
-        return BmMtuChangedEvent.decode(readValue(buffer)!);
+        return BmServicesResetEvent.decode(readValue(buffer)!);
       case 158:
+        return BmMtuChangedEvent.decode(readValue(buffer)!);
+      case 159:
         return BmDetachedFromEngineEvent.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);

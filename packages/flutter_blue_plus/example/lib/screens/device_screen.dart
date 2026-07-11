@@ -91,7 +91,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
       await widget.device.connectAndUpdateStream();
       Snackbar.show(ABC.c, "Connect: Success", success: true);
     } catch (e) {
-      if (e is FlutterBluePlusException && e.code == FbpErrorCode.connectionCanceled.index) {
+      if (e is FlutterBluePlusException && e.code == FbpErrorCode.userCanceled.index) {
         // ignore connections canceled by the user
       } else {
         Snackbar.show(ABC.c, prettyException("Connect Error:", e), success: false);

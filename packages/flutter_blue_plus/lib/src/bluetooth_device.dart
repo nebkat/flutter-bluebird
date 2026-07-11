@@ -67,7 +67,7 @@ class BluetoothDevice {
     if (isConnected) return;
     throw FlutterBluePlusException(
       functionName,
-      FbpErrorCode.deviceIsDisconnected,
+      FbpErrorCode.deviceDisconnected,
       "device is not connected",
     );
   }
@@ -344,7 +344,7 @@ class BluetoothDevice {
       if (!bonded) {
         throw FlutterBluePlusException(
           "createBond",
-          FbpErrorCode.createBondFailed,
+          FbpErrorCode.bondFailed,
           "Failed to create bond",
         );
       }

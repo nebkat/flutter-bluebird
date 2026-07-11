@@ -415,18 +415,13 @@ class FlutterBluePlus {
       try {
         return await invoke(FlutterBluePlusPlatform.instance);
       } on PlatformException catch (e) {
-        throw FlutterBluePlusException(e.code, _fbpCodeForPlatformError(e.code), e.message);
+        throw FlutterBluePlusException(e.code, _errorCodes[e.code] ?? FbpErrorCode.platform, e.message);
       }
     });
   }
 
-  static FbpErrorCode _fbpCodeForPlatformError(String code) => switch (code) {
-        "device_disconnected" => FbpErrorCode.deviceIsDisconnected,
-        "adapter_off" => FbpErrorCode.adapterIsOff,
-        "user_canceled" => FbpErrorCode.connectionCanceled,
-        "bond_failed" => FbpErrorCode.createBondFailed,
-        _ => FbpErrorCode.platform,
-      };
+  /// Wire-string -> [FbpErrorCode] lookup, built from the shared pigeon enum.
+  static final _errorCodes = {for (final c in FbpErrorCode.values) c.wire: c};
 
   /// Extract stream event
   @internal
@@ -583,18 +578,10 @@ class AdvertisementData {
   }
 }
 
-enum FbpErrorCode {
-  success,
-  timeout,
-  platform,
-  createBondFailed,
-  removeBondFailed,
-  deviceIsDisconnected,
-  serviceNotFound,
-  characteristicNotFound,
-  adapterIsOff,
-  connectionCanceled,
-  userRejected
+extension FbpErrorCodeWire on FbpErrorCode {
+  /// The wire form of this code: snake_case of the enum name — the
+  /// convention shared with the native implementations (see pigeons/messages.dart).
+  String get wire => name.replaceAllMapped(RegExp('[A-Z]'), (m) => '_${m[0]!.toLowerCase()}');
 }
 
 class FlutterBluePlusException implements Exception {

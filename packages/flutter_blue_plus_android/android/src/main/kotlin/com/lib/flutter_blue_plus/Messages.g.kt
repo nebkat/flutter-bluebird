@@ -270,6 +270,43 @@ enum class LogLevel(val raw: Int) {
 }
 
 /**
+ * Single source of truth for error codes, shared by every platform.
+ *
+ * Errors cross the channel as `PlatformException.code` *strings* (pigeon
+ * cannot type that field), so the wire form of each code is, by convention,
+ * the snake_case of its name here (e.g. [FbpErrorCode.deviceDisconnected]
+ * crosses as `"device_disconnected"`). Each language has a small `wire`
+ * helper implementing that convention; never hand-write a code string.
+ */
+enum class FbpErrorCode(val raw: Int) {
+  SUCCESS(0),
+  TIMEOUT(1),
+  PLATFORM(2),
+  SERVICE_NOT_FOUND(3),
+  CHARACTERISTIC_NOT_FOUND(4),
+  USER_REJECTED(5),
+  REMOVE_BOND_FAILED(6),
+  GATT_ERROR(7),
+  CB_ERROR(8),
+  DEVICE_DISCONNECTED(9),
+  ADAPTER_OFF(10),
+  NOT_CONNECTED(11),
+  INVALID_IDENTIFIER(12),
+  BOND_FAILED(13),
+  USER_CANCELED(14),
+  UNSUPPORTED(15),
+  OPERATION_IN_PROGRESS(16),
+  PERMISSION_DENIED(17),
+  INVALID_ARGUMENT(18);
+
+  companion object {
+    fun ofRaw(raw: Int): FbpErrorCode? {
+      return values().firstOrNull { it.raw == raw }
+    }
+  }
+}
+
+/**
  * The universal uuid:instance pair identifying one attribute.
  *
  * Generated class from Pigeon that represents data sent in messages.
@@ -1434,121 +1471,126 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
         }
       }
       135.toByte() -> {
-        return (readValue(buffer) as? List<Any?>)?.let {
-          BmAttributeId.fromList(it)
+        return (readValue(buffer) as Long?)?.let {
+          FbpErrorCode.ofRaw(it.toInt())
         }
       }
       136.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmServiceRef.fromList(it)
+          BmAttributeId.fromList(it)
         }
       }
       137.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmCharacteristicRef.fromList(it)
+          BmServiceRef.fromList(it)
         }
       }
       138.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmDescriptorRef.fromList(it)
+          BmCharacteristicRef.fromList(it)
         }
       }
       139.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmMsdFilter.fromList(it)
+          BmDescriptorRef.fromList(it)
         }
       }
       140.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmServiceDataFilter.fromList(it)
+          BmMsdFilter.fromList(it)
         }
       }
       141.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmScanSettings.fromList(it)
+          BmServiceDataFilter.fromList(it)
         }
       }
       142.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmScanAdvertisement.fromList(it)
+          BmScanSettings.fromList(it)
         }
       }
       143.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmBluetoothDevice.fromList(it)
+          BmScanAdvertisement.fromList(it)
         }
       }
       144.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmBluetoothService.fromList(it)
+          BmBluetoothDevice.fromList(it)
         }
       }
       145.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmBluetoothCharacteristic.fromList(it)
+          BmBluetoothService.fromList(it)
         }
       }
       146.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmBluetoothDescriptor.fromList(it)
+          BmBluetoothCharacteristic.fromList(it)
         }
       }
       147.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmCharacteristicProperties.fromList(it)
+          BmBluetoothDescriptor.fromList(it)
         }
       }
       148.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmPhySupport.fromList(it)
+          BmCharacteristicProperties.fromList(it)
         }
       }
       149.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmAdapterStateEvent.fromList(it)
+          BmPhySupport.fromList(it)
         }
       }
       150.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmScanAdvertisementsEvent.fromList(it)
+          BmAdapterStateEvent.fromList(it)
         }
       }
       151.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmScanFailedEvent.fromList(it)
+          BmScanAdvertisementsEvent.fromList(it)
         }
       }
       152.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmConnectionStateEvent.fromList(it)
+          BmScanFailedEvent.fromList(it)
         }
       }
       153.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmCharacteristicNotificationEvent.fromList(it)
+          BmConnectionStateEvent.fromList(it)
         }
       }
       154.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmBondStateEvent.fromList(it)
+          BmCharacteristicNotificationEvent.fromList(it)
         }
       }
       155.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmNameChangedEvent.fromList(it)
+          BmBondStateEvent.fromList(it)
         }
       }
       156.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmServicesResetEvent.fromList(it)
+          BmNameChangedEvent.fromList(it)
         }
       }
       157.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmMtuChangedEvent.fromList(it)
+          BmServicesResetEvent.fromList(it)
         }
       }
       158.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          BmMtuChangedEvent.fromList(it)
+        }
+      }
+      159.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
           BmDetachedFromEngineEvent.fromList(it)
         }
@@ -1582,100 +1624,104 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
         stream.write(134)
         writeValue(stream, value.raw.toLong())
       }
-      is BmAttributeId -> {
+      is FbpErrorCode -> {
         stream.write(135)
-        writeValue(stream, value.toList())
+        writeValue(stream, value.raw.toLong())
       }
-      is BmServiceRef -> {
+      is BmAttributeId -> {
         stream.write(136)
         writeValue(stream, value.toList())
       }
-      is BmCharacteristicRef -> {
+      is BmServiceRef -> {
         stream.write(137)
         writeValue(stream, value.toList())
       }
-      is BmDescriptorRef -> {
+      is BmCharacteristicRef -> {
         stream.write(138)
         writeValue(stream, value.toList())
       }
-      is BmMsdFilter -> {
+      is BmDescriptorRef -> {
         stream.write(139)
         writeValue(stream, value.toList())
       }
-      is BmServiceDataFilter -> {
+      is BmMsdFilter -> {
         stream.write(140)
         writeValue(stream, value.toList())
       }
-      is BmScanSettings -> {
+      is BmServiceDataFilter -> {
         stream.write(141)
         writeValue(stream, value.toList())
       }
-      is BmScanAdvertisement -> {
+      is BmScanSettings -> {
         stream.write(142)
         writeValue(stream, value.toList())
       }
-      is BmBluetoothDevice -> {
+      is BmScanAdvertisement -> {
         stream.write(143)
         writeValue(stream, value.toList())
       }
-      is BmBluetoothService -> {
+      is BmBluetoothDevice -> {
         stream.write(144)
         writeValue(stream, value.toList())
       }
-      is BmBluetoothCharacteristic -> {
+      is BmBluetoothService -> {
         stream.write(145)
         writeValue(stream, value.toList())
       }
-      is BmBluetoothDescriptor -> {
+      is BmBluetoothCharacteristic -> {
         stream.write(146)
         writeValue(stream, value.toList())
       }
-      is BmCharacteristicProperties -> {
+      is BmBluetoothDescriptor -> {
         stream.write(147)
         writeValue(stream, value.toList())
       }
-      is BmPhySupport -> {
+      is BmCharacteristicProperties -> {
         stream.write(148)
         writeValue(stream, value.toList())
       }
-      is BmAdapterStateEvent -> {
+      is BmPhySupport -> {
         stream.write(149)
         writeValue(stream, value.toList())
       }
-      is BmScanAdvertisementsEvent -> {
+      is BmAdapterStateEvent -> {
         stream.write(150)
         writeValue(stream, value.toList())
       }
-      is BmScanFailedEvent -> {
+      is BmScanAdvertisementsEvent -> {
         stream.write(151)
         writeValue(stream, value.toList())
       }
-      is BmConnectionStateEvent -> {
+      is BmScanFailedEvent -> {
         stream.write(152)
         writeValue(stream, value.toList())
       }
-      is BmCharacteristicNotificationEvent -> {
+      is BmConnectionStateEvent -> {
         stream.write(153)
         writeValue(stream, value.toList())
       }
-      is BmBondStateEvent -> {
+      is BmCharacteristicNotificationEvent -> {
         stream.write(154)
         writeValue(stream, value.toList())
       }
-      is BmNameChangedEvent -> {
+      is BmBondStateEvent -> {
         stream.write(155)
         writeValue(stream, value.toList())
       }
-      is BmServicesResetEvent -> {
+      is BmNameChangedEvent -> {
         stream.write(156)
         writeValue(stream, value.toList())
       }
-      is BmMtuChangedEvent -> {
+      is BmServicesResetEvent -> {
         stream.write(157)
         writeValue(stream, value.toList())
       }
-      is BmDetachedFromEngineEvent -> {
+      is BmMtuChangedEvent -> {
         stream.write(158)
+        writeValue(stream, value.toList())
+      }
+      is BmDetachedFromEngineEvent -> {
+        stream.write(159)
         writeValue(stream, value.toList())
       }
       else -> super.writeValue(stream, value)

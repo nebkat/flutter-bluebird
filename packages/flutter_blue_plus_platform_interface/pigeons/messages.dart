@@ -61,6 +61,36 @@ enum LogLevel {
   verbose,
 }
 
+/// Single source of truth for error codes, shared by every platform.
+///
+/// Errors cross the channel as `PlatformException.code` *strings* (pigeon
+/// cannot type that field), so the wire form of each code is, by convention,
+/// the snake_case of its name here (e.g. [FbpErrorCode.deviceDisconnected]
+/// crosses as `"device_disconnected"`). Each language has a small `wire`
+/// helper implementing that convention; never hand-write a code string.
+enum FbpErrorCode {
+  success,
+  timeout,
+  platform,
+  serviceNotFound,
+  characteristicNotFound,
+  userRejected,
+  removeBondFailed,
+  // codes emitted by the native implementations:
+  gattError,
+  cbError,
+  deviceDisconnected,
+  adapterOff,
+  notConnected,
+  invalidIdentifier,
+  bondFailed,
+  userCanceled,
+  unsupported,
+  operationInProgress,
+  permissionDenied,
+  invalidArgument,
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Attribute references
 //

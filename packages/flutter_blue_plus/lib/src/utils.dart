@@ -3,6 +3,7 @@ import 'dart:core';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_blue_plus_platform_interface/flutter_blue_plus_platform_interface.dart';
 
 import 'bluetooth_device.dart';
 import 'bluetooth_utils.dart';
@@ -47,7 +48,7 @@ extension FutureTimeout<T> on Future<T> {
       if (event == BluetoothConnectionState.disconnected) {
         if (!completer.isCompleted) {
           completer.completeError(
-            FlutterBluePlusException(function, FbpErrorCode.deviceIsDisconnected, "Device is disconnected"),
+            FlutterBluePlusException(function, FbpErrorCode.deviceDisconnected, "Device is disconnected"),
           );
         }
       }
@@ -80,7 +81,7 @@ extension FutureTimeout<T> on Future<T> {
         if (!completer.isCompleted) {
           completer.completeError(FlutterBluePlusException(
             function,
-            FbpErrorCode.adapterIsOff,
+            FbpErrorCode.adapterOff,
             "Bluetooth adapter is off",
           ));
         }
