@@ -19,10 +19,10 @@ class BluetoothDescriptor extends BluetoothAttribute {
 
   /// Retrieves the value of a specified descriptor
   Future<List<int>> read({Duration timeout = const Duration(seconds: 15)}) =>
-      device.op("readDescriptor", (p) => p.readDescriptor(device.remoteId, bm), timeout: timeout);
+      device.invoke("readDescriptor", (p) => p.readDescriptor(device.remoteId, bm), timeout: timeout);
 
   /// Writes the value of a descriptor
-  Future<void> write(List<int> value, {Duration timeout = const Duration(seconds: 15)}) => device.op(
+  Future<void> write(List<int> value, {Duration timeout = const Duration(seconds: 15)}) => device.invoke(
       "writeDescriptor", (p) => p.writeDescriptor(device.remoteId, bm, Uint8List.fromList(value)),
       timeout: timeout);
 

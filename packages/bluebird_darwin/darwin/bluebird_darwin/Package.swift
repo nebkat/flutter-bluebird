@@ -6,8 +6,8 @@ import PackageDescription
 let package = Package(
     name: "bluebird_darwin",
     platforms: [
-        .iOS("12.0"),
-        .macOS("10.14"),
+        .iOS("13.0"),
+        .macOS("10.15"),
     ],
     products: [
         .library(name: "bluebird-darwin", targets: ["bluebird_darwin"])

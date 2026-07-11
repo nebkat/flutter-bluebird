@@ -13,6 +13,26 @@ import Foundation
   import FlutterMacOS
 #endif
 
+/// One case per kind of in-flight GATT operation. Operations that target an
+/// attribute carry its canonical ref, because CoreBluetooth correlates
+/// delegate callbacks by attribute only.
+enum GattOp: Equatable {
+  case readChar(BmCharacteristicRef)
+  case writeChar(BmCharacteristicRef)
+  case setNotify(BmCharacteristicRef)
+  case readDesc(BmDescriptorRef)
+  case writeDesc(BmDescriptorRef)
+  case discoverServices
+  case readRssi
+}
+
+/// The in-flight GATT operation of a device: which kind it is (so delegate
+/// callbacks can match it) and the continuation to resume with its result.
+struct PendingGatt {
+  let kind: GattOp
+  let continuation: CheckedContinuation<Any?, Error>
+}
+
 /// Per-device state for a peripheral we are connecting to or connected to.
 /// Mirrors the Android side's DeviceConnection.
 final class PeripheralState {
@@ -29,12 +49,57 @@ final class PeripheralState {
   var servicesToDiscover: [CBService] = []
   var characteristicsToDiscover: [CBCharacteristic] = []
 
+  // In-flight operations, one slot per concurrency class. CoreBluetooth
+  // correlates results only by attribute on a shared delegate, and the Dart
+  // layer serializes operations, so a single in-flight GATT slot suffices;
+  // `kind` lets delegate callbacks match (e.g. a notification must not
+  // resume a pending read). The take* helpers clear a slot before resuming
+  // it, guaranteeing exactly-once resumption.
+  var pendingConnect: CheckedContinuation<Void, Error>?
+  var pendingDisconnect: CheckedContinuation<Void, Error>?
+  var pendingGatt: PendingGatt?
+
   init(_ peripheral: CBPeripheral) { self.peripheral = peripheral }
 
   func clearDiscoveryState() {
     discoveredServices = []
     servicesToDiscover = []
     characteristicsToDiscover = []
+  }
+
+  /// Removes and returns the pending GATT operation, if any, but only if
+  /// `matching` accepts its kind.
+  func takeGatt(matching: (GattOp) -> Bool = { _ in true }) -> PendingGatt? {
+    guard let pending = pendingGatt, matching(pending.kind) else { return nil }
+    pendingGatt = nil
+    return pending
+  }
+
+  /// Removes and returns the pending connect continuation, if any.
+  func takeConnect() -> CheckedContinuation<Void, Error>? {
+    defer { pendingConnect = nil }
+    return pendingConnect
+  }
+
+  /// Removes and returns the pending disconnect continuation, if any.
+  func takeDisconnect() -> CheckedContinuation<Void, Error>? {
+    defer { pendingDisconnect = nil }
+    return pendingDisconnect
+  }
+
+  /// Fails every pending operation on this device (device disconnected or
+  /// adapter turned off).
+  func failAllPending(_ error: Error) {
+    takeGatt()?.continuation.resume(throwing: error)
+    takeConnect()?.resume(throwing: error)
+    takeDisconnect()?.resume(throwing: error)
+  }
+
+  /// Hot restart / engine detach: resumes every slot with CancellationError
+  /// so the launch wrapper drops the pigeon completion without invoking it
+  /// (the dart side no longer exists).
+  func cancelAllPending() {
+    failAllPending(CancellationError())
   }
 }
 
@@ -57,8 +122,6 @@ public class BluebirdPlugin: NSObject, FlutterPlugin, CBCentralManagerDelegate,
   /// Per-device state, keyed by device address. Only devices currently
   /// connecting or connected have an entry.
   private var peripherals: [String: PeripheralState] = [:]
-
-  private let pending = PendingOperations()
 
   // scanning
   private var scanSettings: BmScanSettings?
@@ -92,7 +155,7 @@ public class BluebirdPlugin: NSObject, FlutterPlugin, CBCentralManagerDelegate,
   #if os(iOS)
     public func detachFromEngine(for registrar: FlutterPluginRegistrar) {
       log(.debug, "detachFromEngine")
-      pending.clearAll()
+      peripherals.values.forEach { $0.cancelAllPending() }
       sink?.success(BmDetachedFromEngineEvent())
       sink?.endOfStream()
       sink = nil
@@ -160,17 +223,140 @@ public class BluebirdPlugin: NSObject, FlutterPlugin, CBCentralManagerDelegate,
     }
   }
 
-  /// Completes a pending operation from a delegate callback: failure with the
-  /// wrapped CoreBluetooth error, or success with `success()`.
-  private func complete<T>(
-    _ completion: ((Result<T, Error>) -> Void)?, _ error: Error?, success: @autoclosure () -> T
+  /// Runs `body` on the main actor and reports its result through the pigeon
+  /// `completion`. A CancellationError (hot restart / engine detach) drops the
+  /// completion without invoking it — the dart side no longer exists.
+  ///
+  /// CBCentralManager uses queue nil (main) and pigeon calls arrive on main,
+  /// so @MainActor keeps the single-threaded model.
+  private func launch<T>(
+    _ completion: @escaping (Result<T, Error>) -> Void,
+    _ body: @escaping @MainActor () async throws -> T
   ) {
-    guard let completion else { return }
-    if let error {
-      completion(.failure(cbError(error)))
-    } else {
-      completion(.success(success()))
+    Task { @MainActor in
+      do {
+        completion(.success(try await body()))
+      } catch is CancellationError {
+        // hot restart / detach: drop without invoking
+      } catch {
+        completion(.failure(error))
+      }
     }
+  }
+
+  /// The state for `address`, if currently connected; throws not_connected
+  /// otherwise.
+  private func requireConnectedState(_ address: String) throws -> PeripheralState {
+    guard let state = peripherals[address], state.connection == .connected else {
+      throw notConnectedError()
+    }
+    return state
+  }
+
+  /// The canonical ref for `chr`, so the delegate callback finds the slot.
+  private func canonicalRef(_ chr: CBCharacteristic, in peripheral: CBPeripheral)
+    throws -> BmCharacteristicRef
+  {
+    guard let ref = characteristicRef(for: chr, in: peripheral) else { throw notConnectedError() }
+    return ref
+  }
+
+  /// The canonical ref for `desc`, so the delegate callback finds the slot.
+  private func canonicalRef(_ desc: CBDescriptor, in peripheral: CBPeripheral)
+    throws -> BmDescriptorRef
+  {
+    guard let ref = descriptorRef(for: desc, in: peripheral) else { throw notConnectedError() }
+    return ref
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Pending-operation slots
+  // ───────────────────────────────────────────────────────────────────────────
+
+  /// Occupies the device's GATT slot with `kind`, runs `start`, then suspends
+  /// until a delegate callback resumes the operation.
+  ///
+  /// Throws operation_in_progress immediately if the slot is occupied. If
+  /// `start` throws, the slot is rolled back and the error propagates.
+  @MainActor
+  private func awaitGatt<T>(
+    _ state: PeripheralState, _ kind: GattOp, start: () throws -> Void
+  ) async throws -> T {
+    let value = try await withCheckedThrowingContinuation {
+      (continuation: CheckedContinuation<Any?, Error>) in
+      guard state.pendingGatt == nil else {
+        continuation.resume(throwing: operationInProgressError())
+        return
+      }
+      state.pendingGatt = PendingGatt(kind: kind, continuation: continuation)
+
+      do {
+        try start()
+      } catch {
+        // roll back the slot (unless something already resumed it)
+        // and propagate the error
+        state.takeGatt { $0 == kind }?.continuation.resume(throwing: error)
+      }
+    }
+    return value as! T
+  }
+
+  /// Occupies the device's connect slot, runs `start`, then suspends until a
+  /// delegate callback resumes the operation. Same contract as `awaitGatt`.
+  @MainActor
+  private func awaitConnect(_ state: PeripheralState, start: () throws -> Void) async throws {
+    try await withCheckedThrowingContinuation {
+      (continuation: CheckedContinuation<Void, Error>) in
+      guard state.pendingConnect == nil else {
+        continuation.resume(throwing: operationInProgressError())
+        return
+      }
+      state.pendingConnect = continuation
+
+      do {
+        try start()
+      } catch {
+        state.takeConnect()?.resume(throwing: error)
+      }
+    }
+  }
+
+  /// Occupies the device's disconnect slot, runs `start`, then suspends until
+  /// a delegate callback resumes the operation. Same contract as `awaitGatt`.
+  @MainActor
+  private func awaitDisconnect(_ state: PeripheralState, start: () throws -> Void) async throws {
+    try await withCheckedThrowingContinuation {
+      (continuation: CheckedContinuation<Void, Error>) in
+      guard state.pendingDisconnect == nil else {
+        continuation.resume(throwing: operationInProgressError())
+        return
+      }
+      state.pendingDisconnect = continuation
+
+      do {
+        try start()
+      } catch {
+        state.takeDisconnect()?.resume(throwing: error)
+      }
+    }
+  }
+
+  /// Completes the device's pending GATT operation from a delegate callback,
+  /// but only if `matching` accepts its kind: failure with the wrapped
+  /// CoreBluetooth error, or success with `success()`.
+  /// Returns false if no such operation was in flight.
+  @discardableResult
+  private func completeGatt(
+    _ state: PeripheralState?, matching: (GattOp) -> Bool,
+    error: Error?, success: @autoclosure () -> Any?
+  ) -> Bool {
+    guard let pending = state?.takeGatt(matching: matching) else { return false }
+    if let error {
+      pending.continuation.resume(throwing: cbError(error))
+    } else {
+      pending.continuation.resume(returning: success())
+    }
+    return true
   }
 
   /// if allowLongWrite is disabled, we can only write up to MTU-3
@@ -255,11 +441,13 @@ public class BluebirdPlugin: NSObject, FlutterPlugin, CBCentralManagerDelegate,
             disconnectReasonCode: Self.adapterOffDisconnectCode,
             disconnectReasonString: "Bluetooth turned off"))
       }
+      let states = Array(peripherals.values)
       peripherals.removeAll()
       stopMtuPollingIfIdle()
 
-      pending.failAll(
-        error: PigeonError(code: BluebirdErrorCode.adapterOff.wire, message: "the adapter is turned off", details: nil))
+      let error = PigeonError(
+        code: BluebirdErrorCode.adapterOff.wire, message: "the adapter is turned off", details: nil)
+      states.forEach { $0.failAllPending(error) }
     }
   }
 
@@ -350,7 +538,7 @@ public class BluebirdPlugin: NSObject, FlutterPlugin, CBCentralManagerDelegate,
     // register self as delegate for peripheral
     peripheral.delegate = self
 
-    pending.connect.take(address)?(.success(()))
+    state.takeConnect()?.resume(returning: ())
 
     sink?.success(BmConnectionStateEvent(address: address, connectionState: .connected))
 
@@ -371,14 +559,15 @@ public class BluebirdPlugin: NSObject, FlutterPlugin, CBCentralManagerDelegate,
     log(.error, "didFailToConnectPeripheral: \(error?.localizedDescription ?? "")")
 
     let address = peripheral.identifier.uuidString
-    if peripherals[address]?.connection == .connecting {
+    let state = peripherals[address]
+    if state?.connection == .connecting {
       peripherals.removeValue(forKey: address)
     }
 
     let failure =
       error.map(cbError)
       ?? PigeonError(code: BluebirdErrorCode.cbError.wire, message: "failed to connect", details: nil)
-    pending.connect.take(address)?(.failure(failure))
+    state?.takeConnect()?.resume(throwing: failure)
   }
 
   public func centralManager(
@@ -394,23 +583,22 @@ public class BluebirdPlugin: NSObject, FlutterPlugin, CBCentralManagerDelegate,
 
     let address = peripheral.identifier.uuidString
 
-    peripherals.removeValue(forKey: address)
+    let state = peripherals.removeValue(forKey: address)
     stopMtuPollingIfIdle()
 
     // unregister self as delegate for peripheral
     peripheral.delegate = nil
 
-    pending.disconnect.take(address)?(.success(()))
+    state?.takeDisconnect()?.resume(returning: ())
 
     // a pending connect means the connection was canceled or failed
-    if let connect = pending.connect.take(address) {
-      let failure =
-        error.map(cbError)
-        ?? PigeonError(code: BluebirdErrorCode.userCanceled.wire, message: "connection canceled", details: nil)
-      connect(.failure(failure))
-    }
+    state?.takeConnect()?.resume(
+      throwing: error.map(cbError)
+        ?? PigeonError(
+          code: BluebirdErrorCode.userCanceled.wire, message: "connection canceled", details: nil))
 
-    pending.failAllForDevice(address, error: deviceDisconnectedError())
+    // fail whatever GATT operation was still in flight
+    state?.failAllPending(deviceDisconnectedError())
 
     sink?.success(
       BmConnectionStateEvent(
@@ -431,8 +619,10 @@ public class BluebirdPlugin: NSObject, FlutterPlugin, CBCentralManagerDelegate,
   private func failDiscoveryIfNeeded(_ name: String, _ address: String, _ error: Error?) -> Bool {
     guard let error else { return false }
     log(.error, "\(name): \(error.localizedDescription)")
-    peripherals[address]?.clearDiscoveryState()
-    pending.discover.take(address)?(.failure(cbError(error)))
+    if let state = peripherals[address] {
+      state.clearDiscoveryState()
+      state.takeGatt { $0 == .discoverServices }?.continuation.resume(throwing: cbError(error))
+    }
     return true
   }
 
@@ -526,18 +716,18 @@ public class BluebirdPlugin: NSObject, FlutterPlugin, CBCentralManagerDelegate,
     maybeCompleteDiscovery(peripheral)
   }
 
-  /// Completes the pending discoverServices call once every service has
+  /// Resumes the pending discoverServices call once every service has
   /// reported its characteristics and every characteristic its descriptors.
   private func maybeCompleteDiscovery(_ peripheral: CBPeripheral) {
     let address = peripheral.identifier.uuidString
 
     guard let state = peripherals[address],
       state.servicesToDiscover.isEmpty,
-      state.characteristicsToDiscover.isEmpty,
-      let complete = pending.discover.take(address)
+      state.characteristicsToDiscover.isEmpty
     else { return }
 
-    complete(.success(state.discoveredServices.map { bmBluetoothService($0, in: peripheral) }))
+    state.takeGatt { $0 == .discoverServices }?.continuation.resume(
+      returning: state.discoveredServices.map { bmBluetoothService($0, in: peripheral) })
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -554,12 +744,13 @@ public class BluebirdPlugin: NSObject, FlutterPlugin, CBCentralManagerDelegate,
 
     let address = peripheral.identifier.uuidString
     guard let ref = characteristicRef(for: characteristic, in: peripheral) else { return }
-    let key = DeviceOpKey(address: address, ref: ref)
 
-    if let read = pending.charRead.take(key) {
-      // a pending read exists: this is the read response
-      complete(read, error, success: FlutterStandardTypedData(bytes: characteristic.value ?? Data()))
-    } else if error == nil {
+    // a pending read consumes this callback as the read response
+    let wasPendingRead = completeGatt(
+      peripherals[address], matching: { $0 == .readChar(ref) }, error: error,
+      success: FlutterStandardTypedData(bytes: characteristic.value ?? Data()))
+
+    if !wasPendingRead && error == nil {
       // otherwise it's a notification / indication
       sink?.success(
         BmCharacteristicNotificationEvent(
@@ -580,7 +771,8 @@ public class BluebirdPlugin: NSObject, FlutterPlugin, CBCentralManagerDelegate,
     let address = peripheral.identifier.uuidString
     guard let ref = characteristicRef(for: characteristic, in: peripheral) else { return }
 
-    complete(pending.charWrite.take(DeviceOpKey(address: address, ref: ref)), error, success: ())
+    completeGatt(
+      peripherals[address], matching: { $0 == .writeChar(ref) }, error: error, success: () as Any)
   }
 
   public func peripheral(
@@ -593,8 +785,8 @@ public class BluebirdPlugin: NSObject, FlutterPlugin, CBCentralManagerDelegate,
     let address = peripheral.identifier.uuidString
     guard let ref = characteristicRef(for: characteristic, in: peripheral) else { return }
 
-    complete(
-      pending.setNotify.take(DeviceOpKey(address: address, ref: ref)), error,
+    completeGatt(
+      peripherals[address], matching: { $0 == .setNotify(ref) }, error: error,
       success: characteristic.isNotifying)
   }
 
@@ -608,8 +800,8 @@ public class BluebirdPlugin: NSObject, FlutterPlugin, CBCentralManagerDelegate,
     let address = peripheral.identifier.uuidString
     guard let ref = descriptorRef(for: descriptor, in: peripheral) else { return }
 
-    complete(
-      pending.descRead.take(DeviceOpKey(address: address, ref: ref)), error,
+    completeGatt(
+      peripherals[address], matching: { $0 == .readDesc(ref) }, error: error,
       success: FlutterStandardTypedData(bytes: descriptorValueData(descriptor)))
   }
 
@@ -623,14 +815,17 @@ public class BluebirdPlugin: NSObject, FlutterPlugin, CBCentralManagerDelegate,
     let address = peripheral.identifier.uuidString
     guard let ref = descriptorRef(for: descriptor, in: peripheral) else { return }
 
-    complete(pending.descWrite.take(DeviceOpKey(address: address, ref: ref)), error, success: ())
+    completeGatt(
+      peripherals[address], matching: { $0 == .writeDesc(ref) }, error: error, success: () as Any)
   }
 
   public func peripheral(_ peripheral: CBPeripheral, didReadRSSI RSSI: NSNumber, error: Error?) {
     logResult("didReadRSSI", error, "\(RSSI)")
 
     let address = peripheral.identifier.uuidString
-    complete(pending.rssi.take(address), error, success: Int64(truncating: RSSI))
+    completeGatt(
+      peripherals[address], matching: { $0 == .readRssi }, error: error,
+      success: Int64(truncating: RSSI))
   }
 
   public func peripheralDidUpdateName(_ peripheral: CBPeripheral) {
@@ -667,7 +862,7 @@ extension BluebirdPlugin: BluebirdHostApi {
     }
 
     // all dart state is reset after a hot restart, so reset native state too
-    pending.clearAll()
+    peripherals.values.forEach { $0.cancelAllPending() }
     peripherals.values.forEach { $0.clearDiscoveryState() }
     scanSettings = nil
     scanCounts.removeAll()
@@ -684,6 +879,9 @@ extension BluebirdPlugin: BluebirdHostApi {
 
     log(.debug, "connectedPeripherals: \(connectedPeripheralCount)")
 
+    // note: `peripherals` entries are also intentionally retained here: the
+    // didDisconnectPeripheral callbacks remove them one by one, which is what
+    // drives the connectedCount hot-restart handshake polled by the Dart side.
     // note: we do *not* clear knownPeripherals, otherwise the peripherals
     // would lose their last strong reference and didDisconnectPeripheral
     // would never be called
@@ -718,12 +916,14 @@ extension BluebirdPlugin: BluebirdHostApi {
   }
 
   func getAdapterName(completion: @escaping (Result<String, Error>) -> Void) {
-    ensureCentralManager()
-    #if os(iOS)
-      completion(.success(UIDevice.current.name))
-    #else
-      completion(.success(Host.current().localizedName ?? "Mac Bluetooth Adapter"))
-    #endif
+    launch(completion) { [self] in
+      ensureCentralManager()
+      #if os(iOS)
+        return UIDevice.current.name
+      #else
+        return Host.current().localizedName ?? "Mac Bluetooth Adapter"
+      #endif
+    }
   }
 
   func getAdapterState() throws -> BmAdapterStateEnum {
@@ -732,43 +932,46 @@ extension BluebirdPlugin: BluebirdHostApi {
   }
 
   func turnOn(completion: @escaping (Result<Bool, Error>) -> Void) {
-    completion(.failure(unsupportedError("iOS & macOS do not support turning on bluetooth")))
+    launch(completion) {
+      throw unsupportedError("iOS & macOS do not support turning on bluetooth")
+    }
   }
 
   func turnOff(completion: @escaping (Result<Bool, Error>) -> Void) {
-    completion(.failure(unsupportedError("iOS & macOS do not support turning off bluetooth")))
+    launch(completion) {
+      throw unsupportedError("iOS & macOS do not support turning off bluetooth")
+    }
   }
 
   func startScan(settings: BmScanSettings, completion: @escaping (Result<Void, Error>) -> Void) {
-    let central = ensureCentralManager()
+    launch(completion) { [self] in
+      let central = ensureCentralManager()
 
-    guard isAdapterOn else {
-      completion(.failure(adapterOffError(central.state)))
-      return
+      guard isAdapterOn else {
+        throw adapterOffError(central.state)
+      }
+
+      // remember this for later
+      scanSettings = settings
+      scanCounts.removeAll()
+
+      var scanOpts: [String: Any] = [:]
+      if settings.continuousUpdates {
+        scanOpts[CBCentralManagerScanOptionAllowDuplicatesKey] = true
+      }
+
+      // If any custom filter is set then we cannot filter by services.
+      // Why? An advertisement can match either the service filter *or* the
+      // custom filter. It does not have to match both. So we cannot have
+      // iOS & macOS filtering out any advertisements.
+      var services: [CBUUID] = []
+      if !ScanFilters.hasCustomFilters(settings) {
+        services = settings.withServices.map { CBUUID(string: $0) }
+      }
+
+      central.scanForPeripherals(
+        withServices: services.isEmpty ? nil : services, options: scanOpts)
     }
-
-    // remember this for later
-    scanSettings = settings
-    scanCounts.removeAll()
-
-    var scanOpts: [String: Any] = [:]
-    if settings.continuousUpdates {
-      scanOpts[CBCentralManagerScanOptionAllowDuplicatesKey] = true
-    }
-
-    // If any custom filter is set then we cannot filter by services.
-    // Why? An advertisement can match either the service filter *or* the
-    // custom filter. It does not have to match both. So we cannot have
-    // iOS & macOS filtering out any advertisements.
-    var services: [CBUUID] = []
-    if !ScanFilters.hasCustomFilters(settings) {
-      services = settings.withServices.map { CBUUID(string: $0) }
-    }
-
-    central.scanForPeripherals(
-      withServices: services.isEmpty ? nil : services, options: scanOpts)
-
-    completion(.success(()))
   }
 
   func stopScan() throws {
@@ -778,120 +981,129 @@ extension BluebirdPlugin: BluebirdHostApi {
   func getSystemDevices(
     withServices: [String], completion: @escaping (Result<[BmBluetoothDevice], Error>) -> Void
   ) {
-    let central = ensureCentralManager()
-    let services = withServices.map { CBUUID(string: $0) }
+    launch(completion) { [self] in
+      let central = ensureCentralManager()
+      let services = withServices.map { CBUUID(string: $0) }
 
-    // this returns devices connected by *any* app
-    let peripherals = central.retrieveConnectedPeripherals(withServices: services)
+      // this returns devices connected by *any* app
+      let peripherals = central.retrieveConnectedPeripherals(withServices: services)
 
-    completion(.success(peripherals.map { bmBluetoothDevice($0) }))
+      return peripherals.map { bmBluetoothDevice($0) }
+    }
   }
 
   func getBondedDevices(completion: @escaping (Result<[BmBluetoothDevice], Error>) -> Void) {
-    completion(.failure(unsupportedError("android only")))
+    launch(completion) {
+      throw unsupportedError("android only")
+    }
   }
 
   func connect(address: String, completion: @escaping (Result<Void, Error>) -> Void) {
-    let central = ensureCentralManager()
+    launch(completion) { [self] in
+      let central = ensureCentralManager()
 
-    guard isAdapterOn else {
-      completion(.failure(adapterOffError(central.state)))
-      return
+      guard isAdapterOn else {
+        throw adapterOffError(central.state)
+      }
+
+      // already connected?
+      if connectedPeripheral(address) != nil {
+        log(.debug, "already connected")
+        return
+      }
+
+      // reuse the connecting state if a connection is already in flight —
+      // its occupied slot makes awaitConnect throw operation_in_progress
+      let state: PeripheralState
+      if let existing = peripherals[address] {
+        state = existing
+      } else {
+        guard let uuid = UUID(uuidString: address) else {
+          throw PigeonError(
+            code: BluebirdErrorCode.invalidIdentifier.wire, message: "invalid remoteId",
+            details: address)
+        }
+
+        // check the devices iOS knows about
+        guard
+          let peripheral = central.retrievePeripherals(withIdentifiers: [uuid])
+            .first(where: { $0.identifier.uuidString == address })
+        else {
+          throw PigeonError(
+            code: BluebirdErrorCode.invalidIdentifier.wire, message: "peripheral not found",
+            details: address)
+        }
+
+        // we must keep a strong reference to any CBPeripheral before we connect
+        // to it. CoreBluetooth does not keep strong references itself.
+        knownPeripherals[address] = peripheral
+
+        // set ourself as delegate
+        peripheral.delegate = self
+
+        state = PeripheralState(peripheral)
+        peripherals[address] = state
+      }
+
+      return try await awaitConnect(state) {
+        central.connect(state.peripheral, options: nil)
+      }
     }
-
-    // already connected?
-    if connectedPeripheral(address) != nil {
-      log(.debug, "already connected")
-      completion(.success(()))
-      return
-    }
-
-    guard pending.connect.register(address, completion) else { return }
-
-    guard let uuid = UUID(uuidString: address) else {
-      pending.connect.take(address)?(
-        .failure(
-          PigeonError(code: BluebirdErrorCode.invalidIdentifier.wire, message: "invalid remoteId", details: address)))
-      return
-    }
-
-    // check the devices iOS knows about
-    guard
-      let peripheral = central.retrievePeripherals(withIdentifiers: [uuid])
-        .first(where: { $0.identifier.uuidString == address })
-    else {
-      pending.connect.take(address)?(
-        .failure(
-          PigeonError(
-            code: BluebirdErrorCode.invalidIdentifier.wire, message: "peripheral not found", details: address)))
-      return
-    }
-
-    // we must keep a strong reference to any CBPeripheral before we connect
-    // to it. CoreBluetooth does not keep strong references itself.
-    knownPeripherals[address] = peripheral
-
-    // set ourself as delegate
-    peripheral.delegate = self
-
-    peripherals[address] = PeripheralState(peripheral)
-    central.connect(peripheral, options: nil)
   }
 
   func disconnect(address: String, completion: @escaping (Result<Void, Error>) -> Void) {
-    let central = ensureCentralManager()
+    launch(completion) { [self] in
+      let central = ensureCentralManager()
 
-    // connection still in progress? cancel it
-    if let state = peripherals[address], state.connection == .connecting {
-      peripherals.removeValue(forKey: address)
-      log(.debug, "disconnect: cancelling connection in progress")
-      central.cancelPeripheralConnection(state.peripheral)
+      // connection still in progress? cancel it
+      if let state = peripherals[address], state.connection == .connecting {
+        peripherals.removeValue(forKey: address)
+        log(.debug, "disconnect: cancelling connection in progress")
+        central.cancelPeripheralConnection(state.peripheral)
 
-      // canceling a pending connection does not reliably invoke
-      // didDisconnectPeripheral, so complete everything here
-      pending.connect.take(address)?(
-        .failure(
-          PigeonError(code: BluebirdErrorCode.userCanceled.wire, message: "connection canceled", details: nil)))
+        // canceling a pending connection does not reliably invoke
+        // didDisconnectPeripheral, so complete everything here
+        state.takeConnect()?.resume(
+          throwing: PigeonError(
+            code: BluebirdErrorCode.userCanceled.wire, message: "connection canceled", details: nil))
 
-      sink?.success(
-        BmConnectionStateEvent(
-          address: address,
-          connectionState: .disconnected,
-          disconnectReasonCode: Self.userCanceledErrorCode,
-          disconnectReasonString: "connection canceled"))
+        sink?.success(
+          BmConnectionStateEvent(
+            address: address,
+            connectionState: .disconnected,
+            disconnectReasonCode: Self.userCanceledErrorCode,
+            disconnectReasonString: "connection canceled"))
 
-      completion(.success(()))
-      return
+        return
+      }
+
+      // already disconnected?
+      guard let state = peripherals[address], state.connection == .connected else {
+        log(.debug, "already disconnected")
+        return
+      }
+
+      return try await awaitDisconnect(state) {
+        central.cancelPeripheralConnection(state.peripheral)
+      }
     }
-
-    // already disconnected?
-    guard let peripheral = connectedPeripheral(address) else {
-      log(.debug, "already disconnected")
-      completion(.success(()))
-      return
-    }
-
-    guard pending.disconnect.register(address, completion) else { return }
-
-    central.cancelPeripheralConnection(peripheral)
   }
 
   func discoverServices(
     address: String, completion: @escaping (Result<[BmBluetoothService], Error>) -> Void
   ) {
-    ensureCentralManager()
+    launch(completion) { [self] in
+      ensureCentralManager()
 
-    guard let state = peripherals[address], state.connection == .connected else {
-      completion(.failure(notConnectedError()))
-      return
+      let state = try requireConnectedState(address)
+
+      return try await awaitGatt(state, .discoverServices) {
+        // reset discovery bookkeeping
+        state.clearDiscoveryState()
+
+        state.peripheral.discoverServices(nil)
+      }
     }
-
-    guard pending.discover.register(address, completion) else { return }
-
-    // reset discovery bookkeeping
-    state.clearDiscoveryState()
-
-    state.peripheral.discoverServices(nil)
   }
 
   func readCharacteristic(
@@ -899,14 +1111,11 @@ extension BluebirdPlugin: BluebirdHostApi {
     characteristic: BmCharacteristicRef,
     completion: @escaping (Result<FlutterStandardTypedData, Error>) -> Void
   ) {
-    ensureCentralManager()
+    launch(completion) { [self] in
+      ensureCentralManager()
 
-    guard let peripheral = connectedPeripheral(address) else {
-      completion(.failure(notConnectedError()))
-      return
-    }
-
-    do {
+      let state = try requireConnectedState(address)
+      let peripheral = state.peripheral
       let chr = try locateCharacteristic(characteristic, in: peripheral)
 
       // check readable
@@ -915,16 +1124,11 @@ extension BluebirdPlugin: BluebirdHostApi {
       }
 
       // key by the canonical ref so the delegate callback finds it
-      guard let ref = characteristicRef(for: chr, in: peripheral) else {
-        throw notConnectedError()
-      }
-      guard pending.charRead.register(DeviceOpKey(address: address, ref: ref), completion) else {
-        return
-      }
+      let ref = try canonicalRef(chr, in: peripheral)
 
-      peripheral.readValue(for: chr)
-    } catch {
-      completion(.failure(error))
+      return try await awaitGatt(state, .readChar(ref)) {
+        peripheral.readValue(for: chr)
+      }
     }
   }
 
@@ -936,14 +1140,12 @@ extension BluebirdPlugin: BluebirdHostApi {
     value: FlutterStandardTypedData,
     completion: @escaping (Result<Void, Error>) -> Void
   ) {
-    ensureCentralManager()
+    launch(completion) { [self] in
+      ensureCentralManager()
 
-    guard let peripheral = connectedPeripheral(address) else {
-      completion(.failure(notConnectedError()))
-      return
-    }
+      let state = try requireConnectedState(address)
+      let peripheral = state.peripheral
 
-    do {
       let cbWriteType: CBCharacteristicWriteType =
         writeType == .withResponse ? .withResponse : .withoutResponse
 
@@ -981,20 +1183,15 @@ extension BluebirdPlugin: BluebirdHostApi {
 
       if cbWriteType == .withResponse {
         // key by the canonical ref so the delegate callback finds it
-        guard let ref = characteristicRef(for: chr, in: peripheral) else {
-          throw notConnectedError()
-        }
-        guard pending.charWrite.register(DeviceOpKey(address: address, ref: ref), completion)
-        else { return }
+        let ref = try canonicalRef(chr, in: peripheral)
 
-        peripheral.writeValue(value.data, for: chr, type: .withResponse)
+        return try await awaitGatt(state, .writeChar(ref)) {
+          peripheral.writeValue(value.data, for: chr, type: .withResponse)
+        }
       } else {
         // writes without response are not acknowledged; complete immediately
         peripheral.writeValue(value.data, for: chr, type: .withoutResponse)
-        completion(.success(()))
       }
-    } catch {
-      completion(.failure(error))
     }
   }
 
@@ -1003,26 +1200,19 @@ extension BluebirdPlugin: BluebirdHostApi {
     descriptor: BmDescriptorRef,
     completion: @escaping (Result<FlutterStandardTypedData, Error>) -> Void
   ) {
-    ensureCentralManager()
+    launch(completion) { [self] in
+      ensureCentralManager()
 
-    guard let peripheral = connectedPeripheral(address) else {
-      completion(.failure(notConnectedError()))
-      return
-    }
-
-    do {
+      let state = try requireConnectedState(address)
+      let peripheral = state.peripheral
       let desc = try locateDescriptor(descriptor, in: peripheral)
 
-      guard let ref = descriptorRef(for: desc, in: peripheral) else {
-        throw notConnectedError()
-      }
-      guard pending.descRead.register(DeviceOpKey(address: address, ref: ref), completion) else {
-        return
-      }
+      // key by the canonical ref so the delegate callback finds it
+      let ref = try canonicalRef(desc, in: peripheral)
 
-      peripheral.readValue(for: desc)
-    } catch {
-      completion(.failure(error))
+      return try await awaitGatt(state, .readDesc(ref)) {
+        peripheral.readValue(for: desc)
+      }
     }
   }
 
@@ -1032,14 +1222,12 @@ extension BluebirdPlugin: BluebirdHostApi {
     value: FlutterStandardTypedData,
     completion: @escaping (Result<Void, Error>) -> Void
   ) {
-    ensureCentralManager()
+    launch(completion) { [self] in
+      ensureCentralManager()
 
-    guard let peripheral = connectedPeripheral(address) else {
-      completion(.failure(notConnectedError()))
-      return
-    }
+      let state = try requireConnectedState(address)
+      let peripheral = state.peripheral
 
-    do {
       // check mtu
       let mtu = getMtu(peripheral)
       let dataLen = value.data.count
@@ -1050,16 +1238,12 @@ extension BluebirdPlugin: BluebirdHostApi {
 
       let desc = try locateDescriptor(descriptor, in: peripheral)
 
-      guard let ref = descriptorRef(for: desc, in: peripheral) else {
-        throw notConnectedError()
-      }
-      guard pending.descWrite.register(DeviceOpKey(address: address, ref: ref), completion) else {
-        return
-      }
+      // key by the canonical ref so the delegate callback finds it
+      let ref = try canonicalRef(desc, in: peripheral)
 
-      peripheral.writeValue(value.data, for: desc)
-    } catch {
-      completion(.failure(error))
+      return try await awaitGatt(state, .writeDesc(ref)) {
+        peripheral.writeValue(value.data, for: desc)
+      }
     }
   }
 
@@ -1070,14 +1254,11 @@ extension BluebirdPlugin: BluebirdHostApi {
     enable: Bool,
     completion: @escaping (Result<Bool, Error>) -> Void
   ) {
-    ensureCentralManager()
+    launch(completion) { [self] in
+      ensureCentralManager()
 
-    guard let peripheral = connectedPeripheral(address) else {
-      completion(.failure(notConnectedError()))
-      return
-    }
-
-    do {
+      let state = try requireConnectedState(address)
+      let peripheral = state.peripheral
       let chr = try locateCharacteristic(characteristic, in: peripheral)
 
       // check notify-able
@@ -1096,37 +1277,33 @@ extension BluebirdPlugin: BluebirdHostApi {
           "Warning: CCCD descriptor for characteristic not found: \(chr.uuid.uuidStr)")
       }
 
-      guard let ref = characteristicRef(for: chr, in: peripheral) else {
-        throw notConnectedError()
-      }
-      guard pending.setNotify.register(DeviceOpKey(address: address, ref: ref), completion) else {
-        return
-      }
+      // key by the canonical ref so the delegate callback finds it
+      let ref = try canonicalRef(chr, in: peripheral)
 
-      peripheral.setNotifyValue(enable, for: chr)
-    } catch {
-      completion(.failure(error))
+      return try await awaitGatt(state, .setNotify(ref)) {
+        peripheral.setNotifyValue(enable, for: chr)
+      }
     }
   }
 
   func requestMtu(
     address: String, mtu: Int64, completion: @escaping (Result<Int64, Error>) -> Void
   ) {
-    completion(
-      .failure(unsupportedError("iOS & macOS do not allow mtu requests to the peripheral")))
+    launch(completion) {
+      throw unsupportedError("iOS & macOS do not allow mtu requests to the peripheral")
+    }
   }
 
   func readRssi(address: String, completion: @escaping (Result<Int64, Error>) -> Void) {
-    ensureCentralManager()
+    launch(completion) { [self] in
+      ensureCentralManager()
 
-    guard let peripheral = connectedPeripheral(address) else {
-      completion(.failure(notConnectedError()))
-      return
+      let state = try requireConnectedState(address)
+
+      return try await awaitGatt(state, .readRssi) {
+        state.peripheral.readRSSI()
+      }
     }
-
-    guard pending.rssi.register(address, completion) else { return }
-
-    peripheral.readRSSI()
   }
 
   func requestConnectionPriority(
@@ -1143,7 +1320,9 @@ extension BluebirdPlugin: BluebirdHostApi {
     address: String, txPhy: Int64, rxPhy: Int64, phyOptions: Int64,
     completion: @escaping (Result<Void, Error>) -> Void
   ) {
-    completion(.failure(unsupportedError("android only")))
+    launch(completion) {
+      throw unsupportedError("android only")
+    }
   }
 
   func getBondState(address: String) throws -> BmBondStateEnum {
@@ -1154,15 +1333,21 @@ extension BluebirdPlugin: BluebirdHostApi {
     address: String, pin: FlutterStandardTypedData?,
     completion: @escaping (Result<Bool, Error>) -> Void
   ) {
-    completion(.failure(unsupportedError("android only")))
+    launch(completion) {
+      throw unsupportedError("android only")
+    }
   }
 
   func removeBond(address: String, completion: @escaping (Result<Bool, Error>) -> Void) {
-    completion(.failure(unsupportedError("android only")))
+    launch(completion) {
+      throw unsupportedError("android only")
+    }
   }
 
   func clearGattCache(address: String, completion: @escaping (Result<Void, Error>) -> Void) {
-    completion(.failure(unsupportedError("android only")))
+    launch(completion) {
+      throw unsupportedError("android only")
+    }
   }
 }
 

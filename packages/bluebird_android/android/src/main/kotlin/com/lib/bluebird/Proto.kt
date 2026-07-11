@@ -15,7 +15,9 @@ import android.bluetooth.BluetoothStatusCodes
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanRecord
 import android.bluetooth.le.ScanResult
+import android.content.Intent
 import android.os.Build
+import android.os.Parcelable
 import java.io.ByteArrayOutputStream
 import java.util.UUID
 
@@ -35,24 +37,24 @@ val BluetoothGattCharacteristic.canIndicate: Boolean
 
 /**
  * Writes [value] to [c], papering over the API 33 / legacy split.
- * Returns null on success, or the error to fail the operation with.
+ * Throws a [FlutterError] if the write could not be started.
  */
 @Suppress("DEPRECATION")
 fun BluetoothGatt.writeCharacteristicCompat(
     c: BluetoothGattCharacteristic,
     value: ByteArray,
     writeType: Int,
-): FlutterError? {
+) {
     if (Build.VERSION.SDK_INT >= 33) { // Android 13 (August 2022)
         val rv = writeCharacteristic(c, value, writeType)
         if (rv != BluetoothStatusCodes.SUCCESS) {
-            return FlutterError(BluebirdErrorCode.GATT_ERROR.wire,
+            throw FlutterError(BluebirdErrorCode.GATT_ERROR.wire,
                 "gatt.writeCharacteristic() returned $rv : ${Proto.bluetoothStatusString(rv)}", rv)
         }
     } else {
         // set value
         if (!c.setValue(value)) {
-            return FlutterError(BluebirdErrorCode.GATT_ERROR.wire, "characteristic.setValue() returned false", null)
+            throw FlutterError(BluebirdErrorCode.GATT_ERROR.wire, "characteristic.setValue() returned false", null)
         }
 
         // write type
@@ -60,15 +62,14 @@ fun BluetoothGatt.writeCharacteristicCompat(
 
         // write char
         if (!writeCharacteristic(c)) {
-            return FlutterError(BluebirdErrorCode.GATT_ERROR.wire, "gatt.writeCharacteristic() returned false", null)
+            throw FlutterError(BluebirdErrorCode.GATT_ERROR.wire, "gatt.writeCharacteristic() returned false", null)
         }
     }
-    return null
 }
 
 /**
  * Writes [value] to [d], papering over the API 33 / legacy split.
- * Returns null on success, or the error to fail the operation with.
+ * Throws a [FlutterError] if the write could not be started.
  * [label] names the descriptor in error messages.
  */
 @Suppress("DEPRECATION")
@@ -76,26 +77,34 @@ fun BluetoothGatt.writeDescriptorCompat(
     d: BluetoothGattDescriptor,
     value: ByteArray,
     label: String = "descriptor",
-): FlutterError? {
+) {
     if (Build.VERSION.SDK_INT >= 33) { // Android 13 (August 2022)
         val rv = writeDescriptor(d, value)
         if (rv != BluetoothStatusCodes.SUCCESS) {
-            return FlutterError(BluebirdErrorCode.GATT_ERROR.wire,
+            throw FlutterError(BluebirdErrorCode.GATT_ERROR.wire,
                 "gatt.writeDescriptor() returned $rv : ${Proto.bluetoothStatusString(rv)}", rv)
         }
     } else {
         // set value
         if (!d.setValue(value)) {
-            return FlutterError(BluebirdErrorCode.GATT_ERROR.wire, "$label.setValue() returned false", null)
+            throw FlutterError(BluebirdErrorCode.GATT_ERROR.wire, "$label.setValue() returned false", null)
         }
 
         // write descriptor
         if (!writeDescriptor(d)) {
-            return FlutterError(BluebirdErrorCode.GATT_ERROR.wire, "gatt.writeDescriptor() returned false", null)
+            throw FlutterError(BluebirdErrorCode.GATT_ERROR.wire, "gatt.writeDescriptor() returned false", null)
         }
     }
-    return null
 }
+
+/** Reads a [Parcelable] extra, papering over the API 33 deprecation. */
+@Suppress("DEPRECATION")
+inline fun <reified T : Parcelable> Intent.getParcelableExtraCompat(key: String): T? =
+    if (Build.VERSION.SDK_INT >= 33) { // Android 13 (August 2022)
+        getParcelableExtra(key, T::class.java)
+    } else {
+        getParcelableExtra(key)
+    }
 
 /**
  * BluetoothGatt* <-> pigeon message conversions, typed-ref resolution and
@@ -199,23 +208,8 @@ object Proto {
     //////////////////////////////////////////
     // op keys
 
-    private fun charKey(c: BluetoothGattCharacteristic) = CharKey(
+    fun charKey(c: BluetoothGattCharacteristic) = CharKey(
         uuid128(c.service.uuid), c.service.instanceId, uuid128(c.uuid), c.instanceId)
-
-    fun readCharKey(address: String, c: BluetoothGattCharacteristic) =
-        OpKey.CharOp(address, OpKey.CharOpKind.READ, charKey(c))
-
-    fun writeCharKey(address: String, c: BluetoothGattCharacteristic) =
-        OpKey.CharOp(address, OpKey.CharOpKind.WRITE, charKey(c))
-
-    fun setNotifyKey(address: String, c: BluetoothGattCharacteristic) =
-        OpKey.CharOp(address, OpKey.CharOpKind.NOTIFY, charKey(c))
-
-    fun readDescKey(address: String, d: BluetoothGattDescriptor) =
-        OpKey.DescOp(address, OpKey.DescOpKind.READ, charKey(d.characteristic), uuid128(d.uuid))
-
-    fun writeDescKey(address: String, d: BluetoothGattDescriptor) =
-        OpKey.DescOp(address, OpKey.DescOpKind.WRITE, charKey(d.characteristic), uuid128(d.uuid))
 
     //////////////////////////////////////////
     // message builders

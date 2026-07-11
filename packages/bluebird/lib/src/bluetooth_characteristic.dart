@@ -62,7 +62,7 @@ class BluetoothCharacteristic extends BluetoothAttribute {
   /// read a characteristic
   Future<List<int>> read({Duration timeout = const Duration(seconds: 15)}) async {
     final value =
-        await device.op("readCharacteristic", (p) => p.readCharacteristic(device.remoteId, bm), timeout: timeout);
+        await device.invoke("readCharacteristic", (p) => p.readCharacteristic(device.remoteId, bm), timeout: timeout);
 
     // read results are delivered via the returned future (not a platform
     // event), so emit the app-level event ourselves
@@ -92,7 +92,7 @@ class BluetoothCharacteristic extends BluetoothAttribute {
     }
 
     final writeType = withoutResponse ? BmWriteType.withoutResponse : BmWriteType.withResponse;
-    await device.op("writeCharacteristic",
+    await device.invoke("writeCharacteristic",
         (p) => p.writeCharacteristic(device.remoteId, bm, writeType, allowLongWrite, Uint8List.fromList(value)),
         timeout: timeout);
   }
@@ -112,7 +112,7 @@ class BluetoothCharacteristic extends BluetoothAttribute {
       assert(forceIndications == false, "iOS & macOS do not support forcing indications");
     }
 
-    return device.op("setNotifyValue", (p) => p.setNotifyValue(device.remoteId, bm, forceIndications, notify),
+    return device.invoke("setNotifyValue", (p) => p.setNotifyValue(device.remoteId, bm, forceIndications, notify),
         timeout: timeout);
   }
 

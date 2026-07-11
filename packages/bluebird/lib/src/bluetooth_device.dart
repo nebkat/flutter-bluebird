@@ -72,12 +72,11 @@ class BluetoothDevice {
     );
   }
 
-  /// Runs one platform operation with the standard guard pipeline —
-  /// connected pre-check, global serialization, adapter-off and
-  /// disconnection watchdogs, timeout — stating the operation [name] once.
+  /// [Bluebird.invoke] plus the device-scoped guards — connected pre-check,
+  /// global serialization, disconnection watchdog — stating [name] once.
   ///   - [before] runs inside the serialization mutex, before the call.
   @internal
-  Future<T> op<T>(
+  Future<T> invoke<T>(
     String name,
     Future<T> Function(BluebirdPlatform p) call, {
     Duration? timeout,
@@ -88,7 +87,7 @@ class BluetoothDevice {
     if (requiresConnection) ensureConnected(name);
     Future<T> run() async {
       if (before != null) await before();
-      var future = Bluebird.invoke(call).bluebirdEnsureAdapterIsOn(name);
+      var future = Bluebird.invoke(name, call, ensureAdapterIsOn: true);
       if (requiresConnection) future = future.bluebirdEnsureDeviceIsConnected(this, name);
       if (timeout != null) future = future.bluebirdTimeout(timeout, name);
       return future;
@@ -138,9 +137,8 @@ class BluetoothDevice {
       if (System.isAndroid) _connectTimestamp = DateTime.now();
 
       try {
-        final future = Bluebird.invoke((p) => p.connect(remoteId))
-            .bluebirdEnsureAdapterIsOn("connect")
-            .bluebirdTimeout(timeout, "connect");
+        final future = Bluebird.invoke("connect", (p) => p.connect(remoteId),
+            ensureAdapterIsOn: true, timeout: timeout);
 
         // we return the disconnect mutex now so that this
         // connection attempt can be canceled by calling disconnect
@@ -150,7 +148,7 @@ class BluetoothDevice {
         await future;
       } on BluebirdException catch (e) {
         if (e.code == BluebirdErrorCode.timeout) {
-          await Bluebird.invoke((p) => p.disconnect(remoteId));
+          await Bluebird.invoke("disconnect", (p) => p.disconnect(remoteId));
         }
         rethrow;
       }
@@ -186,9 +184,8 @@ class BluetoothDevice {
         await _ensureAndroidDisconnectionDelay(androidDelay);
 
         // invoke
-        await Bluebird.invoke((p) => p.disconnect(remoteId))
-            .bluebirdEnsureAdapterIsOn("disconnect")
-            .bluebirdTimeout(timeout, "disconnect");
+        await Bluebird.invoke("disconnect", (p) => p.disconnect(remoteId),
+            ensureAdapterIsOn: true, timeout: timeout);
 
         if (System.isAndroid) {
           // Disconnected, remove connect timestamp
@@ -208,7 +205,7 @@ class BluetoothDevice {
     bool subscribeToServicesChanged = true,
     Duration timeout = const Duration(seconds: 15),
   }) async {
-    final services = await op("discoverServices", (p) => p.discoverServices(remoteId), timeout: timeout);
+    final services = await invoke("discoverServices", (p) => p.discoverServices(remoteId), timeout: timeout);
     _services = BluetoothService.constructServices(this, services);
 
     // in order to match iOS behavior on all platforms,
@@ -255,7 +252,7 @@ class BluetoothDevice {
 
   /// Read the RSSI of connected remote device
   Future<int> readRssi({Duration timeout = const Duration(seconds: 15)}) =>
-      op("readRssi", (p) => p.readRssi(remoteId), timeout: timeout);
+      invoke("readRssi", (p) => p.readRssi(remoteId), timeout: timeout);
 
   /// Request to change MTU (Android Only)
   ///  - returns new MTU
@@ -270,7 +267,7 @@ class BluetoothDevice {
     Duration timeout = const Duration(seconds: 15),
   }) {
     ensurePlatform(System.isAndroid, "requestMtu");
-    return op("requestMtu", (p) => p.requestMtu(remoteId, desiredMtu),
+    return invoke("requestMtu", (p) => p.requestMtu(remoteId, desiredMtu),
         timeout: timeout, before: () => Future.delayed(predelay));
   }
 
@@ -280,7 +277,7 @@ class BluetoothDevice {
     Duration timeout = const Duration(seconds: 3),
   }) {
     ensurePlatform(System.isAndroid, "requestConnectionPriority");
-    return op("requestConnectionPriority", (p) => p.requestConnectionPriority(remoteId, connectionPriorityRequest),
+    return invoke("requestConnectionPriority", (p) => p.requestConnectionPriority(remoteId, connectionPriorityRequest),
         timeout: timeout, serialized: false);
   }
 
@@ -296,7 +293,7 @@ class BluetoothDevice {
     Duration timeout = const Duration(seconds: 3),
   }) {
     ensurePlatform(System.isAndroid, "setPreferredPhy");
-    return op("setPreferredPhy", (p) => p.setPreferredPhy(remoteId, txPhy, rxPhy, option.index),
+    return invoke("setPreferredPhy", (p) => p.setPreferredPhy(remoteId, txPhy, rxPhy, option.index),
         timeout: timeout, serialized: false);
   }
 
@@ -307,7 +304,7 @@ class BluetoothDevice {
     Duration timeout = const Duration(seconds: 90),
   }) async {
     ensurePlatform(System.isAndroid, "createBond");
-    final bonded = await op("createBond", (p) => p.createBond(remoteId, pin), timeout: timeout);
+    final bonded = await invoke("createBond", (p) => p.createBond(remoteId, pin), timeout: timeout);
     if (!bonded) {
       throw BluebirdException("createBond", BluebirdErrorCode.bondFailed, "Failed to create bond");
     }
@@ -317,7 +314,7 @@ class BluetoothDevice {
   Future<void> removeBond({Duration timeout = const Duration(seconds: 30)}) async {
     ensurePlatform(System.isAndroid, "removeBond");
     final removed =
-        await op("removeBond", (p) => p.removeBond(remoteId), timeout: timeout, requiresConnection: false);
+        await invoke("removeBond", (p) => p.removeBond(remoteId), timeout: timeout, requiresConnection: false);
     if (!removed) {
       throw BluebirdException("removeBond", BluebirdErrorCode.removeBondFailed, "Failed to remove bond");
     }
@@ -326,14 +323,14 @@ class BluetoothDevice {
   /// Refresh ble services & characteristics (Android Only)
   Future<void> clearGattCache() {
     ensurePlatform(System.isAndroid, "clearGattCache");
-    return op("clearGattCache", (p) => p.clearGattCache(remoteId), serialized: false);
+    return invoke("clearGattCache", (p) => p.clearGattCache(remoteId), serialized: false);
   }
 
   Future<BluetoothBondState> get bondStateNow async {
     ensurePlatform(System.isAndroid, "bondState");
 
     // get current state if needed
-    _bondState ??= await op("getBondState", (p) => p.getBondState(remoteId),
+    _bondState ??= await invoke("getBondState", (p) => p.getBondState(remoteId),
         requiresConnection: false, serialized: false);
     return _bondState!;
   }

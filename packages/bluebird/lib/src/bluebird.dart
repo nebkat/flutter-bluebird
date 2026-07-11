@@ -51,13 +51,13 @@ class Bluebird {
   static LogLevel get logLevel => _logLevel;
 
   /// Checks whether the hardware supports Bluetooth
-  static Future<bool> get isSupported async => await invoke((p) => p.isSupported());
+  static Future<bool> get isSupported async => await invoke("isSupported", (p) => p.isSupported());
 
   /// The current adapter state
   static BluetoothAdapterState get adapterStateNow => _adapterStateNow ?? BluetoothAdapterState.unknown;
 
   /// Return the friendly Bluetooth name of the local Bluetooth adapter
-  static Future<String> get adapterName async => await invoke((p) => p.getAdapterName());
+  static Future<String> get adapterName async => await invoke("getAdapterName", (p) => p.getAdapterName());
 
   /// returns whether we are scanning as a stream
   static Stream<bool> get isScanning => _isScanning.stream;
@@ -101,12 +101,12 @@ class Bluebird {
     bool restoreState = false,
   }) async {
     ensurePlatform(System.isDarwin, "setOptions");
-    await invoke((p) => p.setOptions(showPowerAlert, restoreState));
+    await invoke("setOptions", (p) => p.setOptions(showPowerAlert, restoreState));
   }
 
   /// Turn on Bluetooth (Android only),
   static Future<void> turnOn({Duration timeout = const Duration(seconds: 60)}) async {
-    final userAccepted = await invoke((p) => p.turnOn());
+    final userAccepted = await invoke("turnOn", (p) => p.turnOn());
 
     if (!userAccepted) {
       throw BluebirdException("turnOn", BluebirdErrorCode.userRejected, "user rejected");
@@ -120,7 +120,7 @@ class Bluebird {
   static Stream<BluetoothAdapterState> get adapterState async* {
     // get current state if needed
     if (_adapterStateNow == null) {
-      final state = await invoke((p) => p.getAdapterState());
+      final state = await invoke("getAdapterState", (p) => p.getAdapterState());
       // update _adapterStateNow if it is still null after the await
       // (an adapter state event may have arrived first — prefer it)
       _adapterStateNow ??= state;
@@ -139,14 +139,14 @@ class Bluebird {
   /// - You must still call device.connect() to connect them to *your app*
   /// - [withServices] required on iOS (for privacy purposes). ignored on android.
   static Future<List<BluetoothDevice>> systemDevices(List<Uuid> withServices) async {
-    final devices = await invoke((p) => p.getSystemDevices(withServices.map((s) => s.string).toList()));
+    final devices = await invoke("getSystemDevices", (p) => p.getSystemDevices(withServices.map((s) => s.string).toList()));
     return devices.map(_deviceForBm).toList();
   }
 
   /// Retrieve a list of bonded devices (Android only)
   static Future<List<BluetoothDevice>> get bondedDevices async {
     ensurePlatform(System.isAndroid, "getBondedDevices");
-    final devices = await invoke((p) => p.getBondedDevices());
+    final devices = await invoke("getBondedDevices", (p) => p.getBondedDevices());
     return devices.map(_deviceForBm).toList();
   }
 
@@ -248,7 +248,7 @@ class Bluebird {
 
       // invoke platform method
       try {
-        await invoke((p) => p.startScan(settings));
+        await invoke("startScan", (p) => p.startScan(settings));
       } catch (e) {
         scanBuffer.listen(null).cancel();
         _stopScan(invokePlatform: false);
@@ -314,7 +314,7 @@ class Bluebird {
     _scanSubscriptions.clear();
     _scanTimeout?.cancel();
     _isScanning.add(false);
-    if (invokePlatform) await invoke((p) => p.stopScan());
+    if (invokePlatform) await invoke("stopScan", (p) => p.stopScan());
   }
 
   /// Register a subscription to be canceled when scanning is complete.
@@ -328,13 +328,13 @@ class Bluebird {
   /// Sets the internal Bluebird log level
   static Future<void> setLogLevel(LogLevel level, {bool color = true}) async {
     _logLevel = level;
-    await invoke((p) => p.setLogLevel(level, color: color));
+    await invoke("setLogLevel", (p) => p.setLogLevel(level, color: color));
   }
 
   /// Request Bluetooth PHY support
   static Future<PhySupport> getPhySupport() async {
     ensurePlatform(System.isAndroid, "getPhySupport");
-    return await invoke((p) => p.getPhySupport());
+    return await invoke("getPhySupport", (p) => p.getPhySupport());
   }
 
   static BluetoothDevice deviceForAddress(String address) {
@@ -402,20 +402,28 @@ class Bluebird {
   @internal
   static void emitEvent(BluebirdEvent event) => _eventStream.add(event);
 
+  /// Runs one platform call with the standard guard pipeline, stating the
+  /// operation [name] once. Device-scoped calls go through
+  /// [BluetoothDevice.invoke], which adds the connection guards.
   @internal
-  static Future<T> invoke<T>(Future<T> Function(BluebirdPlatform p) invoke) async {
+  static Future<T> invoke<T>(
+    String name,
+    Future<T> Function(BluebirdPlatform p) call, {
+    Duration? timeout,
+    bool ensureAdapterIsOn = false,
+  }) {
     // Only allow 1 invocation at a time (guarantees that hot restart finishes)
-    return await Mutex.platform.protect(() async {
-      // Initialize
+    var future = Mutex.platform.protect(() async {
       _initBluebird();
-
-      // Invoke
       try {
-        return await invoke(BluebirdPlatform.instance);
+        return await call(BluebirdPlatform.instance);
       } on PlatformException catch (e) {
         throw BluebirdException(e.code, _errorCodes[e.code] ?? BluebirdErrorCode.platform, e.message);
       }
     });
+    if (ensureAdapterIsOn) future = future.bluebirdEnsureAdapterIsOn(name);
+    if (timeout != null) future = future.bluebirdTimeout(timeout, name);
+    return future;
   }
 
   /// Wire-string -> [BluebirdErrorCode] lookup, built from the shared pigeon enum.

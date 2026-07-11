@@ -50,6 +50,13 @@ func deviceDisconnectedError() -> PigeonError {
     code: BluebirdErrorCode.deviceDisconnected.wire, message: "device is disconnected", details: nil)
 }
 
+func operationInProgressError() -> PigeonError {
+  PigeonError(
+    code: BluebirdErrorCode.operationInProgress.wire,
+    message: "this operation is already in progress",
+    details: nil)
+}
+
 func adapterOffError(_ state: CBManagerState) -> PigeonError {
   PigeonError(
     code: BluebirdErrorCode.adapterOff.wire,

@@ -1,4 +1,55 @@
-# Code Improvement Plan — Round 2
+# Code Improvement Plan
+
+## Status: rounds 1-3 applied
+
+All items from rounds 1 and 2 have landed, plus a round-3 architectural
+rewrite of both native plugins. Remaining backlog is at the bottom.
+
+### Round 3: native async rewrite (applied)
+
+Both native plugins were rewritten so every pigeon @async host method is
+LINEAR async code with the pigeon callback completed at the call site —
+no stored-completion machinery:
+
+- **Kotlin**: coroutines (`kotlinx-coroutines-android`). Host methods are
+  `launch(callback) { ... }` bodies; errors are thrown `FlutterError`s;
+  hot-restart/detach cancels in-flight coroutines (callbacks dropped, as
+  before); `waitIfBonding` uses `delay()` instead of blocking the main
+  thread.
+- **Swift**: structured concurrency. Host methods are
+  `launch(completion) { ... }` bodies running on `@MainActor`;
+  deployment targets bumped to iOS 13 / macOS 10.15 (required for
+  continuations).
+
+Because neither Android nor CoreBluetooth offers a per-request token
+(results arrive on one shared callback, correlated only by attribute),
+*some* pending state is unavoidable — but it is now **continuation slots
+on the per-device state object**, not a keyed operation map:
+
+```
+DeviceConnection / PeripheralState
+  ├─ pendingConnect      typed continuation slot
+  ├─ pendingDisconnect   typed continuation slot
+  ├─ pendingGatt         single slot + GattOp kind tag (Android serializes
+  │                      GATT ops per device; Dart serializes globally)
+  └─ pendingBond         (Android only)
+```
+
+`OpKey`, `OperationAwaiter`, `PendingOperations`, and `PendingMap` are all
+deleted. Irreducible residue on Android only: a single `pendingTurnOn`
+slot (enable-BT dialog resumes via onActivityResult) and an address-keyed
+`pendingRemoveBond` map (the one op that legally runs without a
+connection — and it now intentionally *survives* disconnects, fixing a
+latent race where removing a bond on a connected device triggered a
+disconnect that failed the removeBond just before its BOND_NONE arrived).
+
+Dart got the matching treatment: `Bluebird.invoke(name, call, {timeout,
+ensureAdapterIsOn})` owns the platform pipeline; `device.invoke(...)`
+layers the connection guards. Both state the operation name exactly once.
+
+---
+
+# Historical: Round 2 findings (all applied)
 
 Round 1 (Mutex/Phy bugs, Dart `op()` pipeline, shared `BluebirdErrorCode`,
 sealed events, typedefs, utils rewrite, Kotlin helpers/OpKey collapse,
