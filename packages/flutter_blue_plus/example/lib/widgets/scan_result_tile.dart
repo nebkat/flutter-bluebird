@@ -57,13 +57,18 @@ class _ScanResultTileState extends State<ScanResultTile> {
   }
 
   Widget _buildTitle(BuildContext context) {
-    if (widget.result.device.platformName.isNotEmpty) {
+    // prefer the platform name, but fall back to the advertised name,
+    // so un-connected devices still show a name in the list
+    final name = widget.result.device.platformName.isNotEmpty
+        ? widget.result.device.platformName
+        : widget.result.advertisementData.advName;
+    if (name.isNotEmpty) {
       return Column(
         mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-            widget.result.device.platformName,
+            name,
             overflow: TextOverflow.ellipsis,
           ),
           Text(
