@@ -488,8 +488,7 @@ class BluetoothDevice {
   @internal
   BluetoothDescriptor descriptorForRef(BmDescriptorRef ref) {
     final characteristic = characteristicForRef(ref.characteristic);
-    final uuid = Uuid(ref.uuid);
-    final descriptor = characteristic.descriptors.where((d) => d.uuid == uuid).firstOrNull;
+    final descriptor = characteristic.descriptors.where((d) => d.uuid == ref.uuid).firstOrNull;
     if (descriptor == null) {
       throw BluebirdException(
         "descriptorForRef",

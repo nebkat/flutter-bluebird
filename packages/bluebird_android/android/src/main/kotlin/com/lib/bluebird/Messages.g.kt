@@ -312,21 +312,21 @@ enum class BluebirdErrorCode(val raw: Int) {
  * Generated class from Pigeon that represents data sent in messages.
  */
 data class BmAttributeId (
-  val uuid: String,
+  val uuid: Uuid,
   /** Platform-opaque token disambiguating duplicate uuids. */
   val instance: Long
 )
  {
   companion object {
     fun fromList(pigeonVar_list: List<Any?>): BmAttributeId {
-      val uuid = pigeonVar_list[0] as String
+      val uuid = Uuid.parse(pigeonVar_list[0] as String)
       val instance = pigeonVar_list[1] as Long
       return BmAttributeId(uuid, instance)
     }
   }
   fun toList(): List<Any?> {
     return listOf(
-      uuid,
+      uuid.str,
       instance,
     )
   }
@@ -439,20 +439,20 @@ data class BmCharacteristicRef (
 data class BmDescriptorRef (
   val characteristic: BmCharacteristicRef,
   /** Descriptor uuids are unique within a characteristic; no instance needed. */
-  val uuid: String
+  val uuid: Uuid
 )
  {
   companion object {
     fun fromList(pigeonVar_list: List<Any?>): BmDescriptorRef {
       val characteristic = pigeonVar_list[0] as BmCharacteristicRef
-      val uuid = pigeonVar_list[1] as String
+      val uuid = Uuid.parse(pigeonVar_list[1] as String)
       return BmDescriptorRef(characteristic, uuid)
     }
   }
   fun toList(): List<Any?> {
     return listOf(
       characteristic,
-      uuid,
+      uuid.str,
     )
   }
   override fun equals(other: Any?): Boolean {

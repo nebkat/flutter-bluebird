@@ -9,6 +9,8 @@ import 'dart:typed_data' show Float64List, Int32List, Int64List;
 import 'package:flutter/services.dart';
 import 'package:meta/meta.dart' show immutable, protected, visibleForTesting;
 
+import 'uuid.dart';
+
 Object? _extractReplyValueOrThrow(
   List<Object?>? replyList,
   String channelName, {
@@ -173,14 +175,14 @@ class BmAttributeId {
     required this.instance,
   });
 
-  String uuid;
+  Uuid uuid;
 
   /// Platform-opaque token disambiguating duplicate uuids.
   int instance;
 
   List<Object?> _toList() {
     return <Object?>[
-      uuid,
+      uuid.string,
       instance,
     ];
   }
@@ -192,7 +194,7 @@ class BmAttributeId {
   static BmAttributeId decode(Object result) {
     result as List<Object?>;
     return BmAttributeId(
-      uuid: result[0]! as String,
+      uuid: Uuid(result[0]! as String),
       instance: result[1]! as int,
     );
   }
@@ -334,12 +336,12 @@ class BmDescriptorRef {
   BmCharacteristicRef characteristic;
 
   /// Descriptor uuids are unique within a characteristic; no instance needed.
-  String uuid;
+  Uuid uuid;
 
   List<Object?> _toList() {
     return <Object?>[
       characteristic,
-      uuid,
+      uuid.string,
     ];
   }
 
@@ -351,7 +353,7 @@ class BmDescriptorRef {
     result as List<Object?>;
     return BmDescriptorRef(
       characteristic: result[0]! as BmCharacteristicRef,
-      uuid: result[1]! as String,
+      uuid: Uuid(result[1]! as String),
     );
   }
 

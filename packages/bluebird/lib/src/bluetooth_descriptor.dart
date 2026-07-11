@@ -15,7 +15,7 @@ class BluetoothDescriptor extends BluetoothAttribute {
       : super(device: characteristic.device, id: BluetoothAttributeId(Uuid(p.uuid)));
 
   @internal
-  BmDescriptorRef get bm => BmDescriptorRef(characteristic: characteristic.bm, uuid: uuid.string);
+  BmDescriptorRef get bm => BmDescriptorRef(characteristic: characteristic.bm, uuid: uuid);
 
   /// Retrieves the value of a specified descriptor
   Future<List<int>> read({Duration timeout = const Duration(seconds: 15)}) =>
