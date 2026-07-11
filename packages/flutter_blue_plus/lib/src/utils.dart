@@ -9,16 +9,6 @@ import 'bluetooth_device.dart';
 import 'bluetooth_utils.dart';
 import 'flutter_blue_plus.dart';
 
-List<int> hexDecode(String hex) {
-  List<int> numbers = [];
-  for (int i = 0; i < hex.length; i += 2) {
-    String hexPart = hex.substring(i, i + 2);
-    int num = int.parse(hexPart, radix: 16);
-    numbers.add(num);
-  }
-  return numbers;
-}
-
 void ensurePlatform(bool valid, String function) {
   if (valid) return;
   throw FlutterBluePlusException(
@@ -28,82 +18,37 @@ void ensurePlatform(bool valid, String function) {
   );
 }
 
-extension FutureTimeout<T> on Future<T> {
-  Future<T> fbpTimeout(Duration timeout, String function) {
-    return this.timeout(timeout, onTimeout: () {
-      throw FlutterBluePlusException(
-        function,
-        FbpErrorCode.timeout,
-        "Timed out after ${timeout.inSeconds}s",
-      );
+extension FutureGuards<T> on Future<T> {
+  Future<T> fbpTimeout(Duration timeout, String function) => this.timeout(timeout,
+      onTimeout: () =>
+          throw FlutterBluePlusException(function, FbpErrorCode.timeout, "Timed out after ${timeout.inSeconds}s"));
+
+  /// Completes with [error] as soon as [fatal] emits an event matching
+  /// [isFatal], unless this future completes first.
+  Future<T> failOn<S>(Stream<S> fatal, bool Function(S event) isFatal, FlutterBluePlusException Function() error) {
+    final completer = Completer<T>();
+    final subscription = fatal.listen((event) {
+      if (isFatal(event) && !completer.isCompleted) completer.completeError(error());
     });
-  }
-
-  Future<T> fbpEnsureDeviceIsConnected(BluetoothDevice device, String function) {
-    // Create a completer to represent the result of this extended Future.
-    var completer = Completer<T>();
-
-    // disconnection listener.
-    var subscription = device.connectionState.listen((event) {
-      if (event == BluetoothConnectionState.disconnected) {
-        if (!completer.isCompleted) {
-          completer.completeError(
-            FlutterBluePlusException(function, FbpErrorCode.deviceDisconnected, "Device is disconnected"),
-          );
-        }
-      }
-    });
-
-    // When the original future completes
-    // complete our completer and cancel the subscription.
     then((value) {
-      if (!completer.isCompleted) {
-        subscription.cancel();
-        completer.complete(value);
-      }
-    }).catchError((error) {
-      if (!completer.isCompleted) {
-        subscription.cancel();
-        completer.completeError(error);
-      }
-    });
-
+      if (!completer.isCompleted) completer.complete(value);
+    }, onError: (Object e, StackTrace st) {
+      if (!completer.isCompleted) completer.completeError(e, st);
+    }).whenComplete(subscription.cancel);
     return completer.future;
   }
 
-  Future<T> fbpEnsureAdapterIsOn(String function) {
-    // Create a completer to represent the result of this extended Future.
-    var completer = Completer<T>();
+  /// Fails with [FbpErrorCode.adapterOff] if the adapter turns off mid-flight.
+  Future<T> fbpEnsureAdapterIsOn(String function) => failOn(
+      FlutterBluePlus.adapterState,
+      (s) => s == BluetoothAdapterState.off || s == BluetoothAdapterState.turningOff,
+      () => FlutterBluePlusException(function, FbpErrorCode.adapterOff, "Bluetooth adapter is off"));
 
-    // disconnection listener.
-    var subscription = FlutterBluePlus.adapterState.listen((event) {
-      if (event == BluetoothAdapterState.off || event == BluetoothAdapterState.turningOff) {
-        if (!completer.isCompleted) {
-          completer.completeError(FlutterBluePlusException(
-            function,
-            FbpErrorCode.adapterOff,
-            "Bluetooth adapter is off",
-          ));
-        }
-      }
-    });
-
-    // When the original future completes
-    // complete our completer and cancel the subscription.
-    then((value) {
-      if (!completer.isCompleted) {
-        subscription.cancel();
-        completer.complete(value);
-      }
-    }).catchError((error) {
-      if (!completer.isCompleted) {
-        subscription.cancel();
-        completer.completeError(error);
-      }
-    });
-
-    return completer.future;
-  }
+  /// Fails with [FbpErrorCode.deviceDisconnected] if [device] disconnects mid-flight.
+  Future<T> fbpEnsureDeviceIsConnected(BluetoothDevice device, String function) => failOn(
+      device.connectionState,
+      (s) => s == BluetoothConnectionState.disconnected,
+      () => FlutterBluePlusException(function, FbpErrorCode.deviceDisconnected, "Device is disconnected"));
 }
 
 // This is a reimplementation of BehaviorSubject from RxDart library.
