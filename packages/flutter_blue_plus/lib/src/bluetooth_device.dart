@@ -516,10 +516,8 @@ class BluetoothDevice {
   // Attribute lookup by typed ref
   //
 
-  T? _attributeForId<T extends BluetoothAttribute>(List<T> list, BmAttributeId id) {
-    final uuid = Uuid(id.uuid);
-    return list.where((a) => a.uuid == uuid && a.index == id.instance).firstOrNull;
-  }
+  T? _attributeForId<T extends BluetoothAttribute>(List<T> list, BmAttributeId id) =>
+      list.where((a) => a.id == BluetoothAttributeId.fromBm(id)).firstOrNull;
 
   BluetoothCharacteristic? _characteristicForRefOrNull(BmCharacteristicRef ref) {
     final service = _attributeForId(_services, ref.service.service);

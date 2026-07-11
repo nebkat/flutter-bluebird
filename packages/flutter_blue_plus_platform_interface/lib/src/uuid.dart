@@ -57,11 +57,13 @@ class Uuid {
   @override
   String toString() => string;
 
+  /// Uuids are compared by value in their 128-bit form, so the same uuid
+  /// expressed in short (16/32-bit) and long form compare equal.
   @override
-  operator ==(other) => other is Uuid && hashCode == other.hashCode;
+  operator ==(Object other) => other is Uuid && string128 == other.string128;
 
   @override
-  int get hashCode => bytes.hashCode;
+  int get hashCode => string128.hashCode;
 }
 
 extension _IntHexString on int {

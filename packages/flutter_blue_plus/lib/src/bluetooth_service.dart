@@ -23,14 +23,12 @@ class BluetoothService extends BluetoothAttribute {
   @internal
   BluetoothService.fromProto(BluetoothDevice device, BmBluetoothService p)
       : isPrimary = p.isPrimary,
-        super(device: device, uuid: Uuid(p.id.uuid), index: p.id.instance) {
+        super(device: device, id: BluetoothAttributeId.fromBm(p.id)) {
     characteristics = p.characteristics.map((c) => BluetoothCharacteristic.fromProto(c, this)).toList();
   }
 
   @internal
-  BmServiceRef get ref => BmServiceRef(service: id, parentService: _parentService?.id);
-
-  bool _matchesId(BmAttributeId id) => uuid == Uuid(id.uuid) && index == id.instance;
+  BmServiceRef get ref => BmServiceRef(service: id.bm, parentService: _parentService?.id.bm);
 
   @internal
   static List<BluetoothService> constructServices(BluetoothDevice device, List<BmBluetoothService> protos) {
@@ -46,7 +44,8 @@ class BluetoothService extends BluetoothAttribute {
       final service = entry.key;
       final includedRefs = entry.value;
       service.includedServices = includedRefs.map((included) {
-        final includedService = services.where((s) => s._matchesId(included.service)).firstOrNull;
+        final includedId = BluetoothAttributeId.fromBm(included.service);
+        final includedService = services.where((s) => s.id == includedId).firstOrNull;
         if (includedService == null) {
           throw FlutterBluePlusException(
               "constructServices", FbpErrorCode.serviceNotFound, "service not found: ${included.service.uuid}");

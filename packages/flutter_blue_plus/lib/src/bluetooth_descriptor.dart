@@ -14,7 +14,7 @@ class BluetoothDescriptor extends BluetoothAttribute {
   final BluetoothCharacteristic characteristic;
 
   BluetoothDescriptor.fromProto(BmBluetoothDescriptor p, this.characteristic)
-      : super(device: characteristic.device, uuid: Uuid(p.uuid));
+      : super(device: characteristic.device, id: BluetoothAttributeId(Uuid(p.uuid)));
 
   @internal
   BmDescriptorRef get ref => BmDescriptorRef(characteristic: characteristic.ref, uuid: uuid.string);

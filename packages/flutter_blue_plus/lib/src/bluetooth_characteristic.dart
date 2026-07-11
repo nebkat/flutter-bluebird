@@ -22,12 +22,12 @@ class BluetoothCharacteristic extends BluetoothAttribute {
   @internal
   BluetoothCharacteristic.fromProto(BmBluetoothCharacteristic p, this.service)
       : properties = CharacteristicProperties.fromProto(p.properties),
-        super(device: service.device, uuid: Uuid(p.id.uuid), index: p.id.instance) {
+        super(device: service.device, id: BluetoothAttributeId.fromBm(p.id)) {
     descriptors = p.descriptors.map((d) => BluetoothDescriptor.fromProto(d, this)).toList();
   }
 
   @internal
-  BmCharacteristicRef get ref => BmCharacteristicRef(service: service.ref, characteristic: id);
+  BmCharacteristicRef get ref => BmCharacteristicRef(service: service.ref, characteristic: id.bm);
 
   late final StreamController<List<int>> _streamController = StreamController<List<int>>.broadcast(
     onListen: () async {
