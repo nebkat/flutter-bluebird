@@ -1,0 +1,130 @@
+// Copyright 2017-2023, Charles Weinberger & Paul DeMarco.
+// All rights reserved. Use of this source code is governed by a
+// BSD-style license that can be found in the LICENSE file.
+
+import CoreBluetooth
+import Foundation
+
+extension CBUUID {
+  /// Lowercase uuid string. `CBUUID.uuidString` already uses the shortest
+  /// form (16/32-bit) where applicable, matching the ObjC `uuidStr` helper.
+  var uuidStr: String {
+    return uuidString.lowercased()
+  }
+}
+
+/// Platform-opaque instance token disambiguating duplicate uuids.
+/// Mirrors the ObjC identifier strings which used the pointer address
+/// (`(uintptr_t)obj`) of the CoreBluetooth object.
+func instanceToken(_ obj: AnyObject) -> Int64 {
+  return Int64(bitPattern: UInt64(UInt(bitPattern: Unmanaged.passUnretained(obj).toOpaque())))
+}
+
+/// The uuid:instance pair identifying one CoreBluetooth attribute.
+func attributeId(_ attribute: CBAttribute) -> BmAttributeId {
+  return BmAttributeId(uuid: attribute.uuid.uuidStr, instance: instanceToken(attribute))
+}
+
+private func matches(_ attribute: CBAttribute, _ id: BmAttributeId) -> Bool {
+  return attribute.uuid.uuidStr == id.uuid.lowercased() && instanceToken(attribute) == id.instance
+}
+
+private func findService(_ id: BmAttributeId, in services: [CBService]?) -> CBService? {
+  return services?.first(where: { matches($0, id) })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Building refs from CoreBluetooth objects
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Builds the typed ref for a service. Secondary (included) services carry
+/// the id of the primary service that contains them.
+func serviceRef(for service: CBService, in peripheral: CBPeripheral) -> BmServiceRef {
+  var parent: BmAttributeId? = nil
+  if !service.isPrimary {
+    outer: for s in peripheral.services ?? [] {
+      for included in s.includedServices ?? [] where included === service {
+        parent = attributeId(s)
+        break outer
+      }
+    }
+  }
+  return BmServiceRef(service: attributeId(service), parentService: parent)
+}
+
+func characteristicRef(for characteristic: CBCharacteristic, in peripheral: CBPeripheral)
+  -> BmCharacteristicRef?
+{
+  guard let service = characteristic.service else { return nil }
+  return BmCharacteristicRef(
+    service: serviceRef(for: service, in: peripheral),
+    characteristic: attributeId(characteristic))
+}
+
+func descriptorRef(for descriptor: CBDescriptor, in peripheral: CBPeripheral) -> BmDescriptorRef? {
+  guard let characteristic = descriptor.characteristic,
+    let charRef = characteristicRef(for: characteristic, in: peripheral)
+  else { return nil }
+  return BmDescriptorRef(characteristic: charRef, uuid: descriptor.uuid.uuidStr)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Resolving refs back to CoreBluetooth objects
+// ─────────────────────────────────────────────────────────────────────────────
+
+private func invalidIdentifier(_ message: String) -> PigeonError {
+  return PigeonError(code: "invalid_identifier", message: message, details: nil)
+}
+
+func locateService(_ ref: BmServiceRef, in peripheral: CBPeripheral) throws -> CBService {
+  // secondary service: locate the parent first, then search its includedServices
+  if let parentId = ref.parentService {
+    guard let parent = findService(parentId, in: peripheral.services) else {
+      throw invalidIdentifier("service not found in peripheral (svc: '\(parentId.uuid)')")
+    }
+    guard let service = findService(ref.service, in: parent.includedServices) else {
+      throw invalidIdentifier(
+        "included service not found in service (svc: '\(ref.service.uuid)', parent: '\(parentId.uuid)')")
+    }
+    return service
+  }
+
+  if let service = findService(ref.service, in: peripheral.services) {
+    return service
+  }
+
+  // fallback: search included services of every primary service
+  for s in peripheral.services ?? [] {
+    if let service = findService(ref.service, in: s.includedServices) {
+      return service
+    }
+  }
+
+  throw invalidIdentifier("service not found in peripheral (svc: '\(ref.service.uuid)')")
+}
+
+func locateCharacteristic(_ ref: BmCharacteristicRef, in peripheral: CBPeripheral) throws
+  -> CBCharacteristic
+{
+  let service = try locateService(ref.service, in: peripheral)
+  guard
+    let characteristic = service.characteristics?.first(where: { matches($0, ref.characteristic) })
+  else {
+    throw invalidIdentifier(
+      "characteristic not found in service (chr: '\(ref.characteristic.uuid)', svc: '\(ref.service.service.uuid)')")
+  }
+  return characteristic
+}
+
+func locateDescriptor(_ ref: BmDescriptorRef, in peripheral: CBPeripheral) throws -> CBDescriptor {
+  let characteristic = try locateCharacteristic(ref.characteristic, in: peripheral)
+  guard
+    let descriptor = characteristic.descriptors?.first(where: {
+      $0.uuid.uuidStr == ref.uuid.lowercased()
+    })
+  else {
+    throw invalidIdentifier(
+      "descriptor not found in characteristic (desc: '\(ref.uuid)', chr: '\(ref.characteristic.characteristic.uuid)')")
+  }
+  return descriptor
+}

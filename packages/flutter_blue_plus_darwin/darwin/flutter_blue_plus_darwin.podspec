@@ -11,12 +11,12 @@ Pod::Spec.new do |s|
   s.license          = { :file => '../LICENSE' }
   s.author           = { 'Chip Weinberger' => 'example@gmail.com' }
   s.source           = { :path => '.' }
-  s.source_files        = 'flutter_blue_plus_darwin/Sources/flutter_blue_plus_darwin/**/*.{h,m}'
-  s.public_header_files = 'flutter_blue_plus_darwin/Sources/flutter_blue_plus_darwin/include/**/*.h'
+  s.source_files        = 'flutter_blue_plus_darwin/Sources/flutter_blue_plus_darwin/**/*.swift'
   s.ios.dependency 'Flutter'
   s.osx.dependency 'FlutterMacOS'
   s.ios.deployment_target = '12.0'
   s.osx.deployment_target = '10.14'
+  s.swift_version = '5.9'
   s.framework = 'CoreBluetooth'
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', }
 end
