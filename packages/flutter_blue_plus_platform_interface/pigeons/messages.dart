@@ -240,7 +240,9 @@ class BmServicesResetEvent extends BmEvent {
 }
 
 /// Emitted on any MTU change: solicited (requestMtu) or peer-initiated on
-/// Android; synthesized once after connect on darwin.
+/// Android; on darwin, emitted after connect and whenever the negotiated
+/// value changes (CoreBluetooth has no MTU callback, so the plugin polls
+/// while devices are connected).
 class BmMtuChangedEvent extends BmEvent {
   late String address;
   late int mtu;

@@ -42,6 +42,10 @@ public class FlutterBluePlusPlugin: NSObject, FlutterPlugin, CBCentralManagerDel
   private var scanSettings: BmScanSettings?
   private var scanCounts: [String: Int] = [:]
 
+  // mtu tracking, keyed by device address (see checkForMtuChanges)
+  private var peripheralMtu: [String: Int] = [:]
+  private var mtuPollTimer: Timer?
+
   private var logLevel: LogLevel = .debug
   private var showPowerAlert = true
   private var restoreState = false
@@ -131,6 +135,37 @@ public class FlutterBluePlusPlugin: NSObject, FlutterPlugin, CBCentralManagerDel
     return getMaxPayload(peripheral, type: .withoutResponse, allowLongWrite: false) + 3  // ATT overhead
   }
 
+  /// iOS & macOS negotiate the mtu automatically sometime after the
+  /// connection process, but there is no platform callback for it, and
+  /// `maximumWriteValueLength` still returns the un-negotiated default at
+  /// `didConnect` time. So, while any device is connected, poll for changes
+  /// and emit BmMtuChangedEvent when the negotiated value appears.
+  private func startMtuPolling() {
+    guard mtuPollTimer == nil else { return }
+    mtuPollTimer = Timer.scheduledTimer(withTimeInterval: 0.025, repeats: true) { [weak self] _ in
+      self?.checkForMtuChanges()
+    }
+  }
+
+  private func stopMtuPollingIfIdle() {
+    if connectedPeripherals.isEmpty {
+      mtuPollTimer?.invalidate()
+      mtuPollTimer = nil
+    }
+  }
+
+  private func checkForMtuChanges() {
+    for (address, peripheral) in connectedPeripherals {
+      let mtu = getMtu(peripheral)
+      if peripheralMtu[address] != mtu {
+        peripheralMtu[address] = mtu
+        log(.debug, "mtu changed: \(mtu) (\(address))")
+        sink?.success(BmMtuChangedEvent(address: address, mtu: Int64(mtu)))
+      }
+    }
+    stopMtuPollingIfIdle()
+  }
+
   private func clearDiscoveryState(_ address: String) {
     discoveredServices.removeValue(forKey: address)
     servicesToDiscover.removeValue(forKey: address)
@@ -184,6 +219,8 @@ public class FlutterBluePlusPlugin: NSObject, FlutterPlugin, CBCentralManagerDel
       discoveredServices.removeAll()
       servicesToDiscover.removeAll()
       characteristicsToDiscover.removeAll()
+      peripheralMtu.removeAll()
+      stopMtuPollingIfIdle()
 
       pending.failAll(
         error: PigeonError(code: "adapter_off", message: "the adapter is turned off", details: nil))
@@ -281,8 +318,12 @@ public class FlutterBluePlusPlugin: NSObject, FlutterPlugin, CBCentralManagerDel
     sink?.success(BmConnectionStateEvent(address: address, connectionState: .connected))
 
     // iOS negotiates the mtu automatically during connection but offers no
-    // callback for it; synthesize the event once after connect.
-    sink?.success(BmMtuChangedEvent(address: address, mtu: Int64(getMtu(peripheral))))
+    // callback for it, and it usually hasn't happened yet at didConnect time.
+    // Emit the current value now, then poll for the negotiated value.
+    let mtu = getMtu(peripheral)
+    peripheralMtu[address] = mtu
+    sink?.success(BmMtuChangedEvent(address: address, mtu: Int64(mtu)))
+    startMtuPolling()
   }
 
   public func centralManager(
@@ -317,6 +358,8 @@ public class FlutterBluePlusPlugin: NSObject, FlutterPlugin, CBCentralManagerDel
     connectedPeripherals.removeValue(forKey: address)
     connectingPeripherals.removeValue(forKey: address)
     clearDiscoveryState(address)
+    peripheralMtu.removeValue(forKey: address)
+    stopMtuPollingIfIdle()
 
     // unregister self as delegate for peripheral
     peripheral.delegate = nil
