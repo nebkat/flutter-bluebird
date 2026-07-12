@@ -24,6 +24,8 @@ if (flutterVersionName == null) {
 android {
     namespace 'com.lib.bluebird_example'
     compileSdk flutter.compileSdkVersion
+    // highest NDK required across plugins (integration_test wants 28.x)
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_11
