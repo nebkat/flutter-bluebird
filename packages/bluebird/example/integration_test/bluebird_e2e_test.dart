@@ -12,6 +12,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'dart:typed_data';
 
 import 'package:bluebird/bluebird.dart';
@@ -387,10 +388,17 @@ void main() {
     timeout: const Timeout(Duration(seconds: 40)),
   );
 
-  group('bonding', skip: 'requires interactive pairing dialog on macOS', () {
+  // Just-Works bonding completes without a dialog on Android; macOS shows an
+  // OS pairing prompt that an automated test cannot dismiss.
+  group('bonding', skip: Platform.isAndroid ? false : 'requires interactive pairing dialog on macOS', () {
     test(
       'encrypted read triggers Just-Works bonding and returns "top-secret"',
       () async {
+        // start from a clean bond so the encrypted read actually drives pairing
+        if (await device.bondStateNow != BluetoothBondState.none) {
+          await device.removeBond();
+        }
+
         final value = await chr(svcA, chrEncrypted).read(timeout: const Duration(seconds: 30));
         expect(utf8.decode(value), 'top-secret');
         expect(await device.bondStateNow, BluetoothBondState.bonded);
