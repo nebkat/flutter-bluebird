@@ -50,7 +50,7 @@ class BluebirdPlugin :
 
     companion object {
         private const val TAG = "[Bluebird-Android]"
-        private val CCCD = Uuid.parse("2902")
+        private val CCCD = Uuid.CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR
         private const val ENABLE_BLUETOOTH_REQUEST_CODE = 13106
 
         // random number defined by bluebird.
@@ -1271,8 +1271,8 @@ class BluebirdPlugin :
         // pre-API-31: detects the 0x2A05 "services changed" indication from
         // the Generic Attribute service (requires our own subscription)
         private fun checkServicesReset(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
-            if (Uuid(characteristic.service.uuid).str == "1801" &&
-                Uuid(characteristic.uuid).str == "2a05"
+            if (Uuid(characteristic.service.uuid) == Uuid.GENERIC_ATTRIBUTE_SERVICE &&
+                Uuid(characteristic.uuid) == Uuid.SERVICE_CHANGED_CHARACTERISTIC
             ) {
                 emitEvent(BmServicesResetEvent(gatt.device.address))
             }

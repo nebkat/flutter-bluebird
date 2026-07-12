@@ -34,5 +34,15 @@ value class Uuid(val value: UUID) {
             8 -> "$s$BASE_SUFFIX"
             else -> s
         }))
+
+        // Bluetooth SIG assigned uuids
+        /** Generic Attribute service (0x1801). */
+        val GENERIC_ATTRIBUTE_SERVICE = parse("1801")
+
+        /** Service Changed characteristic (0x2A05). */
+        val SERVICE_CHANGED_CHARACTERISTIC = parse("2a05")
+
+        /** Client Characteristic Configuration descriptor (0x2902). */
+        val CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR = parse("2902")
     }
 }
