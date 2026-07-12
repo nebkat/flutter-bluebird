@@ -14,7 +14,7 @@ hardware: the ESP32-S3 test fixture in `tools/esp32_peripheral` (repo root).
 
 ```sh
 cd packages/bluebird/example
-flutter test integration_test/bluebird_e2e_test.dart -d macos
+cd example && flutter test integration_test/bluebird_e2e_test.dart -d macos
 ```
 
 (Substitute `-d <device-id>` for an Android device; `flutter devices` lists ids.)
