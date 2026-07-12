@@ -44,6 +44,23 @@ class Bluebird {
   /// Bluebird log level
   static LogLevel _logLevel = LogLevel.debug;
 
+  /// Resets all global state and re-subscribes to the current platform on the
+  /// next call. For tests only.
+  @visibleForTesting
+  static void resetForTest() {
+    _scanTimeout?.cancel();
+    for (final s in _scanSubscriptions) {
+      s.cancel();
+    }
+    _scanSubscriptions.clear();
+    _devices.clear();
+    _adapterStateNow = null;
+    _isScanning.add(false);
+    _scanResults.add([]);
+    _logLevel = LogLevel.debug;
+    _initialized = false;
+  }
+
   ////////////////////
   //  Public
   //

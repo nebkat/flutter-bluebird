@@ -33,4 +33,45 @@ void main() {
       expect(<Uuid>{Uuid('180a'), Uuid('0000180a-0000-1000-8000-00805f9b34fb')}.length, 1);
     });
   });
+
+  group('Uuid forms', () {
+    test('parses 16-, 32-, and 128-bit inputs', () {
+      expect(Uuid('180a').bytes.length, 2);
+      expect(Uuid('0000180a').bytes.length, 4);
+      expect(Uuid('6e400001-b5a3-f393-e0a9-e50e24dcca9e').bytes.length, 16);
+    });
+
+    test('string is the shortest form, string128 the expanded form', () {
+      expect(Uuid('180a').string, '180a');
+      expect(Uuid('180a').string128, '0000180a-0000-1000-8000-00805f9b34fb');
+      expect(Uuid('0000180a').string, '0000180a');
+      final full = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+      expect(Uuid(full).string, full);
+      expect(Uuid(full).string128, full);
+    });
+
+    test('toString equals the shortest form', () {
+      expect(Uuid('180a').toString(), '180a');
+    });
+  });
+
+  group('Uuid validation', () {
+    test('rejects wrong lengths', () {
+      expect(() => Uuid('18'), throwsFormatException);
+      expect(() => Uuid('180a0'), throwsFormatException);
+    });
+
+    test('rejects a malformed 128-bit layout', () {
+      expect(() => Uuid('6e400001xb5a3-f393-e0a9-e50e24dcca9e'), throwsFormatException);
+    });
+
+    test('rejects non-hex characters', () {
+      expect(() => Uuid('zzzz'), throwsFormatException);
+    });
+
+    test('fromBytes requires 2, 4, or 16 bytes', () {
+      expect(() => Uuid.fromBytes([1, 2, 3]), throwsA(isA<AssertionError>()));
+      expect(Uuid.fromBytes([1, 2]).bytes.length, 2);
+    });
+  });
 }
