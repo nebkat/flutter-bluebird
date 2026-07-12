@@ -1,5 +1,4 @@
 analyzer:
   exclude:
     # parked packages, not part of the pub workspace (see root pubspec.yaml)
-    - packages/bluebird_web/**
     - packages/bluebird_linux/**

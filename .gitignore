@@ -36,3 +36,6 @@
 .packages
 build/
 .pub/
+
+# Test coverage
+coverage/

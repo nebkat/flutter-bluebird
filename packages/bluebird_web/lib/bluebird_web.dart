@@ -9,331 +9,163 @@ import 'package:web/web.dart' show Event;
 import 'src/html.dart';
 import 'src/web_bluetooth.dart';
 
+/// Web implementation of the bluebird platform interface, backed by the
+/// [Web Bluetooth API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Bluetooth_API).
+///
+/// ## Scanning
+///
+/// Web Bluetooth has NO passive scan. There is no way to observe advertisements
+/// from arbitrary nearby devices. The only entry point is
+/// `navigator.bluetooth.requestDevice(...)`, which shows a browser-controlled
+/// device chooser and returns exactly ONE device that the user picks. As a
+/// result [startScan] triggers the chooser and, when a device is selected,
+/// emits a single [BmScanAdvertisementsEvent] carrying one advertisement for
+/// that device. The advertisement is minimal — the API exposes almost no
+/// advertising data, so rssi is reported as `0` and the service/manufacturer
+/// data maps are empty. If the user dismisses the chooser, a
+/// [BmScanFailedEvent] is emitted instead. [stopScan] is a no-op (there is no
+/// ongoing scan to cancel).
+///
+/// ## Typed-ref resolution
+///
+/// Web Bluetooth has no attribute instance-id concept. To honor the platform
+/// interface's `BmAttributeId { uuid, instance }` refs, [discoverServices]
+/// enumerates services (and their characteristics/descriptors) and builds a
+/// per-device cache. Each attribute is assigned an `instance` equal to its
+/// index among same-uuid siblings (in discovery order). The `BmBluetoothService`
+/// tree returned to the app is numbered identically, so the refs the app later
+/// sends back can be resolved by matching (service uuid + instance,
+/// characteristic uuid + instance).
+///
+/// ## Unsupported operations
+///
+/// Web Bluetooth cannot do: read RSSI, request/observe MTU, bonding, PHY,
+/// clear GATT cache, enumerate system/bonded devices, or turn the adapter
+/// on/off. Those methods are intentionally NOT overridden and fall through to
+/// the base class, which throws [UnimplementedError].
 final class BluebirdWeb extends BluebirdPlatform {
-  late final _characteristicValueChangedEventListener = _handleCharacteristicValueChanged.toJS;
-
-  final _devices = <String, BluetoothDevice>{};
-
-  BluetoothRemoteGATTServer _gattForDevice(String address) {
-    final device = _devices[address];
-    if (device == null) throw Exception('The device "$address" could not be found.');
-    final gatt = device.gatt;
-    if (gatt == null) throw Exception('The gatt for the device "$address" is null.');
-    return gatt;
-  }
-
-  // for instanceIds
-  final _charCache = <String, Map<Uuid, Map<Uuid, List<BluetoothRemoteGATTCharacteristic>>>>{};
-
-  final _onCharacteristicReceivedController = StreamController<BmCharacteristicData>.broadcast();
-  final _onConnectionStateChangedController = StreamController<BmConnectionStateResponse>.broadcast();
-  final _onDevicesChangedController = StreamController<List<BluetoothDevice>>.broadcast();
-  final _onScanResponseController = StreamController<BmScanResponse>.broadcast();
-
-  BluetoothRemoteGATTCharacteristic _findCharacteristicOrThrow({
-    required String address,
-    required String identifier,
-  }) {
-    // final list = _charCache[address]?[serviceUuid]?[charUuid];
-    // if (list == null || instanceId < 0 || instanceId >= list.length) {
-    //   throw Exception(
-    //     'Characteristic not found in cache: service=$serviceUuid char=$charUuid instanceId=$instanceId',
-    //   );
-    // }
-    // return list[instanceId];
-    throw UnimplementedError('Characteristic access by identifier is not implemented yet.');
-  }
-
-  BluetoothRemoteGATTDescriptor _findDescriptorOrThrow({
-    required String address,
-    required String identifier,
-  }) {
-    // final characteristic = _findCharacteristicOrThrow(
-    //   address: address,
-    //   serviceUuid: serviceUuid,
-    //   charUuid: charUuid,
-    //   instanceId: instanceId,
-    // );
-    // return characteristic.getDescriptor(descriptorUuid.toJS).toDart;
-    throw UnimplementedError('Descriptor access is not implemented yet.');
-  }
-
-  int _instanceId(String devId, Uuid serviceUuid, BluetoothRemoteGATTCharacteristic target) {
-    final list = _charCache[devId]?[serviceUuid]?[Uuid(target.uuid)];
-    if (list == null) return 0;
-    final idx = list.indexWhere((c) => identical(c, target));
-    return idx >= 0 ? idx : 0;
-  }
-
-  @override
-  Stream<BmCharacteristicData> get onCharacteristicReceived {
-    return _onCharacteristicReceivedController.stream;
-  }
-
-  @override
-  Stream<BmConnectionStateResponse> get onConnectionStateChanged {
-    return _onConnectionStateChangedController.stream;
-  }
-
-  @override
-  Stream<BmScanResponse> get onScanResponse {
-    return _onScanResponseController.stream;
-  }
-
   static void registerWith(Registrar registrar) {
     BluebirdPlatform.instance = BluebirdWeb();
   }
 
+  final _events = StreamController<BmEvent>.broadcast();
+
   @override
-  Future<bool> connect(
-    BmConnectRequest request,
-  ) async {
-    final gatt = _gattForDevice(request.address);
-    await gatt.connect().toDart;
+  Stream<BmEvent> get events => _events.stream;
 
-    _onConnectionStateChangedController.add(
-      BmConnectionStateResponse(
-        address: request.address,
-        connectionState: BmConnectionStateEnum.connected,
-        disconnectReasonCode: null,
-        disconnectReasonString: null,
-      ),
-    );
+  /// Devices we have obtained handles to, keyed by address (== `device.id`).
+  final _devices = <String, BluetoothDevice>{};
 
-    return true;
+  /// Per-device attribute cache, populated by [discoverServices]. Holds the
+  /// live JS handles alongside the instance numbering we exposed to the app so
+  /// that refs can be resolved back to handles.
+  final _caches = <String, _DeviceCache>{};
+
+  /// Reverse map from a live JS characteristic to the ref we handed the app,
+  /// used to label incoming notifications. Keyed by identity via a wrapper.
+  final _charRefs = <BluetoothRemoteGATTCharacteristic, BmCharacteristicRef>{};
+
+  late final _characteristicValueChangedListener =
+      _handleCharacteristicValueChanged.toJS;
+  late final _gattServerDisconnectedListener =
+      _handleGattServerDisconnected.toJS;
+
+  BluetoothRemoteGATTServer _gattForDevice(String address) {
+    final device = _devices[address];
+    if (device == null) {
+      throw StateError('The device "$address" could not be found.');
+    }
+    final gatt = device.gatt;
+    if (gatt == null) {
+      throw StateError('The gatt for the device "$address" is null.');
+    }
+    return gatt;
   }
 
-  @override
-  Future<void> disconnect(
-    BmDisconnectRequest request,
-  ) async {
-    final gatt = _gattForDevice(request.address);
-    gatt.disconnect();
-
-    // drop cache for this device to avoid stale entries
-    _charCache.remove(request.address);
-
-    _onConnectionStateChangedController.add(
-      BmConnectionStateResponse(
-        address: request.address,
-        connectionState: BmConnectionStateEnum.disconnected,
-        disconnectReasonCode: null,
-        disconnectReasonString: null,
-      ),
-    );
-  }
-
-  @override
-  Future<BmDiscoverServicesResponse> discoverServices(
-    BmDiscoverServicesRequest request,
-  ) async {
-    final gatt = _gattForDevice(request.address);
-    final services = <BmBluetoothService>[];
-
-    // ensure dev map exists
-    final devMap = _charCache.putIfAbsent(request.address, () {
-      return <Uuid, Map<Uuid, List<BluetoothRemoteGATTCharacteristic>>>{};
-    });
-
-    // Enumerate services and characteristics; build cache synchronously from discovery results
-    final primaryServices = (await gatt.getPrimaryServices().toDart).toDart;
-    for (final s in primaryServices) {
-      final characteristics = <BmBluetoothCharacteristic>[];
-
-      // reset/ensure service map
-      final charsByUuid = devMap.putIfAbsent(Uuid(s.uuid), () {
-        return <Uuid, List<BluetoothRemoteGATTCharacteristic>>{};
-      });
-
-      // pull all chars and cache them grouped by char.uuid (order matters and defines instanceId)
-      final chars = (await s.getCharacteristics().toDart).toDart;
-
-      // rebuild for this service
-      charsByUuid
-        ..clear()
-        ..addAll(<Uuid, List<BluetoothRemoteGATTCharacteristic>>{});
-      for (final c in chars) {
-        (charsByUuid[Uuid(c.uuid)] ??= <BluetoothRemoteGATTCharacteristic>[]).add(c);
-      }
-
-      for (final c in chars) {
-        final descriptors = <BmBluetoothDescriptor>[];
-
-        try {
-          final descs = (await c.getDescriptors().toDart).toDart;
-          for (final d in descs) {
-            descriptors.add(
-              BmBluetoothDescriptor(uuid: Uuid(d.uuid)),
-            );
-          }
-        } catch (e) {
-          // ignore errors when getting characteristics descriptors
-        }
-
-        characteristics.add(
-          BmBluetoothCharacteristic(
-            uuid: Uuid(c.uuid),
-            index: _instanceId(request.address, Uuid(s.uuid), c),
-            descriptors: descriptors,
-            properties: BmCharacteristicProperties(
-              broadcast: c.properties.broadcast,
-              read: c.properties.read,
-              writeWithoutResponse: c.properties.writeWithoutResponse,
-              write: c.properties.write,
-              notify: c.properties.notify,
-              indicate: c.properties.indicate,
-              authenticatedSignedWrites: c.properties.authenticatedSignedWrites,
-              extendedProperties: false,
-              notifyEncryptionRequired: false,
-              indicateEncryptionRequired: false,
-            ),
-          ),
-        );
-      }
-
-      services.add(
-        BmBluetoothService(
-          uuid: Uuid(s.uuid),
-          index: 0, // TODO
-          isPrimary: s.isPrimary,
-          characteristics: characteristics,
-          includedServices: [], // TODO
-        ),
+  _DeviceCache _cacheForDevice(String address) {
+    final cache = _caches[address];
+    if (cache == null) {
+      throw StateError(
+        'Services have not been discovered for device "$address".',
       );
     }
-
-    return BmDiscoverServicesResponse(services: services);
+    return cache;
   }
 
   @override
-  Future<bool> isSupported(
-    BmIsSupportedRequest request,
-  ) async {
+  Future<bool> isSupported() async {
     try {
       return (await window.navigator.bluetooth.getAvailability().toDart).toDart;
     } catch (e) {
-      return false; // https://developer.mozilla.org/en-US/docs/Web/API/Web_Bluetooth_API#browser_compatibility
+      // https://developer.mozilla.org/en-US/docs/Web/API/Web_Bluetooth_API#browser_compatibility
+      return false;
     }
   }
 
   @override
-  Future<BmBluetoothAdapterState> getAdapterState(
-    BmBluetoothAdapterStateRequest request,
-  ) {
-    return isSupported(BmIsSupportedRequest()).then(
-      (supported) => BmBluetoothAdapterState(
-        adapterState: supported ? BmAdapterStateEnum.on : BmAdapterStateEnum.unknown,
-      ),
-    );
+  Future<BmAdapterStateEnum> getAdapterState() async {
+    return (await isSupported())
+        ? BmAdapterStateEnum.on
+        : BmAdapterStateEnum.unavailable;
   }
 
   @override
-  Future<BmCharacteristicData> readCharacteristic(
-    BmReadCharacteristicRequest request,
-  ) async {
-    final characteristic = _findCharacteristicOrThrow(address: request.address, identifier: request.identifier);
-
-    final value = (await characteristic.readValue().toDart).toDart;
-    return BmCharacteristicData(
-      address: request.address,
-      identifier: request.identifier,
-      value: value.buffer.asUint8List(),
-    );
-  }
-
-  @override
-  Future<BmDescriptorData> readDescriptor(
-    BmReadDescriptorRequest request,
-  ) async {
-    final descriptor = _findDescriptorOrThrow(address: request.address, identifier: request.identifier);
-
-    final value = (await descriptor.readValue().toDart).toDart;
-    return BmDescriptorData(
-      address: request.address,
-      identifier: request.identifier,
-      value: value.buffer.asUint8List(),
-    );
-  }
-
-  @override
-  Future<bool> setNotifyValue(
-    BmSetNotifyValueRequest request,
-  ) async {
-    final characteristic = _findCharacteristicOrThrow(address: request.address, identifier: request.identifier);
-
-    if (request.enable) {
-      characteristic.addEventListener('characteristicvaluechanged', _characteristicValueChangedEventListener);
-      await characteristic.startNotifications().toDart;
-    } else {
-      await characteristic.stopNotifications().toDart;
-      characteristic.removeEventListener('characteristicvaluechanged', _characteristicValueChangedEventListener);
-    }
-
-    return true;
-  }
-
-  @override
-  Future<bool> startScan(
-    BmScanSettings request,
-  ) async {
+  Future<void> startScan(BmScanSettings settings) async {
     final filters = <BluetoothLEScanFilterInit>[
-      // Services
-      for (final service in request.withServices)
+      for (final service in settings.withServices)
         BluetoothLEScanFilterInit(
-          services: [
-            service.string128.toJS,
-          ].toJS,
+          services: [Uuid(service).string128.toJS].toJS,
         ),
-
-      // Names
-      for (final name in request.withNames)
-        BluetoothLEScanFilterInit(
-          name: name,
-        ),
-
-      // Manufacturer data
-      for (final manufacturerData in request.withMsd)
-        BluetoothLEScanFilterInit(
-          manufacturerData: [
-            BluetoothManufacturerDataFilterInit(
-              companyIdentifier: manufacturerData.manufacturerId,
-            ),
-          ].toJS,
-        ),
-
-      // Service data
-      for (final serviceData in request.withServiceData)
-        BluetoothLEScanFilterInit(
-          serviceData: [
-            BluetoothServiceDataFilterInit(
-              service: serviceData.service.string128.toJS,
-            ),
-          ].toJS,
-        )
+      for (final name in settings.withNames)
+        BluetoothLEScanFilterInit(name: name),
     ];
 
-    final RequestDeviceOptions options;
+    final options = filters.isNotEmpty
+        ? RequestDeviceOptions(
+            filters: filters.toJS,
+            optionalServices: settings.webOptionalServices
+                .map((e) => Uuid(e).string128.toJS)
+                .toList()
+                .toJS,
+          )
+        : RequestDeviceOptions(
+            // https://developer.mozilla.org/en-US/docs/Web/API/Bluetooth/requestDevice#acceptalldevices
+            acceptAllDevices: true,
+            optionalServices: settings.webOptionalServices
+                .map((e) => Uuid(e).string128.toJS)
+                .toList()
+                .toJS,
+          );
 
-    if (filters.isNotEmpty) {
-      options = RequestDeviceOptions(
-        filters: filters.toJS,
-        optionalServices: request.webOptionalServices.map((e) => e.string128.toJS).toList().toJS,
+    final BluetoothDevice device;
+    try {
+      device = await window.navigator.bluetooth.requestDevice(options).toDart;
+    } catch (e) {
+      // The user dismissed the chooser (NotFoundError) or the request was
+      // otherwise rejected. Web Bluetooth surfaces this as a thrown DOMException.
+      _events.add(
+        BmScanFailedEvent(
+          errorCode: BluebirdErrorCode.userCanceled.index,
+          errorString: 'The device chooser was dismissed: $e',
+        ),
       );
-    } else {
-      // https://developer.mozilla.org/en-US/docs/Web/API/Bluetooth/requestDevice#acceptalldevices
-      options = RequestDeviceOptions(
-        acceptAllDevices: true,
-        optionalServices: request.webOptionalServices.map((e) => e.string128.toJS).toList().toJS,
-      );
+      return;
     }
 
-    final device = await window.navigator.bluetooth.requestDevice(options).toDart;
-
     _devices[device.address] = device;
-    _onDevicesChangedController.add([..._devices.values]);
 
-    _onScanResponseController.add(
-      BmScanResponse(
+    // Listen for spontaneous disconnects on this device.
+    device.removeEventListener(
+      'gattserverdisconnected',
+      _gattServerDisconnectedListener,
+    );
+    device.addEventListener(
+      'gattserverdisconnected',
+      _gattServerDisconnectedListener,
+    );
+
+    _events.add(
+      BmScanAdvertisementsEvent(
         advertisements: [
           BmScanAdvertisement(
             address: device.address,
@@ -348,55 +180,337 @@ final class BluebirdWeb extends BluebirdPlatform {
             rssi: 0,
           ),
         ],
-        success: true,
-        errorCode: 0,
-        errorString: '',
       ),
     );
+  }
 
-    return true;
+  @override
+  Future<void> stopScan() async {
+    // Web Bluetooth has no ongoing scan to stop; the chooser is modal and
+    // resolves synchronously with the user's choice.
+  }
+
+  @override
+  Future<void> connect(String address) async {
+    final gatt = _gattForDevice(address);
+    await gatt.connect().toDart;
+
+    _events.add(
+      BmConnectionStateEvent(
+        address: address,
+        connectionState: BmConnectionStateEnum.connected,
+      ),
+    );
+  }
+
+  @override
+  Future<void> disconnect(String address) async {
+    final gatt = _gattForDevice(address);
+    gatt.disconnect();
+
+    _clearDeviceCache(address);
+
+    _events.add(
+      BmConnectionStateEvent(
+        address: address,
+        connectionState: BmConnectionStateEnum.disconnected,
+      ),
+    );
+  }
+
+  @override
+  Future<List<BmBluetoothService>> discoverServices(String address) async {
+    final gatt = _gattForDevice(address);
+
+    // Drop any stale cache/notification handles before rebuilding.
+    _clearDeviceCache(address);
+
+    final cache = _DeviceCache();
+    _caches[address] = cache;
+
+    final services = <BmBluetoothService>[];
+
+    final primaryServices = (await gatt.getPrimaryServices().toDart).toDart;
+
+    // instance = index among same-uuid siblings, in discovery order.
+    final serviceUuidCounts = <Uuid, int>{};
+
+    for (final jsService in primaryServices) {
+      final serviceUuid = Uuid(jsService.uuid);
+      final serviceInstance = serviceUuidCounts[serviceUuid] ?? 0;
+      serviceUuidCounts[serviceUuid] = serviceInstance + 1;
+
+      final cachedService = _CachedService(
+        handle: jsService,
+        uuid: serviceUuid,
+        instance: serviceInstance,
+      );
+      cache.services.add(cachedService);
+
+      final serviceRef = BmServiceRef(
+        service: BmAttributeId(uuid: serviceUuid, instance: serviceInstance),
+      );
+
+      final characteristics = <BmBluetoothCharacteristic>[];
+
+      final jsChars = (await jsService.getCharacteristics().toDart).toDart;
+      final charUuidCounts = <Uuid, int>{};
+
+      for (final jsChar in jsChars) {
+        final charUuid = Uuid(jsChar.uuid);
+        final charInstance = charUuidCounts[charUuid] ?? 0;
+        charUuidCounts[charUuid] = charInstance + 1;
+
+        cachedService.characteristics.add(
+          _CachedCharacteristic(
+            handle: jsChar,
+            uuid: charUuid,
+            instance: charInstance,
+          ),
+        );
+
+        final charRef = BmCharacteristicRef(
+          service: serviceRef,
+          characteristic: BmAttributeId(uuid: charUuid, instance: charInstance),
+        );
+        _charRefs[jsChar] = charRef;
+
+        final descriptors = <BmBluetoothDescriptor>[];
+        try {
+          final jsDescs = (await jsChar.getDescriptors().toDart).toDart;
+          for (final jsDesc in jsDescs) {
+            descriptors.add(
+              BmBluetoothDescriptor(uuid: Uuid(jsDesc.uuid).string128),
+            );
+          }
+        } catch (e) {
+          // getDescriptors throws if there are none / access is disallowed.
+        }
+
+        final props = jsChar.properties;
+        characteristics.add(
+          BmBluetoothCharacteristic(
+            id: BmAttributeId(uuid: charUuid, instance: charInstance),
+            descriptors: descriptors,
+            properties: BmCharacteristicProperties(
+              broadcast: props.broadcast,
+              read: props.read,
+              writeWithoutResponse: props.writeWithoutResponse,
+              write: props.write,
+              notify: props.notify,
+              indicate: props.indicate,
+              authenticatedSignedWrites: props.authenticatedSignedWrites,
+              extendedProperties: false,
+              notifyEncryptionRequired: false,
+              indicateEncryptionRequired: false,
+            ),
+          ),
+        );
+      }
+
+      services.add(
+        BmBluetoothService(
+          id: BmAttributeId(uuid: serviceUuid, instance: serviceInstance),
+          isPrimary: jsService.isPrimary,
+          characteristics: characteristics,
+          // Web Bluetooth exposes included services via getIncludedServices(),
+          // but the app model reaches them through the primary tree; we leave
+          // this empty (included-service enumeration is not supported here).
+          includedServices: [],
+        ),
+      );
+    }
+
+    return services;
+  }
+
+  @override
+  Future<Uint8List> readCharacteristic(
+    String address,
+    BmCharacteristicRef characteristic,
+  ) async {
+    final jsChar = _resolveCharacteristic(address, characteristic);
+    final value = (await jsChar.readValue().toDart).toDart;
+    return value.buffer.asUint8List(value.offsetInBytes, value.lengthInBytes);
   }
 
   @override
   Future<void> writeCharacteristic(
-    BmWriteCharacteristicRequest request,
+    String address,
+    BmCharacteristicRef characteristic,
+    BmWriteType writeType,
+    bool allowLongWrite,
+    Uint8List value,
   ) async {
-    final characteristic = _findCharacteristicOrThrow(address: request.address, identifier: request.identifier);
-
-    if (request.writeType == BmWriteType.withResponse) {
-      await characteristic.writeValueWithResponse(Uint8List.fromList(request.value).toJS).toDart;
+    final jsChar = _resolveCharacteristic(address, characteristic);
+    if (writeType == BmWriteType.withResponse) {
+      await jsChar.writeValueWithResponse(value.toJS).toDart;
     } else {
-      await characteristic.writeValueWithoutResponse(Uint8List.fromList(request.value).toJS).toDart;
+      await jsChar.writeValueWithoutResponse(value.toJS).toDart;
     }
   }
 
   @override
-  Future<void> writeDescriptor(
-    BmWriteDescriptorRequest request,
+  Future<Uint8List> readDescriptor(
+    String address,
+    BmDescriptorRef descriptor,
   ) async {
-    final descriptor = _findDescriptorOrThrow(address: request.address, identifier: request.identifier);
-    await descriptor.writeValue(Uint8List.fromList(request.value).toJS).toDart;
+    final jsDesc = await _resolveDescriptor(address, descriptor);
+    final value = (await jsDesc.readValue().toDart).toDart;
+    return value.buffer.asUint8List(value.offsetInBytes, value.lengthInBytes);
   }
 
-  void _handleCharacteristicValueChanged(
-    Event event,
+  @override
+  Future<void> writeDescriptor(
+    String address,
+    BmDescriptorRef descriptor,
+    Uint8List value,
+  ) async {
+    final jsDesc = await _resolveDescriptor(address, descriptor);
+    await jsDesc.writeValue(value.toJS).toDart;
+  }
+
+  @override
+  Future<bool> setNotifyValue(
+    String address,
+    BmCharacteristicRef characteristic,
+    bool forceIndications,
+    bool enable,
+  ) async {
+    final jsChar = _resolveCharacteristic(address, characteristic);
+    if (enable) {
+      jsChar.addEventListener(
+        'characteristicvaluechanged',
+        _characteristicValueChangedListener,
+      );
+      await jsChar.startNotifications().toDart;
+    } else {
+      await jsChar.stopNotifications().toDart;
+      jsChar.removeEventListener(
+        'characteristicvaluechanged',
+        _characteristicValueChangedListener,
+      );
+    }
+    return true;
+  }
+
+  // --- ref resolution -------------------------------------------------------
+
+  BluetoothRemoteGATTCharacteristic _resolveCharacteristic(
+    String address,
+    BmCharacteristicRef ref,
   ) {
-    final characteristic = event.target as BluetoothRemoteGATTCharacteristic;
+    final cache = _cacheForDevice(address);
 
-    final address = characteristic.service.device.address;
+    final serviceId = ref.service.service;
+    final cachedService = cache.services.firstWhere(
+      (s) => s.uuid == serviceId.uuid && s.instance == serviceId.instance,
+      orElse: () => throw StateError(
+        'Service ${serviceId.uuid}#${serviceId.instance} not found for "$address".',
+      ),
+    );
 
-    _onCharacteristicReceivedController.add(
-      BmCharacteristicData(
+    final charId = ref.characteristic;
+    final cachedChar = cachedService.characteristics.firstWhere(
+      (c) => c.uuid == charId.uuid && c.instance == charId.instance,
+      orElse: () => throw StateError(
+        'Characteristic ${charId.uuid}#${charId.instance} not found for "$address".',
+      ),
+    );
+
+    return cachedChar.handle;
+  }
+
+  Future<BluetoothRemoteGATTDescriptor> _resolveDescriptor(
+    String address,
+    BmDescriptorRef ref,
+  ) async {
+    final jsChar = _resolveCharacteristic(address, ref.characteristic);
+    return await jsChar.getDescriptor(ref.uuid.string128.toJS).toDart;
+  }
+
+  // --- event handlers -------------------------------------------------------
+
+  void _handleCharacteristicValueChanged(Event event) {
+    final jsChar = event.target as BluetoothRemoteGATTCharacteristic;
+    final ref = _charRefs[jsChar];
+    if (ref == null) {
+      // We received a notification for a characteristic we have no ref for
+      // (e.g. after a cache reset). Nothing meaningful we can label it with.
+      return;
+    }
+
+    final address = jsChar.service.device.address;
+    final data = jsChar.value?.toDart;
+    final value = data == null
+        ? Uint8List(0)
+        : data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+
+    _events.add(
+      BmCharacteristicNotificationEvent(
         address: address,
-        identifier: '', // TODO
-        value: characteristic.value?.toDart.buffer.asUint8List() ?? [],
+        characteristic: ref,
+        value: value,
       ),
     );
   }
+
+  void _handleGattServerDisconnected(Event event) {
+    final device = event.target as BluetoothDevice;
+    final address = device.address;
+
+    _clearDeviceCache(address);
+
+    _events.add(
+      BmConnectionStateEvent(
+        address: address,
+        connectionState: BmConnectionStateEnum.disconnected,
+      ),
+    );
+  }
+
+  void _clearDeviceCache(String address) {
+    final cache = _caches.remove(address);
+    if (cache == null) return;
+    for (final service in cache.services) {
+      for (final char in service.characteristics) {
+        _charRefs.remove(char.handle);
+      }
+    }
+  }
+}
+
+/// Per-device discovered-attribute cache used for ref resolution.
+class _DeviceCache {
+  final List<_CachedService> services = [];
+}
+
+class _CachedService {
+  _CachedService({
+    required this.handle,
+    required this.uuid,
+    required this.instance,
+  });
+
+  final BluetoothRemoteGATTService handle;
+  final Uuid uuid;
+  final int instance;
+  final List<_CachedCharacteristic> characteristics = [];
+}
+
+class _CachedCharacteristic {
+  _CachedCharacteristic({
+    required this.handle,
+    required this.uuid,
+    required this.instance,
+  });
+
+  final BluetoothRemoteGATTCharacteristic handle;
+  final Uuid uuid;
+  final int instance;
 }
 
 extension on BluetoothDevice {
-  String get address {
-    return id;
-  }
+  /// Web Bluetooth's stable per-origin device identifier, used as the address.
+  String get address => id;
 }

@@ -20,7 +20,7 @@ dependencies:
   bluebird_android: 1.0.0
   bluebird_darwin: 1.0.0
 #  bluebird_linux: 1.0.0
-#  bluebird_web: 1.0.0
+  bluebird_web: 1.0.0
 
 dev_dependencies:
   flutter_lints: ^6.0.0
@@ -39,5 +39,5 @@ flutter:
       # parked:
       # linux:
       #   default_package: bluebird_linux
-      # web:
-      #   default_package: bluebird_web
+      web:
+        default_package: bluebird_web

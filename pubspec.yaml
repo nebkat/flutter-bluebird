@@ -10,5 +10,5 @@ workspace:
   - packages/bluebird_darwin
   # parked until the platform interface stabilizes (see packages/bluebird/pubspec.yaml)
   # - packages/bluebird_linux
-  # - packages/bluebird_web
+  - packages/bluebird_web
   - packages/bluebird/example
