@@ -54,7 +54,7 @@ void main() {
 
   BluetoothService serviceByUuid(Uuid uuid) => services.firstWhere(
         (s) => s.uuid == uuid,
-        orElse: () => fail('service $uuid not found on fixture'),
+        orElse: () => fail('service $uuid not found on fixture; discovered: ${services.map((s) => s.uuid).toList()}'),
       );
 
   BluetoothCharacteristic chr(Uuid service, Uuid characteristic) =>
@@ -130,8 +130,14 @@ void main() {
     expect(adv.connectable, isTrue);
 
     device = result.device;
+    // ignore: avoid_print
+    print('FIXTURE result: address=${result.address} platformName=${result.platformName} adv=${result.advertisementData}');
     await device.connect(timeout: const Duration(seconds: 15));
+    // ignore: avoid_print
+    print('CONNECTED: remoteId=${device.remoteId} platformName=${device.platformName}');
     services = await device.discoverServices();
+    // ignore: avoid_print
+    print('DISCOVERED: ${services.map((s) => s.uuid).toList()}');
   });
 
   tearDownAll(() async {

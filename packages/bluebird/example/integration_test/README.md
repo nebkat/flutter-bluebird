@@ -32,3 +32,11 @@ flutter test integration_test/bluebird_e2e_test.dart -d macos
   pairing requires an interactive dialog on macOS. Remove the `skip:` on the
   `bonding` group to run it manually.
 - Total runtime with the fixture present is under two minutes.
+
+## Troubleshooting: stale GATT cache on macOS
+
+macOS caches a peripheral's GATT database by device identity. If the fixture
+board previously ran different firmware, discovery returns the *old* services
+(the advertisement will look correct — the cache only affects GATT). Fix:
+
+    blueutil -p 0 && sleep 2 && blueutil -p 1    # brew install blueutil
