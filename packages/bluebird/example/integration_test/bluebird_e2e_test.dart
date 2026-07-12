@@ -12,7 +12,6 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show Platform;
 import 'dart:typed_data';
 
 import 'package:bluebird/bluebird.dart';
@@ -388,20 +387,35 @@ void main() {
     timeout: const Timeout(Duration(seconds: 40)),
   );
 
-  // Just-Works bonding completes without a dialog on Android; macOS shows an
-  // OS pairing prompt that an automated test cannot dismiss.
-  group('bonding', skip: Platform.isAndroid ? false : 'requires interactive pairing dialog on macOS', () {
+  // Reading an encryption-requiring characteristic forces pairing/bonding.
+  // Android exposes bond-state management (query + remove) and Just-Works
+  // bonds silently; macOS/iOS bond implicitly inside CoreBluetooth (no bond
+  // API) and prompt with an OS pairing dialog that must be accepted by hand.
+  group('bonding', () {
+    final canManageBonds = !System.isDarwin;
+
     test(
-      'encrypted read triggers Just-Works bonding and returns "top-secret"',
+      'encrypted read triggers bonding and returns "top-secret"',
       () async {
-        // start from a clean bond so the encrypted read actually drives pairing
-        if (await device.bondStateNow != BluetoothBondState.none) {
+        // start from a clean bond so the encrypted read actually drives
+        // pairing; removeBond disconnects on Android, so reconnect + rediscover
+        // to run the read against live attribute handles
+        if (canManageBonds && await device.bondStateNow != BluetoothBondState.none) {
           await device.removeBond();
+          if (device.isDisconnected) {
+            await device.connect(timeout: const Duration(seconds: 15));
+            services = await device.discoverServices();
+          }
         }
 
+        // the read only succeeds once the link is encrypted, so a correct
+        // value is itself proof that bonding completed
         final value = await chr(svcA, chrEncrypted).read(timeout: const Duration(seconds: 30));
         expect(utf8.decode(value), 'top-secret');
-        expect(await device.bondStateNow, BluetoothBondState.bonded);
+
+        if (canManageBonds) {
+          expect(await device.bondStateNow, BluetoothBondState.bonded);
+        }
       },
       timeout: const Timeout(Duration(seconds: 45)),
     );
