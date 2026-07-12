@@ -1260,8 +1260,16 @@ class BluebirdPlugin :
             pending.cont.resume(gatt.services.map { Proto.bmBluetoothService(gatt, it) })
         }
 
-        // detects the 0x2A05 "services changed" indication from the
-        // Generic Attribute service
+        // API 31+: the framework consumes the 0x2A05 "services changed"
+        // indication itself (like CoreBluetooth) and delivers it here instead
+        // of onCharacteristicChanged
+        override fun onServiceChanged(gatt: BluetoothGatt) {
+            log(LogLevel.DEBUG, "onServiceChanged")
+            emitEvent(BmServicesResetEvent(gatt.device.address))
+        }
+
+        // pre-API-31: detects the 0x2A05 "services changed" indication from
+        // the Generic Attribute service (requires our own subscription)
         private fun checkServicesReset(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
             if (Uuid(characteristic.service.uuid).str == "1801" &&
                 Uuid(characteristic.uuid).str == "2a05"

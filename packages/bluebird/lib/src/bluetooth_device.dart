@@ -146,6 +146,11 @@ class BluetoothDevice {
         disconnectReturned = true;
 
         await future;
+
+        // the connect future completing means we are connected; update state
+        // here rather than waiting for the BmConnectionStateEvent, which
+        // travels on a separate channel and may be processed after we return
+        _connectionState = BluetoothConnectionState.connected;
       } on BluebirdException catch (e) {
         if (e.code == BluebirdErrorCode.timeout) {
           await Bluebird.invoke("disconnect", (p) => p.disconnect(remoteId));
