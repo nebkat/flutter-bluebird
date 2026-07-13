@@ -1,0 +1,45 @@
+# Publishes a single package to pub.dev via OIDC (no long-lived token).
+#
+# One-time setup, per package, on pub.dev:
+#   Admin -> Automated publishing -> Enable publishing from GitHub Actions
+#     repository:   nebkat/flutter-bluebird
+#     tag pattern:  {{package}}-v{{version}}   (e.g. bluebird-v0.1.0)
+# and create a GitHub environment named `pub.dev` (Settings -> Environments).
+#
+# Publish by pushing a tag `<package>-v<version>`. Because packages depend on
+# exact versions of each other, publish in dependency order and wait for each to
+# appear on pub.dev before the next:
+#   bluebird_platform_interface-v0.1.0
+#   bluebird_android-v0.1.0 / bluebird_darwin-v0.1.0 / bluebird_web-v0.1.0
+#   bluebird-v0.1.0
+
+name: publish
+
+on:
+  push:
+    tags:
+      - '*-v[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  publish:
+    permissions:
+      id-token: write # required for OIDC auth to pub.dev
+    environment: pub.dev
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Resolve package directory from tag
+        id: pkg
+        run: |
+          name="${GITHUB_REF_NAME%-v*}"
+          echo "dir=packages/${name}" >> "$GITHUB_OUTPUT"
+          echo "Publishing '${name}' from packages/${name}"
+      - name: Install dependencies
+        working-directory: ${{ steps.pkg.outputs.dir }}
+        run: flutter pub get
+      - name: Publish
+        working-directory: ${{ steps.pkg.outputs.dir }}
+        run: flutter pub publish --force
