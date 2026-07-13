@@ -1,7 +1,9 @@
 name: bluebird_web
-description: Web implementation of the bluebird plugin.
-version: 1.0.0
-homepage: https://github.com/boskokg/bluebird
+description: The Web implementation of bluebird, the Bluetooth Low Energy (BLE) plugin for Flutter.
+version: 0.1.0
+homepage: https://github.com/nebkat/flutter-bluebird
+repository: https://github.com/nebkat/flutter-bluebird
+issue_tracker: https://github.com/nebkat/flutter-bluebird/issues
 
 environment:
   sdk: ^3.12.0
@@ -11,7 +13,7 @@ resolution: workspace
 dependencies:
   flutter:
     sdk: flutter
-  bluebird_platform_interface: 1.0.0
+  bluebird_platform_interface: 0.1.0
   flutter_web_plugins:
     sdk: flutter
   web: '>=0.5.0 <2.0.0'

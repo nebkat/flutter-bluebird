@@ -35,7 +35,7 @@ BmBluetoothCharacteristic bmChar(
 }) =>
     BmBluetoothCharacteristic(
       id: attr(uuid, instance),
-      descriptors: [for (final d in descriptors) BmBluetoothDescriptor(uuid: d)],
+      descriptors: [for (final d in descriptors) BmBluetoothDescriptor(id: attr(d))],
       properties: properties ?? props(read: true),
     );
 

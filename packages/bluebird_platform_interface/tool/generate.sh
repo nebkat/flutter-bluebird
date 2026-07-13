@@ -63,27 +63,6 @@ patch('lib/src/messages.g.dart', [
         "    return BmAttributeId(\n      uuid: result[0]! as String,",
         "    return BmAttributeId(\n      uuid: Uuid(result[0]! as String),",
     ),
-    # BmDescriptorRef: field, _toList, decode.
-    (
-        "  /// Descriptor uuids are unique within a characteristic; no instance needed.\n"
-        "  String uuid;",
-        "  /// Descriptor uuids are unique within a characteristic; no instance needed.\n"
-        "  Uuid uuid;",
-    ),
-    (
-        "    return <Object?>[\n      characteristic,\n      uuid,\n    ];",
-        "    return <Object?>[\n      characteristic,\n      uuid.string,\n    ];",
-    ),
-    (
-        "    return BmDescriptorRef(\n"
-        "      characteristic: result[0]! as BmCharacteristicRef,\n"
-        "      uuid: result[1]! as String,\n"
-        "    );",
-        "    return BmDescriptorRef(\n"
-        "      characteristic: result[0]! as BmCharacteristicRef,\n"
-        "      uuid: Uuid(result[1]! as String),\n"
-        "    );",
-    ),
 ])
 
 # --- Kotlin: bluebird_android Messages.g.kt (Uuid is in the same package) --
@@ -104,23 +83,6 @@ patch('../bluebird_android/android/src/main/kotlin/com/lib/bluebird/Messages.g.k
     (
         "    return listOf(\n      uuid,\n      instance,\n    )",
         "    return listOf(\n      uuid.str,\n      instance,\n    )",
-    ),
-    # BmDescriptorRef: constructor param, fromList, toList.
-    (
-        "  /** Descriptor uuids are unique within a characteristic; no instance needed. */\n"
-        "  val uuid: String",
-        "  /** Descriptor uuids are unique within a characteristic; no instance needed. */\n"
-        "  val uuid: Uuid",
-    ),
-    (
-        "      val uuid = pigeonVar_list[1] as String\n"
-        "      return BmDescriptorRef(characteristic, uuid)",
-        "      val uuid = Uuid.parse(pigeonVar_list[1] as String)\n"
-        "      return BmDescriptorRef(characteristic, uuid)",
-    ),
-    (
-        "    return listOf(\n      characteristic,\n      uuid,\n    )",
-        "    return listOf(\n      characteristic,\n      uuid.str,\n    )",
     ),
 ])
 EOF

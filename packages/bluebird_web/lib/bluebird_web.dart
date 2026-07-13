@@ -19,7 +19,7 @@ import 'src/web_bluetooth.dart';
 /// `navigator.bluetooth.requestDevice(...)`, which shows a browser-controlled
 /// device chooser and returns exactly ONE device that the user picks. As a
 /// result [startScan] triggers the chooser and, when a device is selected,
-/// emits a single [BmScanAdvertisementsEvent] carrying one advertisement for
+/// emits a single [BmScanAdvertisementEvent] carrying one advertisement for
 /// that device. The advertisement is minimal — the API exposes almost no
 /// advertising data, so rssi is reported as `0` and the service/manufacturer
 /// data maps are empty. If the user dismisses the chooser, a
@@ -65,10 +65,8 @@ final class BluebirdWeb extends BluebirdPlatform {
   /// used to label incoming notifications. Keyed by identity via a wrapper.
   final _charRefs = <BluetoothRemoteGATTCharacteristic, BmCharacteristicRef>{};
 
-  late final _characteristicValueChangedListener =
-      _handleCharacteristicValueChanged.toJS;
-  late final _gattServerDisconnectedListener =
-      _handleGattServerDisconnected.toJS;
+  late final _characteristicValueChangedListener = _handleCharacteristicValueChanged.toJS;
+  late final _gattServerDisconnectedListener = _handleGattServerDisconnected.toJS;
 
   BluetoothRemoteGATTServer _gattForDevice(String address) {
     final device = _devices[address];
@@ -85,9 +83,7 @@ final class BluebirdWeb extends BluebirdPlatform {
   _DeviceCache _cacheForDevice(String address) {
     final cache = _caches[address];
     if (cache == null) {
-      throw StateError(
-        'Services have not been discovered for device "$address".',
-      );
+      throw StateError('Services have not been discovered for device "$address".');
     }
     return cache;
   }
@@ -103,38 +99,26 @@ final class BluebirdWeb extends BluebirdPlatform {
   }
 
   @override
-  Future<BmAdapterStateEnum> getAdapterState() async {
-    return (await isSupported())
-        ? BmAdapterStateEnum.on
-        : BmAdapterStateEnum.unavailable;
-  }
+  Future<BluetoothAdapterState> getAdapterState() async =>
+      (await isSupported()) ? BluetoothAdapterState.on : BluetoothAdapterState.unavailable;
 
   @override
   Future<void> startScan(BmScanSettings settings) async {
     final filters = <BluetoothLEScanFilterInit>[
       for (final service in settings.withServices)
-        BluetoothLEScanFilterInit(
-          services: [Uuid(service).string128.toJS].toJS,
-        ),
-      for (final name in settings.withNames)
-        BluetoothLEScanFilterInit(name: name),
+        BluetoothLEScanFilterInit(services: [Uuid(service).string128.toJS].toJS),
+      for (final name in settings.withNames) BluetoothLEScanFilterInit(name: name),
     ];
 
     final options = filters.isNotEmpty
         ? RequestDeviceOptions(
             filters: filters.toJS,
-            optionalServices: settings.webOptionalServices
-                .map((e) => Uuid(e).string128.toJS)
-                .toList()
-                .toJS,
+            optionalServices: settings.webOptionalServices.map((e) => Uuid(e).string128.toJS).toList().toJS,
           )
         : RequestDeviceOptions(
             // https://developer.mozilla.org/en-US/docs/Web/API/Bluetooth/requestDevice#acceptalldevices
             acceptAllDevices: true,
-            optionalServices: settings.webOptionalServices
-                .map((e) => Uuid(e).string128.toJS)
-                .toList()
-                .toJS,
+            optionalServices: settings.webOptionalServices.map((e) => Uuid(e).string128.toJS).toList().toJS,
           );
 
     final BluetoothDevice device;
@@ -155,31 +139,23 @@ final class BluebirdWeb extends BluebirdPlatform {
     _devices[device.address] = device;
 
     // Listen for spontaneous disconnects on this device.
-    device.removeEventListener(
-      'gattserverdisconnected',
-      _gattServerDisconnectedListener,
-    );
-    device.addEventListener(
-      'gattserverdisconnected',
-      _gattServerDisconnectedListener,
-    );
+    device.removeEventListener('gattserverdisconnected', _gattServerDisconnectedListener);
+    device.addEventListener('gattserverdisconnected', _gattServerDisconnectedListener);
 
     _events.add(
-      BmScanAdvertisementsEvent(
-        advertisements: [
-          BmScanAdvertisement(
-            address: device.address,
-            platformName: device.name,
-            advName: null,
-            connectable: true,
-            txPowerLevel: null,
-            appearance: null,
-            manufacturerData: {},
-            serviceData: {},
-            serviceUuids: [],
-            rssi: 0,
-          ),
-        ],
+      BmScanAdvertisementEvent(
+        advertisement: BmScanAdvertisement(
+          address: device.address,
+          platformName: device.name,
+          advName: null,
+          connectable: true,
+          txPowerLevel: null,
+          appearance: null,
+          manufacturerData: {},
+          serviceData: {},
+          serviceUuids: [],
+          rssi: 0,
+        ),
       ),
     );
   }
@@ -195,12 +171,7 @@ final class BluebirdWeb extends BluebirdPlatform {
     final gatt = _gattForDevice(address);
     await gatt.connect().toDart;
 
-    _events.add(
-      BmConnectionStateEvent(
-        address: address,
-        connectionState: BmConnectionStateEnum.connected,
-      ),
-    );
+    _events.add(BmConnectionStateEvent(address: address, connectionState: BluetoothConnectionState.connected));
   }
 
   @override
@@ -210,12 +181,7 @@ final class BluebirdWeb extends BluebirdPlatform {
 
     _clearDeviceCache(address);
 
-    _events.add(
-      BmConnectionStateEvent(
-        address: address,
-        connectionState: BmConnectionStateEnum.disconnected,
-      ),
-    );
+    _events.add(BmConnectionStateEvent(address: address, connectionState: BluetoothConnectionState.disconnected));
   }
 
   @override
@@ -240,11 +206,7 @@ final class BluebirdWeb extends BluebirdPlatform {
       final serviceInstance = serviceUuidCounts[serviceUuid] ?? 0;
       serviceUuidCounts[serviceUuid] = serviceInstance + 1;
 
-      final cachedService = _CachedService(
-        handle: jsService,
-        uuid: serviceUuid,
-        instance: serviceInstance,
-      );
+      final cachedService = _CachedService(handle: jsService, uuid: serviceUuid, instance: serviceInstance);
       cache.services.add(cachedService);
 
       final serviceRef = BmServiceRef(
@@ -262,11 +224,7 @@ final class BluebirdWeb extends BluebirdPlatform {
         charUuidCounts[charUuid] = charInstance + 1;
 
         cachedService.characteristics.add(
-          _CachedCharacteristic(
-            handle: jsChar,
-            uuid: charUuid,
-            instance: charInstance,
-          ),
+          _CachedCharacteristic(handle: jsChar, uuid: charUuid, instance: charInstance),
         );
 
         final charRef = BmCharacteristicRef(
@@ -279,9 +237,7 @@ final class BluebirdWeb extends BluebirdPlatform {
         try {
           final jsDescs = (await jsChar.getDescriptors().toDart).toDart;
           for (final jsDesc in jsDescs) {
-            descriptors.add(
-              BmBluetoothDescriptor(uuid: Uuid(jsDesc.uuid).string128),
-            );
+            descriptors.add(BmBluetoothDescriptor(id: BmAttributeId(uuid: Uuid(jsDesc.uuid), instance: 0)));
           }
         } catch (e) {
           // getDescriptors throws if there are none / access is disallowed.
@@ -325,10 +281,7 @@ final class BluebirdWeb extends BluebirdPlatform {
   }
 
   @override
-  Future<Uint8List> readCharacteristic(
-    String address,
-    BmCharacteristicRef characteristic,
-  ) async {
+  Future<Uint8List> readCharacteristic(String address, BmCharacteristicRef characteristic) async {
     final jsChar = _resolveCharacteristic(address, characteristic);
     final value = (await jsChar.readValue().toDart).toDart;
     return value.buffer.asUint8List(value.offsetInBytes, value.lengthInBytes);
@@ -351,21 +304,14 @@ final class BluebirdWeb extends BluebirdPlatform {
   }
 
   @override
-  Future<Uint8List> readDescriptor(
-    String address,
-    BmDescriptorRef descriptor,
-  ) async {
+  Future<Uint8List> readDescriptor(String address, BmDescriptorRef descriptor) async {
     final jsDesc = await _resolveDescriptor(address, descriptor);
     final value = (await jsDesc.readValue().toDart).toDart;
     return value.buffer.asUint8List(value.offsetInBytes, value.lengthInBytes);
   }
 
   @override
-  Future<void> writeDescriptor(
-    String address,
-    BmDescriptorRef descriptor,
-    Uint8List value,
-  ) async {
+  Future<void> writeDescriptor(String address, BmDescriptorRef descriptor, Uint8List value) async {
     final jsDesc = await _resolveDescriptor(address, descriptor);
     await jsDesc.writeValue(value.toJS).toDart;
   }
@@ -374,59 +320,42 @@ final class BluebirdWeb extends BluebirdPlatform {
   Future<bool> setNotifyValue(
     String address,
     BmCharacteristicRef characteristic,
-    bool forceIndications,
     bool enable,
   ) async {
     final jsChar = _resolveCharacteristic(address, characteristic);
     if (enable) {
-      jsChar.addEventListener(
-        'characteristicvaluechanged',
-        _characteristicValueChangedListener,
-      );
+      jsChar.addEventListener('characteristicvaluechanged', _characteristicValueChangedListener);
       await jsChar.startNotifications().toDart;
     } else {
       await jsChar.stopNotifications().toDart;
-      jsChar.removeEventListener(
-        'characteristicvaluechanged',
-        _characteristicValueChangedListener,
-      );
+      jsChar.removeEventListener('characteristicvaluechanged', _characteristicValueChangedListener);
     }
     return true;
   }
 
   // --- ref resolution -------------------------------------------------------
 
-  BluetoothRemoteGATTCharacteristic _resolveCharacteristic(
-    String address,
-    BmCharacteristicRef ref,
-  ) {
+  BluetoothRemoteGATTCharacteristic _resolveCharacteristic(String address, BmCharacteristicRef ref) {
     final cache = _cacheForDevice(address);
 
     final serviceId = ref.service.service;
     final cachedService = cache.services.firstWhere(
       (s) => s.uuid == serviceId.uuid && s.instance == serviceId.instance,
-      orElse: () => throw StateError(
-        'Service ${serviceId.uuid}#${serviceId.instance} not found for "$address".',
-      ),
+      orElse: () => throw StateError('Service ${serviceId.uuid}#${serviceId.instance} not found for "$address".'),
     );
 
     final charId = ref.characteristic;
     final cachedChar = cachedService.characteristics.firstWhere(
       (c) => c.uuid == charId.uuid && c.instance == charId.instance,
-      orElse: () => throw StateError(
-        'Characteristic ${charId.uuid}#${charId.instance} not found for "$address".',
-      ),
+      orElse: () => throw StateError('Characteristic ${charId.uuid}#${charId.instance} not found for "$address".'),
     );
 
     return cachedChar.handle;
   }
 
-  Future<BluetoothRemoteGATTDescriptor> _resolveDescriptor(
-    String address,
-    BmDescriptorRef ref,
-  ) async {
+  Future<BluetoothRemoteGATTDescriptor> _resolveDescriptor(String address, BmDescriptorRef ref) async {
     final jsChar = _resolveCharacteristic(address, ref.characteristic);
-    return await jsChar.getDescriptor(ref.uuid.string128.toJS).toDart;
+    return await jsChar.getDescriptor(ref.id.uuid.string128.toJS).toDart;
   }
 
   // --- event handlers -------------------------------------------------------
@@ -442,17 +371,9 @@ final class BluebirdWeb extends BluebirdPlatform {
 
     final address = jsChar.service.device.address;
     final data = jsChar.value?.toDart;
-    final value = data == null
-        ? Uint8List(0)
-        : data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+    final value = data == null ? Uint8List(0) : data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
 
-    _events.add(
-      BmCharacteristicNotificationEvent(
-        address: address,
-        characteristic: ref,
-        value: value,
-      ),
-    );
+    _events.add(BmCharacteristicNotificationEvent(address: address, characteristic: ref, value: value));
   }
 
   void _handleGattServerDisconnected(Event event) {
@@ -461,12 +382,7 @@ final class BluebirdWeb extends BluebirdPlatform {
 
     _clearDeviceCache(address);
 
-    _events.add(
-      BmConnectionStateEvent(
-        address: address,
-        connectionState: BmConnectionStateEnum.disconnected,
-      ),
-    );
+    _events.add(BmConnectionStateEvent(address: address, connectionState: BluetoothConnectionState.disconnected));
   }
 
   void _clearDeviceCache(String address) {
@@ -486,11 +402,7 @@ class _DeviceCache {
 }
 
 class _CachedService {
-  _CachedService({
-    required this.handle,
-    required this.uuid,
-    required this.instance,
-  });
+  _CachedService({required this.handle, required this.uuid, required this.instance});
 
   final BluetoothRemoteGATTService handle;
   final Uuid uuid;
@@ -499,11 +411,7 @@ class _CachedService {
 }
 
 class _CachedCharacteristic {
-  _CachedCharacteristic({
-    required this.handle,
-    required this.uuid,
-    required this.instance,
-  });
+  _CachedCharacteristic({required this.handle, required this.uuid, required this.instance});
 
   final BluetoothRemoteGATTCharacteristic handle;
   final Uuid uuid;

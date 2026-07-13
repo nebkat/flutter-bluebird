@@ -1,72 +1,51 @@
 import 'package:flutter/foundation.dart';
 
+import 'bluebird.dart';
 import 'bluetooth_characteristic.dart';
 import 'bluetooth_device.dart';
 import 'bluetooth_utils.dart';
-import 'bluebird.dart';
-
-class BluetoothEvents {
-  Stream<OnConnectionStateChangedEvent> get onConnectionStateChanged =>
-      Bluebird.extractEventStream<OnConnectionStateChangedEvent>();
-
-  Stream<OnMtuChangedEvent> get onMtuChanged => Bluebird.extractEventStream<OnMtuChangedEvent>();
-
-  Stream<OnServicesResetEvent> get onServicesReset => Bluebird.extractEventStream<OnServicesResetEvent>();
-
-  Stream<OnCharacteristicReceivedEvent> get onCharacteristicReceived =>
-      Bluebird.extractEventStream<OnCharacteristicReceivedEvent>();
-
-  Stream<OnNameChangedEvent> get onNameChanged => Bluebird.extractEventStream<OnNameChangedEvent>();
-
-  Stream<OnBondStateChangedEvent> get onBondStateChanged =>
-      Bluebird.extractEventStream<OnBondStateChangedEvent>();
-}
-
-//
-// Event Classes
-//
 
 /// Base of all app-level events. Sealed, so `switch`es over events are
 /// compiler-checked for exhaustiveness.
-sealed class BluebirdEvent {
-  /// the relevant device, when the event concerns one
-  BluetoothDevice? get device => null;
-}
-
-/// Base of all events that concern a specific device.
-sealed class BluebirdDeviceEvent extends BluebirdEvent {
-  @override
-  final BluetoothDevice device;
-
-  BluebirdDeviceEvent(this.device);
-}
+sealed class BluebirdEvent {}
 
 final class OnDetachedFromEngineEvent extends BluebirdEvent {
   @internal
   OnDetachedFromEngineEvent();
 }
 
-final class OnScanResponseEvent extends BluebirdEvent {
-  /// the newly received advertisements
-  final List<ScanResult> advertisements;
+final class OnScanAdvertisementEvent extends BluebirdEvent {
+  final ScanResult advertisement;
 
   @internal
-  OnScanResponseEvent(this.advertisements);
+  OnScanAdvertisementEvent(this.advertisement);
+}
+
+final class OnScanFailedEvent extends BluebirdEvent {
+  final int errorCode;
+  final String errorString;
+
+  @internal
+  OnScanFailedEvent(this.errorCode, this.errorString);
 }
 
 final class OnAdapterStateChangedEvent extends BluebirdEvent {
-  /// the new adapter state
   final BluetoothAdapterState adapterState;
 
   @internal
   OnAdapterStateChangedEvent(this.adapterState);
 }
 
+sealed class BluebirdDeviceEvent extends BluebirdEvent {
+  final BluetoothDevice device;
+
+  BluebirdDeviceEvent(this.device);
+}
+
 final class OnConnectionStateChangedEvent extends BluebirdDeviceEvent {
-  /// the new connection state
   final BluetoothConnectionState connectionState;
 
-  /// the disconnect reason, if [connectionState] is disconnected
+  /// The disconnect reason, if [connectionState] is disconnected
   final DisconnectReason? disconnectReason;
 
   @internal
@@ -74,7 +53,6 @@ final class OnConnectionStateChangedEvent extends BluebirdDeviceEvent {
 }
 
 final class OnMtuChangedEvent extends BluebirdDeviceEvent {
-  /// the new mtu
   final int mtu;
 
   @internal
@@ -86,23 +64,34 @@ final class OnServicesResetEvent extends BluebirdDeviceEvent {
   OnServicesResetEvent(super.device);
 }
 
-/// A value received via notify/indicate, or the result of a read.
-final class OnCharacteristicReceivedEvent extends BluebirdEvent {
+/// Base of characteristic value events — a value observed for a characteristic,
+/// whether from notify/indicate ([OnCharacteristicNotifiedEvent]) or a read
+/// ([OnCharacteristicReadEvent]). Filter this base to observe *all* values;
+/// filter a subtype to observe just one kind.
+sealed class OnCharacteristicValueEvent extends BluebirdDeviceEvent {
   /// the relevant characteristic
   final BluetoothCharacteristic characteristic;
 
-  /// the new data
+  /// the value
   final List<int> value;
 
   @internal
-  OnCharacteristicReceivedEvent(this.characteristic, this.value);
+  OnCharacteristicValueEvent(this.characteristic, this.value) : super(characteristic.device);
+}
 
-  @override
-  BluetoothDevice get device => characteristic.device;
+/// A value received via notify/indicate.
+final class OnCharacteristicNotifiedEvent extends OnCharacteristicValueEvent {
+  @internal
+  OnCharacteristicNotifiedEvent(super.characteristic, super.value);
+}
+
+/// The result of a [BluetoothCharacteristic.read].
+final class OnCharacteristicReadEvent extends OnCharacteristicValueEvent {
+  @internal
+  OnCharacteristicReadEvent(super.characteristic, super.value);
 }
 
 final class OnNameChangedEvent extends BluebirdDeviceEvent {
-  /// the new name
   final String name;
 
   @internal
@@ -110,12 +99,9 @@ final class OnNameChangedEvent extends BluebirdDeviceEvent {
 }
 
 final class OnBondStateChangedEvent extends BluebirdDeviceEvent {
-  /// the new bond state
-  final BluetoothBondState bondState;
-
-  /// the previous bond state, if known
+  final BluetoothBondState state;
   final BluetoothBondState? prevState;
 
   @internal
-  OnBondStateChangedEvent(super.device, this.bondState, this.prevState);
+  OnBondStateChangedEvent(super.device, this.state, this.prevState);
 }

@@ -2,26 +2,23 @@ import 'dart:async';
 import 'dart:core';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:bluebird_platform_interface/bluebird_platform_interface.dart';
+import 'package:flutter/foundation.dart';
 
-import 'bluetooth_device.dart';
-import 'bluetooth_utils.dart';
 import 'bluebird.dart';
+import 'bluetooth_device.dart';
 
 void ensurePlatform(bool valid, String function) {
   if (valid) return;
-  throw BluebirdException(
-    function,
-    BluebirdErrorCode.platform,
-    "Not supported on platform ${System.current}",
-  );
+  throw BluebirdException(function, BluebirdErrorCode.platform, "Not supported on platform ${System.current}");
 }
 
 extension FutureGuards<T> on Future<T> {
-  Future<T> bluebirdTimeout(Duration timeout, String function) => this.timeout(timeout,
-      onTimeout: () =>
-          throw BluebirdException(function, BluebirdErrorCode.timeout, "Timed out after ${timeout.inSeconds}s"));
+  Future<T> bluebirdTimeout(Duration timeout, String function) => this.timeout(
+    timeout,
+    onTimeout: () =>
+        throw BluebirdException(function, BluebirdErrorCode.timeout, "Timed out after ${timeout.inSeconds}s"),
+  );
 
   /// Completes with [error] as soon as [fatal] emits an event matching
   /// [isFatal], unless this future completes first.
@@ -30,25 +27,30 @@ extension FutureGuards<T> on Future<T> {
     final subscription = fatal.listen((event) {
       if (isFatal(event) && !completer.isCompleted) completer.completeError(error());
     });
-    then((value) {
-      if (!completer.isCompleted) completer.complete(value);
-    }, onError: (Object e, StackTrace st) {
-      if (!completer.isCompleted) completer.completeError(e, st);
-    }).whenComplete(subscription.cancel);
+    then(
+      (value) {
+        if (!completer.isCompleted) completer.complete(value);
+      },
+      onError: (Object e, StackTrace st) {
+        if (!completer.isCompleted) completer.completeError(e, st);
+      },
+    ).whenComplete(subscription.cancel);
     return completer.future;
   }
 
   /// Fails with [BluebirdErrorCode.adapterOff] if the adapter turns off mid-flight.
   Future<T> bluebirdEnsureAdapterIsOn(String function) => failOn(
-      Bluebird.adapterState,
-      (s) => s == BluetoothAdapterState.off || s == BluetoothAdapterState.turningOff,
-      () => BluebirdException(function, BluebirdErrorCode.adapterOff, "Bluetooth adapter is off"));
+    Bluebird.adapterState,
+    (s) => s == BluetoothAdapterState.off || s == BluetoothAdapterState.turningOff,
+    () => BluebirdException(function, BluebirdErrorCode.adapterOff, "Bluetooth adapter is off"),
+  );
 
   /// Fails with [BluebirdErrorCode.deviceDisconnected] if [device] disconnects mid-flight.
   Future<T> bluebirdEnsureDeviceIsConnected(BluetoothDevice device, String function) => failOn(
-      device.connectionState,
-      (s) => s == BluetoothConnectionState.disconnected,
-      () => BluebirdException(function, BluebirdErrorCode.deviceDisconnected, "Device is disconnected"));
+    device.connectionState,
+    (s) => s == BluetoothConnectionState.disconnected,
+    () => BluebirdException(function, BluebirdErrorCode.deviceDisconnected, "Device is disconnected"),
+  );
 }
 
 // This is a reimplementation of BehaviorSubject from RxDart library.
@@ -62,7 +64,9 @@ class StreamControllerReEmit<T> {
 
   StreamControllerReEmit({required T initialValue}) : latestValue = initialValue;
 
-  Stream<T> get stream => _controller.stream.newStreamWithInitialValue(latestValue);
+  /// A [ValueStream] view: `.value` reads [latestValue], listening re-emits it
+  /// then streams subsequent changes.
+  ValueStream<T> get stream => ValueStream(value: () => latestValue, changes: () => _controller.stream);
 
   T get value => latestValue;
 
@@ -76,20 +80,111 @@ class StreamControllerReEmit<T> {
   Future<void> close() => _controller.close();
 }
 
-extension StreamExtensions<T> on Stream<T> {
-  /// See https://api.flutter.dev/flutter/package-async_async/StreamExtensions/listenAndBuffer.html
-  Stream<T> listenAndBuffer() {
-    final controller = StreamController<T>(sync: true);
-    final subscription = listen(
-      controller.add,
-      onError: controller.addError,
-      onDone: controller.close,
-    );
-    controller
-      ..onPause = subscription.pause
-      ..onResume = subscription.resume
-      ..onCancel = subscription.cancel;
-    return controller.stream;
+/// A [Stream] that also exposes its current [value] synchronously.
+///
+/// Modeled on rxdart's `ValueStream`/`BehaviorSubject`: listening re-emits the
+/// current value first (captured at listen time), then every subsequent change.
+/// Unlike a plain stream, `.value` reads the latest value without subscribing —
+/// which removes the need for a parallel `xNow` getter alongside each stream.
+///
+/// The change stream is built lazily (on first subscription) and cached, so
+/// reading [value] alone never allocates it. This makes `.value` cheap whether
+/// or not the owner caches the `ValueStream` in a field.
+class ValueStream<T> extends Stream<T> {
+  final T Function() _valueFactory;
+  final Stream<T> Function() _changesFactory;
+
+  ValueStream._(this._valueFactory, this._changesFactory);
+
+  /// [changes] builds the change stream; it must emit on every change *without*
+  /// pre-emitting the current value. It is invoked lazily on first use, so
+  /// reading [value] alone never runs it. [value] returns the current value.
+  @internal
+  factory ValueStream({required T Function() value, required Stream<T> Function() changes}) =>
+      ValueStream._(value, changes);
+
+  /// The change stream, built once on first use and reused thereafter.
+  late final Stream<T> _changes = _changesFactory();
+
+  /// The current value, read synchronously without subscribing.
+  T get value => _valueFactory();
+
+  /// The raw change stream: emits on every change, *without* re-emitting the
+  /// current [value] on listen. Use this when you only want deltas; listen to
+  /// the [ValueStream] itself (e.g. in a `StreamBuilder`) to get the current
+  /// value first, then changes.
+  Stream<T> get changes => _changes;
+
+  @override
+  bool get isBroadcast => _changes.isBroadcast;
+
+  @override
+  StreamSubscription<T> listen(
+    void Function(T value)? onData, {
+    Function? onError,
+    void Function()? onDone,
+    bool? cancelOnError,
+  }) {
+    return _changes
+        .newStreamWithInitialValue(_valueFactory())
+        .listen(onData, onError: onError, onDone: onDone, cancelOnError: cancelOnError);
+  }
+
+  /// Like [Stream.map], but preserves the [value] view: the result is a
+  /// [ValueStream] whose current value is [convert] applied to this one's.
+  @override
+  ValueStream<S> map<S>(S Function(T event) convert) =>
+      ValueStream(value: () => convert(_valueFactory()), changes: () => _changes.map(convert));
+}
+
+/// The async sibling of [ValueStream], for a value whose *current* reading is
+/// produced asynchronously (e.g. it must be fetched from the platform the first
+/// time, because the platform only reports it on demand — never unsolicited).
+///
+/// Listening awaits the current value, emits it, then streams every subsequent
+/// change — so `await stream.first` yields the real current value, not a
+/// placeholder. Unlike [ValueStream], [value] is a `Future` (it may fetch), so
+/// there is no synchronous `xNow` accessor: use `await stream.value`.
+class AsyncValueStream<T> extends Stream<T> {
+  final Future<T> Function() _valueFactory;
+  final Stream<T> Function() _changesFactory;
+
+  AsyncValueStream._(this._valueFactory, this._changesFactory);
+
+  /// [value] returns the current value, fetching it if not yet known; [changes]
+  /// builds the change stream, which must emit on every change *without*
+  /// pre-emitting the current value.
+  @internal
+  factory AsyncValueStream({required Future<T> Function() value, required Stream<T> Function() changes}) =>
+      AsyncValueStream._(value, changes);
+
+  /// The change stream, built once on first use and reused thereafter.
+  late final Stream<T> _changes = _changesFactory();
+
+  /// The current value, fetched if it is not yet known.
+  Future<T> get value => _valueFactory();
+
+  /// The raw change stream: emits on every change, *without* the leading current
+  /// value. Use this when you only want deltas; listen to the [AsyncValueStream]
+  /// itself to get the current value first, then changes.
+  Stream<T> get changes => _changes;
+
+  @override
+  bool get isBroadcast => _changes.isBroadcast;
+
+  @override
+  StreamSubscription<T> listen(
+    void Function(T value)? onData, {
+    Function? onError,
+    void Function()? onDone,
+    bool? cancelOnError,
+  }) {
+    return _emit().listen(onData, onError: onError, onDone: onDone, cancelOnError: cancelOnError);
+  }
+
+  Stream<T> _emit() async* {
+    yield await _valueFactory();
+    yield* _changes;
   }
 }
 
@@ -132,7 +227,6 @@ extension StreamNewStreamWithInitialValue<T> on Stream<T> {
 // this mutex lets a single task through at a time.
 class Mutex {
   static final global = Mutex();
-  static final scan = Mutex();
   static final disconnect = Mutex();
   static final platform = Mutex();
 

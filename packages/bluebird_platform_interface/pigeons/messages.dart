@@ -20,7 +20,7 @@ import 'package:pigeon/pigeon.dart';
 // Enums
 // ─────────────────────────────────────────────────────────────────────────────
 
-enum BmAdapterStateEnum {
+enum BluetoothAdapterState {
   unknown,
   unavailable,
   unauthorized,
@@ -30,7 +30,7 @@ enum BmAdapterStateEnum {
   off,
 }
 
-enum BmConnectionStateEnum {
+enum BluetoothConnectionState {
   disconnected,
   connected,
 }
@@ -40,13 +40,13 @@ enum BmWriteType {
   withoutResponse,
 }
 
-enum BmConnectionPriorityEnum {
+enum ConnectionPriority {
   balanced,
   high,
   lowPower,
 }
 
-enum BmBondStateEnum {
+enum BluetoothBondState {
   none,
   bonding,
   bonded,
@@ -123,8 +123,10 @@ class BmCharacteristicRef {
 class BmDescriptorRef {
   late BmCharacteristicRef characteristic;
 
-  /// Descriptor uuids are unique within a characteristic; no instance needed.
-  late String uuid;
+  /// Descriptors are uuid-unique within a characteristic, so [id]'s instance is
+  /// always 0; the [BmAttributeId] keeps descriptors uniform with services and
+  /// characteristics.
+  late BmAttributeId id;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -196,7 +198,7 @@ class BmBluetoothCharacteristic {
 }
 
 class BmBluetoothDescriptor {
-  late String uuid;
+  late BmAttributeId id;
 }
 
 class BmCharacteristicProperties {
@@ -227,11 +229,11 @@ class BmPhySupport {
 sealed class BmEvent {}
 
 class BmAdapterStateEvent extends BmEvent {
-  late BmAdapterStateEnum adapterState;
+  late BluetoothAdapterState adapterState;
 }
 
-class BmScanAdvertisementsEvent extends BmEvent {
-  late List<BmScanAdvertisement> advertisements;
+class BmScanAdvertisementEvent extends BmEvent {
+  late BmScanAdvertisement advertisement;
 }
 
 class BmScanFailedEvent extends BmEvent {
@@ -241,7 +243,7 @@ class BmScanFailedEvent extends BmEvent {
 
 class BmConnectionStateEvent extends BmEvent {
   late String address;
-  late BmConnectionStateEnum connectionState;
+  late BluetoothConnectionState connectionState;
   int? disconnectReasonCode;
   String? disconnectReasonString;
 }
@@ -256,8 +258,8 @@ class BmCharacteristicNotificationEvent extends BmEvent {
 
 class BmBondStateEvent extends BmEvent {
   late String address;
-  late BmBondStateEnum bondState;
-  BmBondStateEnum? prevState;
+  late BluetoothBondState bondState;
+  BluetoothBondState? prevState;
 }
 
 class BmNameChangedEvent extends BmEvent {
@@ -312,7 +314,7 @@ abstract class BluebirdHostApi {
   /// @async: may need to request runtime permissions before answering.
   @async
   String getAdapterName();
-  BmAdapterStateEnum getAdapterState();
+  BluetoothAdapterState getAdapterState();
 
   /// Android: shows the enable-bluetooth dialog; completes with user consent.
   @async
@@ -357,7 +359,7 @@ abstract class BluebirdHostApi {
 
   /// Completes after the CCCD write confirms (or immediately if no CCCD).
   @async
-  bool setNotifyValue(String address, BmCharacteristicRef characteristic, bool forceIndications, bool enable);
+  bool setNotifyValue(String address, BmCharacteristicRef characteristic, bool enable);
 
   @async
   int requestMtu(String address, int mtu);
@@ -365,13 +367,13 @@ abstract class BluebirdHostApi {
   int readRssi(String address);
 
   // android-only extras
-  void requestConnectionPriority(String address, BmConnectionPriorityEnum connectionPriority);
+  void requestConnectionPriority(String address, ConnectionPriority connectionPriority);
   BmPhySupport getPhySupport();
   @async
   void setPreferredPhy(String address, int txPhy, int rxPhy, int phyOptions);
 
   // bonding (android)
-  BmBondStateEnum getBondState(String address);
+  BluetoothBondState getBondState(String address);
   @async
   bool createBond(String address, Uint8List? pin);
   @async

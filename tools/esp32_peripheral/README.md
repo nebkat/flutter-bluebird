@@ -52,7 +52,7 @@ below). Preferred ATT MTU is **517** (`ble_att_set_preferred_mtu`), so
 | `A002` | Characteristic | READ, WRITE, WRITE_NO_RSP | Stores what is written (256-byte buffer); read it back to verify | `write` (with response), `write(withoutResponse: true)`, read-back verification |
 | `A003` | Characteristic | NOTIFY | Incrementing `uint32` counter (LE) every **1 s** while subscribed | `setNotifyValue(true)`, CCCD handling, `onCharacteristicReceived` / `lastValueStream` |
 | `A004` | Characteristic | INDICATE | Counter every **2 s** while subscribed | Indications + CCCD indicate bit |
-| `A005` | Characteristic | NOTIFY, INDICATE | Counter every 1 s; uses notifications if the notify bit is set, indications if only the indicate bit is set | `setNotifyValue(true, forceIndications: true)` path |
+| `A005` | Characteristic | NOTIFY, INDICATE | Counter every 1 s; uses notifications if the notify bit is set, indications if only the indicate bit is set | notify preferred when a characteristic supports both notify + indicate |
 | `A006` | Characteristic | READ, WRITE | 512-byte value buffer (initialised with `00..ff` pattern) | Long reads (blob), `allowLongWrite` MTU-spanning writes, `maxAttrLen` |
 | `A007` | Characteristic | READ (encrypted) | Static value `"top-secret"`; read triggers Just Works pairing (NO_INPUT_NO_OUTPUT, bonding=1, SC=1) | `createBond` / implicit pairing, `bondState`, encrypted read errors |
 | `A008` | Characteristic | WRITE | Control: write `0x01` → sends Service Changed (`ble_svc_gatt_changed(0x0001, 0xffff)`); write `0x02` → peripheral terminates the connection | `onServicesReset` (0x2A05 handling); disconnect events + `disconnectReason` |

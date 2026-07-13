@@ -46,7 +46,8 @@ class _DescriptorTileState extends State<DescriptorTile> {
 
   Future onReadPressed() async {
     try {
-      await d.read();
+      final value = await d.read();
+      if (mounted) setState(() => _value = value);
       Snackbar.show(ABC.c, "Descriptor Read : Success", success: true);
     } catch (e) {
       Snackbar.show(ABC.c, prettyException("Descriptor Read Error:", e), success: false);
@@ -105,7 +106,7 @@ class _DescriptorTileState extends State<DescriptorTile> {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          const Text('Descriptor'),
+          Text(d.uuid.name ?? 'Descriptor'),
           buildUuid(context),
           buildValue(context),
         ],

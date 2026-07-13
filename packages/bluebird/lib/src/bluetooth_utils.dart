@@ -1,7 +1,11 @@
 import 'package:bluebird_platform_interface/bluebird_platform_interface.dart';
 
-/// State of the bluetooth adapter.
-typedef BluetoothAdapterState = BmAdapterStateEnum;
+// BluetoothAdapterState, BluetoothConnectionState, BluetoothBondState and
+// ConnectionPriority are pure enums shared with the wire protocol — defined in
+// the platform interface (pigeon schema) and re-exported here, so there is no
+// separate "Bm" variant to convert.
+export 'package:bluebird_platform_interface/bluebird_platform_interface.dart'
+    show BluetoothAdapterState, BluetoothConnectionState, BluetoothBondState, ConnectionPriority;
 
 class DisconnectReason {
   final int? code; // specific to platform
@@ -14,17 +18,6 @@ class DisconnectReason {
       '}';
 }
 
-typedef BluetoothConnectionState = BmConnectionStateEnum;
-
-/// Bond state of a device.
-///
-/// [BluetoothBondState.none] no bond
-/// [BluetoothBondState.bonding] bonding is in progress
-/// [BluetoothBondState.bonded] bond success
-typedef BluetoothBondState = BmBondStateEnum;
-
-typedef ConnectionPriority = BmConnectionPriorityEnum;
-
 enum Phy {
   le1m,
   le2m,
@@ -36,6 +29,9 @@ enum Phy {
         Phy.le2m => 2,
         Phy.leCoded => 4,
       };
+
+  /// The combined bitmask for a set of phys — the bitwise-OR of each [mask].
+  static int maskFrom(Set<Phy> phys) => phys.fold(0, (mask, phy) => mask | phy.mask);
 }
 
 enum PhyCoding { noPreferred, s2, s8 }

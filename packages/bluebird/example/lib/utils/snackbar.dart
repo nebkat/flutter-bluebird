@@ -36,7 +36,7 @@ class Snackbar {
 
 String prettyException(String prefix, dynamic e) {
   if (e is BluebirdException) {
-    return "$prefix ${e.description}";
+    return "$prefix ${e.description}${e.details != null ? ' [${e.details}]' : ''}";
   } else if (e is PlatformException) {
     return "$prefix ${e.message}";
   }

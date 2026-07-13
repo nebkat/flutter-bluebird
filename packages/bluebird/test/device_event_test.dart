@@ -1,12 +1,12 @@
-import 'dart:typed_data';
-
 import 'package:bluebird/bluebird.dart';
-import 'package:bluebird_platform_interface/bluebird_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_platform.dart';
 import 'protos.dart';
 
+/// Unit tests for [BluetoothDevice.applyEvent]: each app-level event updates
+/// the device's own state. The `Bm…Event` → `On…Event` translation is
+/// Bluebird's responsibility and is covered in event_routing_test.dart.
 void main() {
   late BluetoothDevice device;
 
@@ -15,103 +15,79 @@ void main() {
     device = Bluebird.deviceForAddress('AA:BB:CC:DD:EE:FF');
   });
 
-  BmConnectionStateEvent conn(BmConnectionStateEnum state, {int? code, String? reason}) => BmConnectionStateEvent(
-        address: device.remoteId,
-        connectionState: state,
-        disconnectReasonCode: code,
-        disconnectReasonString: reason,
-      );
+  OnConnectionStateChangedEvent connEvent(BluetoothConnectionState state, [DisconnectReason? reason]) =>
+      OnConnectionStateChangedEvent(device, state, reason);
 
   group('connection state', () {
-    test('connected sets isConnected and reports no disconnect reason', () {
-      final event = device.handleConnectionStateEvent(conn(BmConnectionStateEnum.connected));
+    test('connected sets isConnected', () {
+      device.applyEvent(connEvent(BluetoothConnectionState.connected));
       expect(device.isConnected, isTrue);
-      expect(event.connectionState, BluetoothConnectionState.connected);
-      expect(event.disconnectReason, isNull);
+      expect(device.connectionState.value, BluetoothConnectionState.connected);
     });
 
-    test('disconnected clears mtu, records the reason, and reports it', () {
-      device.handleConnectionStateEvent(conn(BmConnectionStateEnum.connected));
-      device.handleMtuChangedEvent(BmMtuChangedEvent(address: device.remoteId, mtu: 515));
-      expect(device.mtuNow, 515);
+    test('disconnected clears mtu and records the reason', () {
+      device.applyEvent(connEvent(BluetoothConnectionState.connected));
+      device.applyEvent(OnMtuChangedEvent(device, 515));
+      expect(device.mtu.value, 515);
 
-      final event = device.handleConnectionStateEvent(conn(BmConnectionStateEnum.disconnected, code: 19, reason: 'peer'));
+      device.applyEvent(connEvent(BluetoothConnectionState.disconnected, DisconnectReason(19, 'peer')));
       expect(device.isDisconnected, isTrue);
-      expect(device.mtuNow, 23); // reset to default
-      expect(event.disconnectReason?.code, 19);
-      expect(event.disconnectReason?.description, 'peer');
+      expect(device.mtu.value, 23); // reset to default
       expect(device.disconnectReason?.code, 19);
+      expect(device.disconnectReason?.description, 'peer');
     });
   });
 
-  test('mtu change updates mtuNow', () {
-    final event = device.handleMtuChangedEvent(BmMtuChangedEvent(address: device.remoteId, mtu: 247));
-    expect(device.mtuNow, 247);
-    expect(event.mtu, 247);
+  test('mtu change updates mtu.value', () {
+    device.applyEvent(OnMtuChangedEvent(device, 247));
+    expect(device.mtu.value, 247);
   });
 
-  test('services reset clears discovered services', () async {
+  test('services reset invalidates and clears discovered services', () async {
     final fake = FakePlatform()..services = [bmService('a000', characteristics: [bmChar('b001')])];
     FakePlatform.install(fake);
     device = Bluebird.deviceForAddress('AA:BB:CC:DD:EE:FF');
-    device.handleConnectionStateEvent(conn(BmConnectionStateEnum.connected));
+    device.applyEvent(connEvent(BluetoothConnectionState.connected));
     await device.discoverServices(subscribeToServicesChanged: false);
-    expect(device.services, isNotEmpty);
+    final char = device.services.single.characteristics.single;
 
-    device.handleServicesResetEvent(BmServicesResetEvent(address: device.remoteId));
+    // a reset invalidates every discovered attribute and clears the tree, so a
+    // held reference fails loudly until the caller re-discovers.
+    device.applyEvent(OnServicesResetEvent(device));
     expect(device.services, isEmpty);
+    expect(char.isValid, isFalse);
+    await expectLater(char.read(), throwsA(isA<BluebirdException>()));
   });
 
-  group('bond state', () {
-    test('carries the reported previous state', () {
-      final event = device.handleBondStateEvent(BmBondStateEvent(
-        address: device.remoteId,
-        bondState: BmBondStateEnum.bonded,
-        prevState: BmBondStateEnum.bonding,
-      ));
-      expect(event.bondState, BluetoothBondState.bonded);
-      expect(event.prevState, BluetoothBondState.bonding);
-    });
+  test('re-discovery invalidates every previously discovered attribute', () async {
+    final fake = FakePlatform()
+      ..services = [
+        bmService('a000', characteristics: [bmChar('b001'), bmChar('b002')]),
+      ];
+    FakePlatform.install(fake);
+    device = Bluebird.deviceForAddress('AA:BB:CC:DD:EE:FF');
+    device.applyEvent(connEvent(BluetoothConnectionState.connected));
+    await device.discoverServices(subscribeToServicesChanged: false);
+    final oldService = device.services.single;
+    final oldChar = oldService.characteristics.first;
 
-    test('falls back to the last known state when no previous is reported', () {
-      device.handleBondStateEvent(BmBondStateEvent(address: device.remoteId, bondState: BmBondStateEnum.bonding));
-      final event = device.handleBondStateEvent(BmBondStateEvent(address: device.remoteId, bondState: BmBondStateEnum.bonded));
-      expect(event.prevState, BluetoothBondState.bonding);
-      expect(device.prevBondState, BluetoothBondState.bonding);
-    });
+    // re-discovering (even an identical layout) rebuilds the tree from scratch —
+    // old objects are invalidated rather than reused, since their identity token
+    // cannot be safely re-matched.
+    await device.discoverServices(subscribeToServicesChanged: false);
+
+    expect(identical(device.services.single, oldService), isFalse);
+    expect(oldService.isValid, isFalse);
+    expect(oldChar.isValid, isFalse);
+    await expectLater(oldChar.read(), throwsA(isA<BluebirdException>()));
+
+    // the freshly discovered tree is valid and usable
+    expect(device.services.single.characteristics.first.isValid, isTrue);
   });
 
-  group('characteristic notification', () {
-    Future<void> discover() async {
-      final fake = FakePlatform()..services = [bmService('a000', characteristics: [bmChar('b001', properties: props(notify: true))])];
-      FakePlatform.install(fake);
-      device = Bluebird.deviceForAddress('AA:BB:CC:DD:EE:FF');
-      device.handleConnectionStateEvent(conn(BmConnectionStateEnum.connected));
-      await device.discoverServices(subscribeToServicesChanged: false);
-    }
-
-    test('resolved notification routes to the characteristic and stream', () async {
-      await discover();
-      final c = device.services.single.characteristics.single;
-      final ref = BmCharacteristicRef(service: device.services.single.bm, characteristic: attr('b001'));
-
-      final received = expectLater(c.notifications, emits([1, 2, 3]));
-      final event = device.handleCharacteristicNotification(
-        BmCharacteristicNotificationEvent(address: device.remoteId, characteristic: ref, value: Uint8List.fromList([1, 2, 3])),
-      );
-      expect(event, isNotNull);
-      expect(event!.value, [1, 2, 3]);
-      expect(event.characteristic, c);
-      await received;
-    });
-
-    test('notification for an unknown characteristic is dropped (null)', () async {
-      await discover();
-      final ref = BmCharacteristicRef(service: device.services.single.bm, characteristic: attr('bfff'));
-      final event = device.handleCharacteristicNotification(
-        BmCharacteristicNotificationEvent(address: device.remoteId, characteristic: ref, value: Uint8List.fromList([0])),
-      );
-      expect(event, isNull);
-    });
+  test('bond state event stores the bond state and previous state', () {
+    device.applyEvent(OnBondStateChangedEvent(device, BluetoothBondState.bonded, BluetoothBondState.bonding));
+    expect(device.currentBondState, BluetoothBondState.bonded);
+    expect(device.prevBondState, BluetoothBondState.bonding);
   });
 }

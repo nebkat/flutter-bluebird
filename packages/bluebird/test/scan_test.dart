@@ -14,61 +14,88 @@ void main() {
     FakePlatform.install(fake);
   });
 
-  test('advertisements accumulate and de-duplicate by address', () async {
-    await Bluebird.startScan();
-    expect(fake.calls, contains('startScan'));
-
-    fake.emit(BmScanAdvertisementsEvent(advertisements: [bmAdv('AA', advName: 'one'), bmAdv('BB', advName: 'two')]));
+  test('scan() emits each advertisement individually', () async {
+    final seen = <String>[];
+    final sub = Bluebird.scan().listen((r) => seen.add(r.address));
     await pumpEventQueue();
-    expect(Bluebird.lastScanResults.map((r) => r.address), unorderedEquals(['AA', 'BB']));
+    expect(fake.calls, contains('startScan'));
+    expect(Bluebird.isScanning.value, isTrue);
+
+    fake.emit(BmScanAdvertisementEvent(advertisement: bmAdv('AA')));
+    fake.emit(BmScanAdvertisementEvent(advertisement: bmAdv('BB')));
+    await pumpEventQueue();
+    expect(seen, ['AA', 'BB']);
+
+    await sub.cancel();
+    await pumpEventQueue();
+    expect(Bluebird.isScanning.value, isFalse);
+    expect(fake.calls, contains('stopScan'));
+  });
+
+  test('accumulate() collects advertisements into a de-duplicated list', () async {
+    var latest = <ScanResult>[];
+    final sub = Bluebird.scan().accumulate().listen((list) => latest = list);
+    await pumpEventQueue();
+
+    fake.emit(BmScanAdvertisementEvent(advertisement: bmAdv('AA', advName: 'one')));
+    fake.emit(BmScanAdvertisementEvent(advertisement: bmAdv('BB', advName: 'two')));
+    await pumpEventQueue();
+    expect(latest.map((r) => r.address), unorderedEquals(['AA', 'BB']));
 
     // a fresh advertisement for AA updates in place, not appends
-    fake.emit(BmScanAdvertisementsEvent(advertisements: [bmAdv('AA', advName: 'one-again', rssi: -40)]));
+    fake.emit(BmScanAdvertisementEvent(advertisement: bmAdv('AA', advName: 'one-again', rssi: -40)));
     await pumpEventQueue();
-    expect(Bluebird.lastScanResults, hasLength(2));
-    expect(Bluebird.lastScanResults.firstWhere((r) => r.address == 'AA').rssi, -40);
+    expect(latest, hasLength(2));
+    expect(latest.firstWhere((r) => r.address == 'AA').rssi, -40);
 
-    await Bluebird.stopScan();
-    expect(Bluebird.isScanningNow, isFalse);
+    await sub.cancel();
   });
 
   test('scans with filters applied', () async {
-    await Bluebird.startScan(
+    final sub = Bluebird.scan(
       withServices: [Uuid('180f')],
       withMsd: [MsdFilter(0x02e5, data: [1], mask: [0xff])],
       withServiceData: [ServiceDataFilter(Uuid('180a'), data: [2])],
       withNames: ['dev'],
-    );
-    expect(fake.calls, contains('startScan'));
-    await Bluebird.stopScan();
-  });
-
-  test('oneByOne streams each advertisement individually', () async {
-    final seen = <String>[];
-    final sub = Bluebird.scanResults.listen((r) {
-      if (r.isNotEmpty) seen.add(r.single.address);
-    });
-    await Bluebird.startScan(oneByOne: true);
-    fake.emit(BmScanAdvertisementsEvent(advertisements: [bmAdv('AA'), bmAdv('BB')]));
+    ).listen((_) {});
     await pumpEventQueue();
-    expect(seen, ['AA', 'BB']);
+    expect(fake.calls, contains('startScan'));
     await sub.cancel();
   });
 
-  test('a timeout stops the scan automatically', () async {
-    await Bluebird.startScan(timeout: const Duration(milliseconds: 50));
-    expect(Bluebird.isScanningNow, isTrue);
-    await Future.delayed(const Duration(milliseconds: 150));
-    expect(Bluebird.isScanningNow, isFalse);
+  test('cancelling the subscription stops the scan', () async {
+    final sub = Bluebird.scan().listen((_) {});
+    await pumpEventQueue();
+    expect(Bluebird.isScanning.value, isTrue);
+
+    await sub.cancel();
+    await pumpEventQueue();
+    expect(Bluebird.isScanning.value, isFalse);
     expect(fake.calls, contains('stopScan'));
   });
 
+  test('a second concurrent scan throws operationInProgress', () async {
+    final sub = Bluebird.scan().listen((_) {});
+    await pumpEventQueue();
+    expect(Bluebird.isScanning.value, isTrue);
+
+    await expectLater(
+      Bluebird.scan().first,
+      throwsA(isA<BluebirdException>().having((e) => e.code, 'code', BluebirdErrorCode.operationInProgress)),
+    );
+    await sub.cancel();
+  });
+
   test('a scan failure surfaces as an error and stops scanning', () async {
-    await Bluebird.startScan();
-    final error = expectLater(Bluebird.scanResults, emitsThrough(emitsError(isA<BluebirdException>())));
+    final errors = <Object>[];
+    final sub = Bluebird.scan().listen((_) {}, onError: errors.add);
+    await pumpEventQueue();
+
     fake.emit(BmScanFailedEvent(errorCode: 2, errorString: 'bluetooth off'));
-    await error;
-    expect(Bluebird.isScanningNow, isFalse);
+    await pumpEventQueue();
+    expect(errors.single, isA<BluebirdException>());
+    expect(Bluebird.isScanning.value, isFalse);
+    await sub.cancel();
   });
 
   test('platform errors map to BluebirdException by wire code', () async {
@@ -86,10 +113,25 @@ void main() {
   });
 
   test('adapter state reflects platform events', () async {
-    fake.adapterState = BmAdapterStateEnum.off;
+    fake.adapterState = BluetoothAdapterState.off;
     expect(await Bluebird.adapterState.first, BluetoothAdapterState.off);
 
-    fake.emit(BmAdapterStateEvent(adapterState: BmAdapterStateEnum.on));
+    fake.emit(BmAdapterStateEvent(adapterState: BluetoothAdapterState.on));
     expect(await Bluebird.adapterState.first, BluetoothAdapterState.on);
+  });
+
+  test('adapterState is an AsyncValueStream: .value fetches, .changes is deltas-only', () async {
+    fake.adapterState = BluetoothAdapterState.off;
+
+    // .value fetches the current state from the platform (adapter events fire
+    // only on changes, so the current state must be asked for)
+    expect(await Bluebird.adapterState.value, BluetoothAdapterState.off);
+
+    // .changes emits subsequent changes only — no leading current value
+    final deltas = expectLater(Bluebird.adapterState.changes, emits(BluetoothAdapterState.on));
+    fake.emit(BmAdapterStateEvent(adapterState: BluetoothAdapterState.on));
+    await deltas;
+
+    expect(await Bluebird.adapterState.value, BluetoothAdapterState.on);
   });
 }

@@ -9,7 +9,7 @@ import 'package:bluebird_platform_interface/bluebird_platform_interface.dart';
 final class FakePlatform extends BluebirdPlatform {
   final _events = StreamController<BmEvent>.broadcast();
 
-  BmAdapterStateEnum adapterState = BmAdapterStateEnum.on;
+  BluetoothAdapterState adapterState = BluetoothAdapterState.on;
   bool supported = true;
   List<BmBluetoothService> services = const [];
 
@@ -40,7 +40,7 @@ final class FakePlatform extends BluebirdPlatform {
   Future<bool> isSupported() => _run('isSupported', supported);
 
   @override
-  Future<BmAdapterStateEnum> getAdapterState() => _run('getAdapterState', adapterState);
+  Future<BluetoothAdapterState> getAdapterState() => _run('getAdapterState', adapterState);
 
   @override
   Future<void> startScan(BmScanSettings settings) => _run('startScan', null);
@@ -82,7 +82,7 @@ final class FakePlatform extends BluebirdPlatform {
   }
 
   @override
-  Future<bool> setNotifyValue(String address, BmCharacteristicRef c, bool force, bool enable) =>
+  Future<bool> setNotifyValue(String address, BmCharacteristicRef c, bool enable) =>
       _run('setNotifyValue', true);
 
   @override
@@ -106,30 +106,30 @@ final class FakePlatform extends BluebirdPlatform {
   Future<String> getAdapterName() => _run('getAdapterName', 'FakeAdapter');
 
   // android-only surface
-  BmBondStateEnum bondState = BmBondStateEnum.bonded;
+  BluetoothBondState bondState = BluetoothBondState.bonded;
   List<BmBluetoothDevice> bondedDevices = const [];
 
   @override
   Future<int> requestMtu(String address, int mtu) => _run('requestMtu', mtu);
 
   @override
-  Future<bool> createBond(String address, Uint8List? pin) => _run('createBond', bondState == BmBondStateEnum.bonded);
+  Future<bool> createBond(String address, Uint8List? pin) => _run('createBond', bondState == BluetoothBondState.bonded);
 
   @override
-  Future<bool> removeBond(String address) => _run('removeBond', bondState == BmBondStateEnum.none);
+  Future<bool> removeBond(String address) => _run('removeBond', bondState == BluetoothBondState.none);
 
   @override
   Future<void> clearGattCache(String address) => _run('clearGattCache', null);
 
   @override
-  Future<void> requestConnectionPriority(String address, BmConnectionPriorityEnum priority) =>
+  Future<void> requestConnectionPriority(String address, ConnectionPriority priority) =>
       _run('requestConnectionPriority', null);
 
   @override
   Future<void> setPreferredPhy(String address, int txPhy, int rxPhy, int phyOptions) => _run('setPreferredPhy', null);
 
   @override
-  Future<BmBondStateEnum> getBondState(String address) => _run('getBondState', bondState);
+  Future<BluetoothBondState> getBondState(String address) => _run('getBondState', bondState);
 
   @override
   Future<List<BmBluetoothDevice>> getBondedDevices() => _run('getBondedDevices', bondedDevices);

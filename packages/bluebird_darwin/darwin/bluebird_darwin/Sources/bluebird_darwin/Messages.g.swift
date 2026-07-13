@@ -184,7 +184,7 @@ private func nilOrValue<T>(_ value: Any?) -> T? {
 }
 
 
-enum BmAdapterStateEnum: Int, CaseIterable {
+enum BluetoothAdapterState: Int, CaseIterable {
   case unknown = 0
   case unavailable = 1
   case unauthorized = 2
@@ -194,7 +194,7 @@ enum BmAdapterStateEnum: Int, CaseIterable {
   case off = 6
 }
 
-enum BmConnectionStateEnum: Int, CaseIterable {
+enum BluetoothConnectionState: Int, CaseIterable {
   case disconnected = 0
   case connected = 1
 }
@@ -204,13 +204,13 @@ enum BmWriteType: Int, CaseIterable {
   case withoutResponse = 1
 }
 
-enum BmConnectionPriorityEnum: Int, CaseIterable {
+enum ConnectionPriority: Int, CaseIterable {
   case balanced = 0
   case high = 1
   case lowPower = 2
 }
 
-enum BmBondStateEnum: Int, CaseIterable {
+enum BluetoothBondState: Int, CaseIterable {
   case none = 0
   case bonding = 1
   case bonded = 2
@@ -381,41 +381,43 @@ struct BmCharacteristicRef: Hashable, CustomStringConvertible {
 /// Generated class from Pigeon that represents data sent in messages.
 struct BmDescriptorRef: Hashable, CustomStringConvertible {
   var characteristic: BmCharacteristicRef
-  /// Descriptor uuids are unique within a characteristic; no instance needed.
-  var uuid: String
+  /// Descriptors are uuid-unique within a characteristic, so [id]'s instance is
+  /// always 0; the [BmAttributeId] keeps descriptors uniform with services and
+  /// characteristics.
+  var id: BmAttributeId
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
   static func fromList(_ pigeonVar_list: [Any?]) -> BmDescriptorRef? {
     let characteristic = pigeonVar_list[0] as! BmCharacteristicRef
-    let uuid = pigeonVar_list[1] as! String
+    let id = pigeonVar_list[1] as! BmAttributeId
 
     return BmDescriptorRef(
       characteristic: characteristic,
-      uuid: uuid
+      id: id
     )
   }
   func toList() -> [Any?] {
     return [
       characteristic,
-      uuid,
+      id,
     ]
   }
   static func == (lhs: BmDescriptorRef, rhs: BmDescriptorRef) -> Bool {
     if Swift.type(of: lhs) != Swift.type(of: rhs) {
       return false
     }
-    return MessagesPigeonInternal.deepEquals(lhs.characteristic, rhs.characteristic) && MessagesPigeonInternal.deepEquals(lhs.uuid, rhs.uuid)
+    return MessagesPigeonInternal.deepEquals(lhs.characteristic, rhs.characteristic) && MessagesPigeonInternal.deepEquals(lhs.id, rhs.id)
   }
 
   func hash(into hasher: inout Hasher) {
     hasher.combine("BmDescriptorRef")
     MessagesPigeonInternal.deepHash(value: characteristic, hasher: &hasher)
-    MessagesPigeonInternal.deepHash(value: uuid, hasher: &hasher)
+    MessagesPigeonInternal.deepHash(value: id, hasher: &hasher)
   }
 
   public var description: String {
-    return "BmDescriptorRef(characteristic: \(String(describing: characteristic)), uuid: \(String(describing: uuid)))"
+    return "BmDescriptorRef(characteristic: \(String(describing: characteristic)), id: \(String(describing: id)))"
   }
 }
 
@@ -817,36 +819,36 @@ struct BmBluetoothCharacteristic: Hashable, CustomStringConvertible {
 
 /// Generated class from Pigeon that represents data sent in messages.
 struct BmBluetoothDescriptor: Hashable, CustomStringConvertible {
-  var uuid: String
+  var id: BmAttributeId
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
   static func fromList(_ pigeonVar_list: [Any?]) -> BmBluetoothDescriptor? {
-    let uuid = pigeonVar_list[0] as! String
+    let id = pigeonVar_list[0] as! BmAttributeId
 
     return BmBluetoothDescriptor(
-      uuid: uuid
+      id: id
     )
   }
   func toList() -> [Any?] {
     return [
-      uuid
+      id
     ]
   }
   static func == (lhs: BmBluetoothDescriptor, rhs: BmBluetoothDescriptor) -> Bool {
     if Swift.type(of: lhs) != Swift.type(of: rhs) {
       return false
     }
-    return MessagesPigeonInternal.deepEquals(lhs.uuid, rhs.uuid)
+    return MessagesPigeonInternal.deepEquals(lhs.id, rhs.id)
   }
 
   func hash(into hasher: inout Hasher) {
     hasher.combine("BmBluetoothDescriptor")
-    MessagesPigeonInternal.deepHash(value: uuid, hasher: &hasher)
+    MessagesPigeonInternal.deepHash(value: id, hasher: &hasher)
   }
 
   public var description: String {
-    return "BmBluetoothDescriptor(uuid: \(String(describing: uuid)))"
+    return "BmBluetoothDescriptor(id: \(String(describing: id)))"
   }
 }
 
@@ -980,12 +982,12 @@ protocol BmEvent {
 
 /// Generated class from Pigeon that represents data sent in messages.
 struct BmAdapterStateEvent: BmEvent {
-  var adapterState: BmAdapterStateEnum
+  var adapterState: BluetoothAdapterState
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
   static func fromList(_ pigeonVar_list: [Any?]) -> BmAdapterStateEvent? {
-    let adapterState = pigeonVar_list[0] as! BmAdapterStateEnum
+    let adapterState = pigeonVar_list[0] as! BluetoothAdapterState
 
     return BmAdapterStateEvent(
       adapterState: adapterState
@@ -1014,37 +1016,37 @@ struct BmAdapterStateEvent: BmEvent {
 }
 
 /// Generated class from Pigeon that represents data sent in messages.
-struct BmScanAdvertisementsEvent: BmEvent {
-  var advertisements: [BmScanAdvertisement]
+struct BmScanAdvertisementEvent: BmEvent {
+  var advertisement: BmScanAdvertisement
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
-  static func fromList(_ pigeonVar_list: [Any?]) -> BmScanAdvertisementsEvent? {
-    let advertisements = pigeonVar_list[0] as! [BmScanAdvertisement]
+  static func fromList(_ pigeonVar_list: [Any?]) -> BmScanAdvertisementEvent? {
+    let advertisement = pigeonVar_list[0] as! BmScanAdvertisement
 
-    return BmScanAdvertisementsEvent(
-      advertisements: advertisements
+    return BmScanAdvertisementEvent(
+      advertisement: advertisement
     )
   }
   func toList() -> [Any?] {
     return [
-      advertisements
+      advertisement
     ]
   }
-  static func == (lhs: BmScanAdvertisementsEvent, rhs: BmScanAdvertisementsEvent) -> Bool {
+  static func == (lhs: BmScanAdvertisementEvent, rhs: BmScanAdvertisementEvent) -> Bool {
     if Swift.type(of: lhs) != Swift.type(of: rhs) {
       return false
     }
-    return MessagesPigeonInternal.deepEquals(lhs.advertisements, rhs.advertisements)
+    return MessagesPigeonInternal.deepEquals(lhs.advertisement, rhs.advertisement)
   }
 
   func hash(into hasher: inout Hasher) {
-    hasher.combine("BmScanAdvertisementsEvent")
-    MessagesPigeonInternal.deepHash(value: advertisements, hasher: &hasher)
+    hasher.combine("BmScanAdvertisementEvent")
+    MessagesPigeonInternal.deepHash(value: advertisement, hasher: &hasher)
   }
 
   public var description: String {
-    return "BmScanAdvertisementsEvent(advertisements: \(String(describing: advertisements)))"
+    return "BmScanAdvertisementEvent(advertisement: \(String(describing: advertisement)))"
   }
 }
 
@@ -1091,7 +1093,7 @@ struct BmScanFailedEvent: BmEvent {
 /// Generated class from Pigeon that represents data sent in messages.
 struct BmConnectionStateEvent: BmEvent {
   var address: String
-  var connectionState: BmConnectionStateEnum
+  var connectionState: BluetoothConnectionState
   var disconnectReasonCode: Int64? = nil
   var disconnectReasonString: String? = nil
 
@@ -1099,7 +1101,7 @@ struct BmConnectionStateEvent: BmEvent {
   // swift-format-ignore: AlwaysUseLowerCamelCase
   static func fromList(_ pigeonVar_list: [Any?]) -> BmConnectionStateEvent? {
     let address = pigeonVar_list[0] as! String
-    let connectionState = pigeonVar_list[1] as! BmConnectionStateEnum
+    let connectionState = pigeonVar_list[1] as! BluetoothConnectionState
     let disconnectReasonCode: Int64? = nilOrValue(pigeonVar_list[2])
     let disconnectReasonString: String? = nilOrValue(pigeonVar_list[3])
 
@@ -1189,15 +1191,15 @@ struct BmCharacteristicNotificationEvent: BmEvent {
 /// Generated class from Pigeon that represents data sent in messages.
 struct BmBondStateEvent: BmEvent {
   var address: String
-  var bondState: BmBondStateEnum
-  var prevState: BmBondStateEnum? = nil
+  var bondState: BluetoothBondState
+  var prevState: BluetoothBondState? = nil
 
 
   // swift-format-ignore: AlwaysUseLowerCamelCase
   static func fromList(_ pigeonVar_list: [Any?]) -> BmBondStateEvent? {
     let address = pigeonVar_list[0] as! String
-    let bondState = pigeonVar_list[1] as! BmBondStateEnum
-    let prevState: BmBondStateEnum? = nilOrValue(pigeonVar_list[2])
+    let bondState = pigeonVar_list[1] as! BluetoothBondState
+    let prevState: BluetoothBondState? = nilOrValue(pigeonVar_list[2])
 
     return BmBondStateEvent(
       address: address,
@@ -1393,13 +1395,13 @@ private class MessagesPigeonCodecReader: FlutterStandardReader {
     case 129:
       let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
       if let enumResultAsInt = enumResultAsInt {
-        return BmAdapterStateEnum(rawValue: enumResultAsInt)
+        return BluetoothAdapterState(rawValue: enumResultAsInt)
       }
       return nil
     case 130:
       let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
       if let enumResultAsInt = enumResultAsInt {
-        return BmConnectionStateEnum(rawValue: enumResultAsInt)
+        return BluetoothConnectionState(rawValue: enumResultAsInt)
       }
       return nil
     case 131:
@@ -1411,13 +1413,13 @@ private class MessagesPigeonCodecReader: FlutterStandardReader {
     case 132:
       let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
       if let enumResultAsInt = enumResultAsInt {
-        return BmConnectionPriorityEnum(rawValue: enumResultAsInt)
+        return ConnectionPriority(rawValue: enumResultAsInt)
       }
       return nil
     case 133:
       let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
       if let enumResultAsInt = enumResultAsInt {
-        return BmBondStateEnum(rawValue: enumResultAsInt)
+        return BluetoothBondState(rawValue: enumResultAsInt)
       }
       return nil
     case 134:
@@ -1463,7 +1465,7 @@ private class MessagesPigeonCodecReader: FlutterStandardReader {
     case 150:
       return BmAdapterStateEvent.fromList(self.readValue() as! [Any?])
     case 151:
-      return BmScanAdvertisementsEvent.fromList(self.readValue() as! [Any?])
+      return BmScanAdvertisementEvent.fromList(self.readValue() as! [Any?])
     case 152:
       return BmScanFailedEvent.fromList(self.readValue() as! [Any?])
     case 153:
@@ -1488,19 +1490,19 @@ private class MessagesPigeonCodecReader: FlutterStandardReader {
 
 private class MessagesPigeonCodecWriter: FlutterStandardWriter {
   override func writeValue(_ value: Any) {
-    if let value = value as? BmAdapterStateEnum {
+    if let value = value as? BluetoothAdapterState {
       super.writeByte(129)
       super.writeValue(value.rawValue)
-    } else if let value = value as? BmConnectionStateEnum {
+    } else if let value = value as? BluetoothConnectionState {
       super.writeByte(130)
       super.writeValue(value.rawValue)
     } else if let value = value as? BmWriteType {
       super.writeByte(131)
       super.writeValue(value.rawValue)
-    } else if let value = value as? BmConnectionPriorityEnum {
+    } else if let value = value as? ConnectionPriority {
       super.writeByte(132)
       super.writeValue(value.rawValue)
-    } else if let value = value as? BmBondStateEnum {
+    } else if let value = value as? BluetoothBondState {
       super.writeByte(133)
       super.writeValue(value.rawValue)
     } else if let value = value as? LogLevel {
@@ -1554,7 +1556,7 @@ private class MessagesPigeonCodecWriter: FlutterStandardWriter {
     } else if let value = value as? BmAdapterStateEvent {
       super.writeByte(150)
       super.writeValue(value.toList())
-    } else if let value = value as? BmScanAdvertisementsEvent {
+    } else if let value = value as? BmScanAdvertisementEvent {
       super.writeByte(151)
       super.writeValue(value.toList())
     } else if let value = value as? BmScanFailedEvent {
@@ -1679,7 +1681,7 @@ protocol BluebirdHostApi {
   func isSupported() throws -> Bool
   /// @async: may need to request runtime permissions before answering.
   func getAdapterName(completion: @escaping (Result<String, Error>) -> Void)
-  func getAdapterState() throws -> BmAdapterStateEnum
+  func getAdapterState() throws -> BluetoothAdapterState
   /// Android: shows the enable-bluetooth dialog; completes with user consent.
   func turnOn(completion: @escaping (Result<Bool, Error>) -> Void)
   func turnOff(completion: @escaping (Result<Bool, Error>) -> Void)
@@ -1695,13 +1697,13 @@ protocol BluebirdHostApi {
   func readDescriptor(address: String, descriptor: BmDescriptorRef, completion: @escaping (Result<FlutterStandardTypedData, Error>) -> Void)
   func writeDescriptor(address: String, descriptor: BmDescriptorRef, value: FlutterStandardTypedData, completion: @escaping (Result<Void, Error>) -> Void)
   /// Completes after the CCCD write confirms (or immediately if no CCCD).
-  func setNotifyValue(address: String, characteristic: BmCharacteristicRef, forceIndications: Bool, enable: Bool, completion: @escaping (Result<Bool, Error>) -> Void)
+  func setNotifyValue(address: String, characteristic: BmCharacteristicRef, enable: Bool, completion: @escaping (Result<Bool, Error>) -> Void)
   func requestMtu(address: String, mtu: Int64, completion: @escaping (Result<Int64, Error>) -> Void)
   func readRssi(address: String, completion: @escaping (Result<Int64, Error>) -> Void)
-  func requestConnectionPriority(address: String, connectionPriority: BmConnectionPriorityEnum) throws
+  func requestConnectionPriority(address: String, connectionPriority: ConnectionPriority) throws
   func getPhySupport() throws -> BmPhySupport
   func setPreferredPhy(address: String, txPhy: Int64, rxPhy: Int64, phyOptions: Int64, completion: @escaping (Result<Void, Error>) -> Void)
-  func getBondState(address: String) throws -> BmBondStateEnum
+  func getBondState(address: String) throws -> BluetoothBondState
   func createBond(address: String, pin: FlutterStandardTypedData?, completion: @escaping (Result<Bool, Error>) -> Void)
   func removeBond(address: String, completion: @escaping (Result<Bool, Error>) -> Void)
   func clearGattCache(address: String, completion: @escaping (Result<Void, Error>) -> Void)
@@ -2041,9 +2043,8 @@ class BluebirdHostApiSetup {
         let args = message as! [Any?]
         let addressArg = args[0] as! String
         let characteristicArg = args[1] as! BmCharacteristicRef
-        let forceIndicationsArg = args[2] as! Bool
-        let enableArg = args[3] as! Bool
-        api.setNotifyValue(address: addressArg, characteristic: characteristicArg, forceIndications: forceIndicationsArg, enable: enableArg) { result in
+        let enableArg = args[2] as! Bool
+        api.setNotifyValue(address: addressArg, characteristic: characteristicArg, enable: enableArg) { result in
           switch result {
           case .success(let res):
             reply(wrapResult(res))
@@ -2095,7 +2096,7 @@ class BluebirdHostApiSetup {
       requestConnectionPriorityChannel.setMessageHandler { message, reply in
         let args = message as! [Any?]
         let addressArg = args[0] as! String
-        let connectionPriorityArg = args[1] as! BmConnectionPriorityEnum
+        let connectionPriorityArg = args[1] as! ConnectionPriority
         do {
           try api.requestConnectionPriority(address: addressArg, connectionPriority: connectionPriorityArg)
           reply(wrapResult(nil))

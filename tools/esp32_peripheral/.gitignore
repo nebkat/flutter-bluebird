@@ -1,0 +1,6 @@
+# ESP-IDF build output and generated config.
+# sdkconfig is generated from sdkconfig.defaults — only the latter is tracked.
+build/
+sdkconfig
+sdkconfig.old
+.cache/

@@ -81,30 +81,23 @@ void main() {
     final completer = Completer<ScanResult>();
     ScanResult? partial;
 
-    final sub = Bluebird.onScanResults.listen((results) {
-      for (final r in results) {
-        final adv = r.advertisementData;
-        if (adv.advName != fixtureName && r.platformName != fixtureName) continue;
-        partial = r;
-        // wait until the scan-response (service data) has been merged in
-        if (adv.manufacturerData.isNotEmpty && adv.serviceData.isNotEmpty) {
-          if (!completer.isCompleted) completer.complete(r);
-        }
+    final sub = Bluebird.scan(withNames: const [fixtureName]).listen((r) {
+      final adv = r.advertisementData;
+      if (adv.advName != fixtureName && r.platformName != fixtureName) return;
+      partial = r;
+      // wait until the scan-response (service data) has been merged in
+      if (adv.manufacturerData.isNotEmpty && adv.serviceData.isNotEmpty) {
+        if (!completer.isCompleted) completer.complete(r);
       }
     });
 
     try {
-      await Bluebird.startScan(
-        withNames: const [fixtureName],
-        timeout: const Duration(seconds: 25),
-      );
       return await completer.future.timeout(
         const Duration(seconds: 20),
         onTimeout: () => partial ?? fail(fixtureMissingMessage),
       );
     } finally {
-      await sub.cancel();
-      await Bluebird.stopScan();
+      await sub.cancel(); // stops the scan
     }
   }
 
@@ -292,30 +285,14 @@ void main() {
   );
 
   test(
-    'notify|indicate characteristic (forceIndications on Android only)',
+    'notify|indicate characteristic subscribes (uses notifications)',
     () async {
       final c = chr(svcA, chrNotifyInd);
-      final values = <int>[];
-
-      if (System.isAndroid) {
-        // Android: force the CCCD indicate bit instead of notify
-        final events = Bluebird.events.onCharacteristicReceived
-            .where((e) => e.characteristic.uuid == c.uuid && e.device == device)
-            .map((e) => decodeCounter(e.value));
-        await c.setNotifyValue(true, forceIndications: true);
-        try {
-          values.addAll(await events.take(3).toList().timeout(const Duration(seconds: 10)));
-        } finally {
-          await c.setNotifyValue(false);
-        }
-      } else {
-        // macOS/iOS: CoreBluetooth cannot force indications, plain subscribe
-        values.addAll(await c.notifications
-            .take(3)
-            .map(decodeCounter)
-            .toList()
-            .timeout(const Duration(seconds: 10)));
-      }
+      final values = await c.notifications
+          .take(3)
+          .map(decodeCounter)
+          .toList()
+          .timeout(const Duration(seconds: 10));
 
       expectStrictlyIncrementing(values);
     },
@@ -400,7 +377,7 @@ void main() {
         // start from a clean bond so the encrypted read actually drives
         // pairing; removeBond disconnects on Android, so reconnect + rediscover
         // to run the read against live attribute handles
-        if (canManageBonds && await device.bondStateNow != BluetoothBondState.none) {
+        if (canManageBonds && await device.bondState.value != BluetoothBondState.none) {
           await device.removeBond();
           if (device.isDisconnected) {
             await device.connect(timeout: const Duration(seconds: 15));
@@ -414,7 +391,7 @@ void main() {
         expect(utf8.decode(value), 'top-secret');
 
         if (canManageBonds) {
-          expect(await device.bondStateNow, BluetoothBondState.bonded);
+          expect(await device.bondState.value, BluetoothBondState.bonded);
         }
       },
       timeout: const Timeout(Duration(seconds: 45)),

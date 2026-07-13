@@ -322,7 +322,7 @@ static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
             .flags = BLE_GATT_CHR_F_INDICATE,
             .val_handle = &chr_indicate_val_handle,
         }, {
-            /* NOTIFY | INDICATE: exercises the forceIndications path */
+            /* NOTIFY | INDICATE: exercises subscribing when both bits are set */
             .uuid = &chr_notify_ind_uuid.u,
             .access_cb = access_counter,
             .flags = BLE_GATT_CHR_F_NOTIFY | BLE_GATT_CHR_F_INDICATE,
@@ -409,8 +409,7 @@ notify_timer_cb(TimerHandle_t timer)
     }
 
     /* Combo characteristic: prefer notifications; fall back to indications
-     * when the client subscribed with the indicate bit only
-     * (e.g. bluebird's forceIndications). */
+     * when the client subscribed with the indicate bit only. */
     if (combo_notify_enabled) {
         send_counter(chr_notify_ind_val_handle, false);
     } else if (combo_indicate_enabled) {

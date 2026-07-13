@@ -1,20 +1,21 @@
 // Copyright 2017-2023, Charles Weinberger & Paul DeMarco.
+// Copyright 2026, Nebojša Cvetković (nebkat).
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
 import 'dart:async';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart';
 import 'package:bluebird_platform_interface/bluebird_platform_interface.dart';
+import 'package:flutter/foundation.dart';
 
+import 'bluebird.dart';
 import 'bluetooth_attribute.dart';
 import 'bluetooth_characteristic.dart';
 import 'bluetooth_descriptor.dart';
 import 'bluetooth_events.dart';
 import 'bluetooth_service.dart';
 import 'bluetooth_utils.dart';
-import 'bluebird.dart';
 import 'utils.dart';
 
 const int _mtuMax = 517;
@@ -23,6 +24,16 @@ class BluetoothDevice {
   final String remoteId;
 
   List<BluetoothService> _services = [];
+
+  /// When the current set of services was discovered. Re-stamped on every
+  /// (re-)discovery and on a services reset. Each discovered attribute captures
+  /// the timestamp current when it was built; an attribute whose timestamp is no
+  /// longer this one is from a superseded discovery and is treated as stale (see
+  /// [BluetoothAttribute.isValid]).
+  DateTime _discovery = DateTime.now();
+
+  @internal
+  DateTime get discoveryToken => _discovery;
 
   int? _mtu;
   BluetoothConnectionState _connectionState = BluetoothConnectionState.disconnected;
@@ -65,11 +76,7 @@ class BluetoothDevice {
 
   void ensureConnected(String functionName) {
     if (isConnected) return;
-    throw BluebirdException(
-      functionName,
-      BluebirdErrorCode.deviceDisconnected,
-      "device is not connected",
-    );
+    throw BluebirdException(functionName, BluebirdErrorCode.deviceDisconnected, "device is not connected");
   }
 
   /// [Bluebird.invoke] plus the device-scoped guards — connected pre-check,
@@ -124,10 +131,7 @@ class BluetoothDevice {
   /// Establishes a connection to the Bluetooth Device.
   ///   [timeout] if timeout occurs, cancel the connection request and throw exception
   ///   [mtu] Android only. Request a larger mtu right after connection, if set.
-  Future<void> connect({
-    Duration timeout = const Duration(seconds: 35),
-    int? mtu = _mtuMax,
-  }) async {
+  Future<void> connect({Duration timeout = const Duration(seconds: 35), int? mtu = _mtuMax}) async {
     // make sure no one else is calling disconnect
     await Mutex.disconnect.take();
     bool disconnectReturned = false;
@@ -137,8 +141,12 @@ class BluetoothDevice {
       if (System.isAndroid) _connectTimestamp = DateTime.now();
 
       try {
-        final future = Bluebird.invoke("connect", (p) => p.connect(remoteId),
-            ensureAdapterIsOn: true, timeout: timeout);
+        final future = Bluebird.invoke(
+          "connect",
+          (p) => p.connect(remoteId),
+          ensureAdapterIsOn: true,
+          timeout: timeout,
+        );
 
         // we return the disconnect mutex now so that this
         // connection attempt can be canceled by calling disconnect
@@ -189,8 +197,7 @@ class BluetoothDevice {
         await _ensureAndroidDisconnectionDelay(androidDelay);
 
         // invoke
-        await Bluebird.invoke("disconnect", (p) => p.disconnect(remoteId),
-            ensureAdapterIsOn: true, timeout: timeout);
+        await Bluebird.invoke("disconnect", (p) => p.disconnect(remoteId), ensureAdapterIsOn: true, timeout: timeout);
 
         if (System.isAndroid) {
           // Disconnected, remove connect timestamp
@@ -210,7 +217,12 @@ class BluetoothDevice {
     bool subscribeToServicesChanged = true,
     Duration timeout = const Duration(seconds: 15),
   }) async {
+    final discoveredAt = DateTime.now();
     final services = await invoke("discoverServices", (p) => p.discoverServices(remoteId), timeout: timeout);
+    // Stamp this discovery so any previously discovered attributes become stale
+    // (their identity can't be safely reused), then build the fresh tree under
+    // the new timestamp.
+    _discovery = discoveredAt;
     _services = BluetoothService.constructServices(this, services);
 
     // in order to match iOS behavior on all platforms,
@@ -219,7 +231,8 @@ class BluetoothDevice {
       if (!System.isDarwin) {
         BluetoothCharacteristic? c = _servicesChangedCharacteristic;
         if (c != null && (c.properties.notify || c.properties.indicate)) {
-          await c.setNotifyValue(true); // TODO: Use notifications
+          // keep the Services Changed indications on for the connection's lifetime
+          await c.subscribe();
         }
       }
     }
@@ -230,24 +243,29 @@ class BluetoothDevice {
   /// The most recent disconnection reason
   DisconnectReason? get disconnectReason => _disconnectReason;
 
-  /// The current connection state *of our app* to the device
-  Stream<BluetoothConnectionState> get connectionState =>
-      Bluebird.extractEventStream<OnConnectionStateChangedEvent>((m) => m.device == this)
-          .map((e) => e.connectionState)
-          .newStreamWithInitialValue(_connectionState);
+  /// The connection state *of our app* to the device, as a stream that also
+  /// exposes the current value via `device.connectionState.value`.
+  late final ValueStream<BluetoothConnectionState> connectionState = ValueStream(
+    value: () => _connectionState,
+    changes: () => Bluebird.extractEventStream<OnConnectionStateChangedEvent>(
+      (e) => e.device == this,
+    ).map((e) => e.connectionState),
+  );
 
-  /// The current MTU size in bytes
-  int get mtuNow => _mtu ?? 23;
+  /// The MTU size in bytes, as a stream that also exposes the current value:
+  ///   - `device.mtu.value` reads the current MTU synchronously
+  ///   - listening emits immediately, then again whenever the mtu changes
+  ///
+  /// Built once per device (the underlying change stream is cold until listened
+  /// to), so `.value` is a cheap field read rather than rebuilding the chain.
+  late final ValueStream<int> mtu = ValueStream(
+    value: () => _mtu ?? 23,
+    changes: () => Bluebird.extractEventStream<OnMtuChangedEvent>((e) => e.device == this).map((e) => e.mtu),
+  );
 
-  /// Stream emits a value:
-  ///   - immediately when first listened to
-  ///   - whenever the mtu changes
-  Stream<int> get mtu => Bluebird.extractEventStream<OnMtuChangedEvent>((e) => e.device == this)
-      .map((e) => e.mtu)
-      .newStreamWithInitialValue(mtuNow);
-
-  int get maxAttrLenNow => min(512, mtuNow - 3);
-  Stream<int> get maxAttrLen => mtu.map((m) => min(512, m - 3));
+  /// The maximum attribute length in bytes, derived from [mtu].
+  /// Use `device.maxAttrLen.value` for the current value.
+  late final ValueStream<int> maxAttrLen = mtu.map((m) => min(512, m - 3));
 
   /// Services Reset Stream
   ///  - uses the GAP Services Changed characteristic (0x2A05)
@@ -272,8 +290,12 @@ class BluetoothDevice {
     Duration timeout = const Duration(seconds: 15),
   }) {
     ensurePlatform(System.isAndroid, "requestMtu");
-    return invoke("requestMtu", (p) => p.requestMtu(remoteId, desiredMtu),
-        timeout: timeout, before: () => Future.delayed(predelay));
+    return invoke(
+      "requestMtu",
+      (p) => p.requestMtu(remoteId, desiredMtu),
+      timeout: timeout,
+      before: () => Future.delayed(predelay),
+    );
   }
 
   /// Request connection priority update (Android only)
@@ -282,32 +304,37 @@ class BluetoothDevice {
     Duration timeout = const Duration(seconds: 3),
   }) {
     ensurePlatform(System.isAndroid, "requestConnectionPriority");
-    return invoke("requestConnectionPriority", (p) => p.requestConnectionPriority(remoteId, connectionPriorityRequest),
-        timeout: timeout, serialized: false);
+    return invoke(
+      "requestConnectionPriority",
+      (p) => p.requestConnectionPriority(remoteId, connectionPriorityRequest),
+      timeout: timeout,
+      serialized: false,
+    );
   }
 
   /// Set the preferred connection (Android Only)
-  ///   - [txPhy] bitwise OR of all allowed phys for Tx, e.g. (Phy.le2m.mask | Phy.leCoded.mask)
-  ///   - [txPhy] bitwise OR of all allowed phys for Rx, e.g. (Phy.le2m.mask | Phy.leCoded.mask)
+  ///   - [txPhy] the set of allowed phys for Tx, e.g. {Phy.le2m, Phy.leCoded}
+  ///   - [rxPhy] the set of allowed phys for Rx, e.g. {Phy.le2m, Phy.leCoded}
   ///   - [option] preferred coding to use when transmitting on Phy.leCoded
   /// Please note that this is just a recommendation given to the system.
   Future<void> setPreferredPhy({
-    required int txPhy,
-    required int rxPhy,
+    required Set<Phy> txPhy,
+    required Set<Phy> rxPhy,
     required PhyCoding option,
     Duration timeout = const Duration(seconds: 3),
   }) {
     ensurePlatform(System.isAndroid, "setPreferredPhy");
-    return invoke("setPreferredPhy", (p) => p.setPreferredPhy(remoteId, txPhy, rxPhy, option.index),
-        timeout: timeout, serialized: false);
+    return invoke(
+      "setPreferredPhy",
+      (p) => p.setPreferredPhy(remoteId, Phy.maskFrom(txPhy), Phy.maskFrom(rxPhy), option.index),
+      timeout: timeout,
+      serialized: false,
+    );
   }
 
   /// Force the bonding popup to show now (Android Only)
   /// Note! calling this is usually not necessary!! The platform does it automatically.
-  Future<void> createBond({
-    Uint8List? pin,
-    Duration timeout = const Duration(seconds: 90),
-  }) async {
+  Future<void> createBond({Uint8List? pin, Duration timeout = const Duration(seconds: 90)}) async {
     ensurePlatform(System.isAndroid, "createBond");
     final bonded = await invoke("createBond", (p) => p.createBond(remoteId, pin), timeout: timeout);
     if (!bonded) {
@@ -318,8 +345,12 @@ class BluetoothDevice {
   /// Remove bond (Android Only)
   Future<void> removeBond({Duration timeout = const Duration(seconds: 30)}) async {
     ensurePlatform(System.isAndroid, "removeBond");
-    final removed =
-        await invoke("removeBond", (p) => p.removeBond(remoteId), timeout: timeout, requiresConnection: false);
+    final removed = await invoke(
+      "removeBond",
+      (p) => p.removeBond(remoteId),
+      timeout: timeout,
+      requiresConnection: false,
+    );
     if (!removed) {
       throw BluebirdException("removeBond", BluebirdErrorCode.removeBondFailed, "Failed to remove bond");
     }
@@ -331,33 +362,37 @@ class BluetoothDevice {
     return invoke("clearGattCache", (p) => p.clearGattCache(remoteId), serialized: false);
   }
 
-  Future<BluetoothBondState> get bondStateNow async {
-    ensurePlatform(System.isAndroid, "bondState");
+  /// The bond state of the device (Android Only), as a stream that also exposes
+  /// the current value via `await device.bondState.value`.
+  ///   - the platform reports bond state only on demand (events fire on
+  ///     *changes*), so the current value is fetched the first time it is needed.
+  late final AsyncValueStream<BluetoothBondState> bondState = AsyncValueStream(
+    value: _fetchBondState,
+    changes: () => Bluebird.extractEventStream<OnBondStateChangedEvent>((m) => m.device == this).map((e) => e.state),
+  );
 
-    // get current state if needed
-    _bondState ??= await invoke("getBondState", (p) => p.getBondState(remoteId),
-        requiresConnection: false, serialized: false);
+  /// Returns the current bond state, fetching it from the platform the first
+  /// time it is needed (Android Only).
+  Future<BluetoothBondState> _fetchBondState() async {
+    ensurePlatform(System.isAndroid, "bondState");
+    _bondState ??= await invoke(
+      "getBondState",
+      (p) => p.getBondState(remoteId),
+      requiresConnection: false,
+      serialized: false,
+    );
     return _bondState!;
-  }
-
-  /// Get the current bondState of the device (Android Only)
-  Stream<BluetoothBondState> get bondState async* {
-    ensurePlatform(System.isAndroid, "bondState");
-
-    yield* Bluebird.extractEventStream<OnBondStateChangedEvent>((m) => m.device == this)
-        .map((e) => e.bondState)
-        .newStreamWithInitialValue(await bondStateNow);
   }
 
   /// Get the previous bondState of the device (Android Only)
   BluetoothBondState? get prevBondState => _prevBondState;
 
   /// Get the GATT service (0x1801)
-  BluetoothService? get _gattService => _services.where((s) => s.uuid == Uuids.gattService).firstOrNull;
+  BluetoothService? get _gattService => _services.where((s) => s.uuid == Uuids.service.genericAttribute).firstOrNull;
 
   /// Get the Services Changed characteristic (0x2A05)
   BluetoothCharacteristic? get _servicesChangedCharacteristic =>
-      _gattService?.characteristics.where((chr) => chr.uuid == Uuids.servicesChangedCharacteristic).firstOrNull;
+      _gattService?.characteristics.where((chr) => chr.uuid == Uuids.characteristic.serviceChanged).firstOrNull;
 
   /// Workaround race condition between connect and disconnect.
   /// The bug: If you call disconnect right as android is establishing a connection
@@ -378,89 +413,69 @@ class BluetoothDevice {
     }
   }
 
-  //
-  // Platform event routing — called by Bluebird. Each handler updates
-  // this device's private state and returns the app-level event to broadcast.
-  //
-
   @internal
-  OnConnectionStateChangedEvent handleConnectionStateEvent(BmConnectionStateEvent event) {
-    final connectionState = event.connectionState;
-    _connectionState = connectionState;
+  void applyEvent(BluebirdDeviceEvent event) {
+    switch (event) {
+      case OnCharacteristicValueEvent():
+        break;
+      case OnConnectionStateChangedEvent():
+        _connectionState = event.connectionState;
 
-    if (connectionState == BluetoothConnectionState.disconnected) {
-      _disconnectReason = DisconnectReason(event.disconnectReasonCode, event.disconnectReasonString);
+        if (event.connectionState == BluetoothConnectionState.disconnected) {
+          _disconnectReason = event.disconnectReason;
 
-      // clear mtu
-      _mtu = null;
+          // clear mtu
+          _mtu = null;
 
-      // cancel & delete subscriptions
-      for (final s in _subscriptions) {
-        s.cancel();
-      }
-      _subscriptions.clear();
-
-      // cancel delayed subscriptions after the disconnected event has been
-      // delivered to their streams
-      if (_delayedSubscriptions.isNotEmpty) {
-        final delayed = List.of(_delayedSubscriptions);
-        _delayedSubscriptions.clear();
-        Future.delayed(Duration.zero).then((_) {
-          for (final s in delayed) {
+          // cancel & delete subscriptions
+          for (final s in _subscriptions) {
             s.cancel();
           }
-        });
-      }
+          _subscriptions.clear();
 
-      // Note: to make Bluebird easier to use, we do not clear `_services`,
-      // otherwise `services` would be more annoying to use. We also
-      // do not clear `_bondState`, for faster performance.
+          // cancel delayed subscriptions after the disconnected event has been
+          // delivered to their streams
+          if (_delayedSubscriptions.isNotEmpty) {
+            final delayed = List.of(_delayedSubscriptions);
+            _delayedSubscriptions.clear();
+            Future.delayed(Duration.zero).then((_) {
+              for (final s in delayed) {
+                s.cancel();
+              }
+            });
+          }
+
+          // Note: to make Bluebird easier to use, we do not clear `_services`,
+          // otherwise `services` would be more annoying to use. We also
+          // do not clear `_bondState`, for faster performance.
+        }
+
+      case OnMtuChangedEvent():
+        _mtu = event.mtu;
+
+      case OnNameChangedEvent():
+        if (System.isDarwin) {
+          // iOS & macOS internally use the name changed callback for the platform name
+          _platformName = event.name;
+        }
+
+      case OnServicesResetEvent():
+        // The GATT layout may have changed. Re-stamp the discovery so every
+        // previously discovered attribute becomes stale, and require a fresh
+        // discoverServices() before anything can be used again.
+        _discovery = DateTime.now();
+        _services = [];
+
+      case OnBondStateChangedEvent():
+        _prevBondState = event.prevState;
+        _bondState = event.state;
     }
-
-    return OnConnectionStateChangedEvent(
-      this,
-      connectionState,
-      connectionState == BluetoothConnectionState.disconnected ? _disconnectReason : null,
-    );
   }
 
+  /// The last known bond state, read synchronously (null if never observed).
+  /// Used by [Bluebird] to resolve the previous state on a bond-state event.
   @internal
-  OnMtuChangedEvent handleMtuChangedEvent(BmMtuChangedEvent event) {
-    _mtu = event.mtu;
-    return OnMtuChangedEvent(this, event.mtu);
-  }
-
-  @internal
-  OnNameChangedEvent handleNameChangedEvent(BmNameChangedEvent event) {
-    if (System.isDarwin) {
-      // iOS & macOS internally use the name changed callback for the platform name
-      _platformName = event.name;
-    }
-    return OnNameChangedEvent(this, event.name);
-  }
-
-  @internal
-  OnServicesResetEvent handleServicesResetEvent(BmServicesResetEvent event) {
-    _services = [];
-    return OnServicesResetEvent(this);
-  }
-
-  @internal
-  OnBondStateChangedEvent handleBondStateEvent(BmBondStateEvent event) {
-    _prevBondState = event.prevState ?? _bondState;
-    _bondState = event.bondState;
-    return OnBondStateChangedEvent(this, _bondState!, _prevBondState);
-  }
-
-  /// Returns null if the characteristic cannot be resolved
-  /// (e.g. services not discovered).
-  @internal
-  OnCharacteristicReceivedEvent? handleCharacteristicNotification(BmCharacteristicNotificationEvent event) {
-    final characteristic = _characteristicForRefOrNull(event.characteristic);
-    if (characteristic == null) return null;
-    characteristic.handleReceivedValue(event.value);
-    return OnCharacteristicReceivedEvent(characteristic, event.value);
-  }
+  BluetoothBondState? get currentBondState => _bondState;
 
   //
   // Attribute lookup by typed ref
@@ -471,7 +486,10 @@ class BluetoothDevice {
     return list.where((a) => a.id == wanted).firstOrNull;
   }
 
-  BluetoothCharacteristic? _characteristicForRefOrNull(BmCharacteristicRef ref) {
+  /// Resolves a characteristic by its platform ref, or null if it cannot be
+  /// resolved (e.g. services not discovered).
+  @internal
+  BluetoothCharacteristic? characteristicForRefOrNull(BmCharacteristicRef ref) {
     final service = _attributeForId(_services, ref.service.service);
     if (service == null) return null;
     return _attributeForId(service.characteristics, ref.characteristic);
@@ -479,7 +497,7 @@ class BluetoothDevice {
 
   @internal
   BluetoothCharacteristic characteristicForRef(BmCharacteristicRef ref) {
-    final characteristic = _characteristicForRefOrNull(ref);
+    final characteristic = characteristicForRefOrNull(ref);
     if (characteristic == null) {
       throw BluebirdException(
         "characteristicForRef",
@@ -493,12 +511,12 @@ class BluetoothDevice {
   @internal
   BluetoothDescriptor descriptorForRef(BmDescriptorRef ref) {
     final characteristic = characteristicForRef(ref.characteristic);
-    final descriptor = characteristic.descriptors.where((d) => d.uuid == ref.uuid).firstOrNull;
+    final descriptor = _attributeForId(characteristic.descriptors, ref.id);
     if (descriptor == null) {
       throw BluebirdException(
         "descriptorForRef",
         BluebirdErrorCode.characteristicNotFound,
-        "descriptor not found: ${ref.uuid}",
+        "descriptor not found: ${ref.id.uuid}",
       );
     }
     return descriptor;
@@ -513,11 +531,10 @@ class BluetoothDevice {
   int get hashCode => remoteId.hashCode;
 
   @override
-  String toString() {
-    return '${(BluetoothDevice)}{'
-        'remoteId: $remoteId, '
-        'platformName: $platformName, '
-        'services: $_services'
-        '}';
-  }
+  String toString() =>
+      'BluetoothDevice{'
+      'remoteId: $remoteId, '
+      'platformName: $platformName, '
+      'services: $_services'
+      '}';
 }

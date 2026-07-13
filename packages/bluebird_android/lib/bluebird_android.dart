@@ -39,10 +39,10 @@ final class BluebirdAndroid extends BluebirdPlatform {
   Future<String> getAdapterName() => _call('getAdapterName', () => _api.getAdapterName());
 
   @override
-  Future<BmAdapterStateEnum> getAdapterState() => _call('getAdapterState', () => _api.getAdapterState());
+  Future<BluetoothAdapterState> getAdapterState() => _call('getAdapterState', () => _api.getAdapterState());
 
   @override
-  Future<BmBondStateEnum> getBondState(String address) => _call('getBondState', () => _api.getBondState(address));
+  Future<BluetoothBondState> getBondState(String address) => _call('getBondState', () => _api.getBondState(address));
 
   @override
   Future<List<BmBluetoothDevice>> getBondedDevices() => _call('getBondedDevices', () => _api.getBondedDevices());
@@ -72,7 +72,7 @@ final class BluebirdAndroid extends BluebirdPlatform {
   Future<bool> removeBond(String address) => _call('removeBond', () => _api.removeBond(address));
 
   @override
-  Future<void> requestConnectionPriority(String address, BmConnectionPriorityEnum connectionPriority) =>
+  Future<void> requestConnectionPriority(String address, ConnectionPriority connectionPriority) =>
       _call('requestConnectionPriority', () => _api.requestConnectionPriority(address, connectionPriority));
 
   @override
@@ -86,8 +86,8 @@ final class BluebirdAndroid extends BluebirdPlatform {
   }
 
   @override
-  Future<bool> setNotifyValue(String address, BmCharacteristicRef characteristic, bool forceIndications, bool enable) =>
-      _call('setNotifyValue', () => _api.setNotifyValue(address, characteristic, forceIndications, enable));
+  Future<bool> setNotifyValue(String address, BmCharacteristicRef characteristic, bool enable) =>
+      _call('setNotifyValue', () => _api.setNotifyValue(address, characteristic, enable));
 
   @override
   Future<void> setOptions(bool showPowerAlert, bool restoreState) =>

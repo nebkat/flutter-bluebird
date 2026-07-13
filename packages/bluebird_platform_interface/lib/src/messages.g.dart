@@ -48,8 +48,9 @@ bool _deepEquals(Object? a, Object? b) {
   }
   if (a is List && b is List) {
     return a.length == b.length &&
-        a.indexed
-            .every(((int, dynamic) item) => _deepEquals(item.$2, b[item.$1]));
+        a.indexed.every(
+          ((int, dynamic) item) => _deepEquals(item.$2, b[item.$1]),
+        );
   }
   if (a is Map && b is Map) {
     if (a.length != b.length) {
@@ -98,7 +99,7 @@ int _deepHash(Object? value) {
   return value.hashCode;
 }
 
-enum BmAdapterStateEnum {
+enum BluetoothAdapterState {
   unknown,
   unavailable,
   unauthorized,
@@ -108,36 +109,15 @@ enum BmAdapterStateEnum {
   off,
 }
 
-enum BmConnectionStateEnum {
-  disconnected,
-  connected,
-}
+enum BluetoothConnectionState { disconnected, connected }
 
-enum BmWriteType {
-  withResponse,
-  withoutResponse,
-}
+enum BmWriteType { withResponse, withoutResponse }
 
-enum BmConnectionPriorityEnum {
-  balanced,
-  high,
-  lowPower,
-}
+enum ConnectionPriority { balanced, high, lowPower }
 
-enum BmBondStateEnum {
-  none,
-  bonding,
-  bonded,
-}
+enum BluetoothBondState { none, bonding, bonded }
 
-enum LogLevel {
-  none,
-  error,
-  warning,
-  info,
-  debug,
-  verbose,
-}
+enum LogLevel { none, error, warning, info, debug, verbose }
 
 /// Single source of truth for error codes, shared by every platform.
 ///
@@ -170,10 +150,7 @@ enum BluebirdErrorCode {
 
 /// The universal uuid:instance pair identifying one attribute.
 class BmAttributeId {
-  BmAttributeId({
-    required this.uuid,
-    required this.instance,
-  });
+  BmAttributeId({required this.uuid, required this.instance});
 
   Uuid uuid;
 
@@ -181,10 +158,7 @@ class BmAttributeId {
   int instance;
 
   List<Object?> _toList() {
-    return <Object?>[
-      uuid.string,
-      instance,
-    ];
+    return <Object?>[uuid.string, instance];
   }
 
   Object encode() {
@@ -223,10 +197,7 @@ class BmAttributeId {
 }
 
 class BmServiceRef {
-  BmServiceRef({
-    required this.service,
-    this.parentService,
-  });
+  BmServiceRef({required this.service, this.parentService});
 
   BmAttributeId service;
 
@@ -234,10 +205,7 @@ class BmServiceRef {
   BmAttributeId? parentService;
 
   List<Object?> _toList() {
-    return <Object?>[
-      service,
-      parentService,
-    ];
+    return <Object?>[service, parentService];
   }
 
   Object encode() {
@@ -276,20 +244,14 @@ class BmServiceRef {
 }
 
 class BmCharacteristicRef {
-  BmCharacteristicRef({
-    required this.service,
-    required this.characteristic,
-  });
+  BmCharacteristicRef({required this.service, required this.characteristic});
 
   BmServiceRef service;
 
   BmAttributeId characteristic;
 
   List<Object?> _toList() {
-    return <Object?>[
-      service,
-      characteristic,
-    ];
+    return <Object?>[service, characteristic];
   }
 
   Object encode() {
@@ -328,21 +290,17 @@ class BmCharacteristicRef {
 }
 
 class BmDescriptorRef {
-  BmDescriptorRef({
-    required this.characteristic,
-    required this.uuid,
-  });
+  BmDescriptorRef({required this.characteristic, required this.id});
 
   BmCharacteristicRef characteristic;
 
-  /// Descriptor uuids are unique within a characteristic; no instance needed.
-  Uuid uuid;
+  /// Descriptors are uuid-unique within a characteristic, so [id]'s instance is
+  /// always 0; the [BmAttributeId] keeps descriptors uniform with services and
+  /// characteristics.
+  BmAttributeId id;
 
   List<Object?> _toList() {
-    return <Object?>[
-      characteristic,
-      uuid.string,
-    ];
+    return <Object?>[characteristic, id];
   }
 
   Object encode() {
@@ -353,7 +311,7 @@ class BmDescriptorRef {
     result as List<Object?>;
     return BmDescriptorRef(
       characteristic: result[0]! as BmCharacteristicRef,
-      uuid: Uuid(result[1]! as String),
+      id: result[1]! as BmAttributeId,
     );
   }
 
@@ -367,7 +325,7 @@ class BmDescriptorRef {
       return true;
     }
     return _deepEquals(characteristic, other.characteristic) &&
-        _deepEquals(uuid, other.uuid);
+        _deepEquals(id, other.id);
   }
 
   @override
@@ -376,16 +334,12 @@ class BmDescriptorRef {
 
   @override
   String toString() {
-    return 'BmDescriptorRef(characteristic: $characteristic, uuid: $uuid)';
+    return 'BmDescriptorRef(characteristic: $characteristic, id: $id)';
   }
 }
 
 class BmMsdFilter {
-  BmMsdFilter({
-    required this.manufacturerId,
-    this.data,
-    this.mask,
-  });
+  BmMsdFilter({required this.manufacturerId, this.data, this.mask});
 
   int manufacturerId;
 
@@ -394,11 +348,7 @@ class BmMsdFilter {
   Uint8List? mask;
 
   List<Object?> _toList() {
-    return <Object?>[
-      manufacturerId,
-      data,
-      mask,
-    ];
+    return <Object?>[manufacturerId, data, mask];
   }
 
   Object encode() {
@@ -439,11 +389,7 @@ class BmMsdFilter {
 }
 
 class BmServiceDataFilter {
-  BmServiceDataFilter({
-    required this.service,
-    required this.data,
-    this.mask,
-  });
+  BmServiceDataFilter({required this.service, required this.data, this.mask});
 
   String service;
 
@@ -452,11 +398,7 @@ class BmServiceDataFilter {
   Uint8List? mask;
 
   List<Object?> _toList() {
-    return <Object?>[
-      service,
-      data,
-      mask,
-    ];
+    return <Object?>[service, data, mask];
   }
 
   Object encode() {
@@ -565,8 +507,8 @@ class BmScanSettings {
       withNames: (result[2]! as List<Object?>).cast<String>(),
       withKeywords: (result[3]! as List<Object?>).cast<String>(),
       withMsd: (result[4]! as List<Object?>).cast<BmMsdFilter>(),
-      withServiceData:
-          (result[5]! as List<Object?>).cast<BmServiceDataFilter>(),
+      withServiceData: (result[5]! as List<Object?>)
+          .cast<BmServiceDataFilter>(),
       continuousUpdates: result[6]! as bool,
       continuousDivisor: result[7]! as int,
       androidLegacy: result[8]! as bool,
@@ -672,10 +614,10 @@ class BmScanAdvertisement {
       connectable: result[3]! as bool,
       txPowerLevel: result[4] as int?,
       appearance: result[5] as int?,
-      manufacturerData:
-          (result[6]! as Map<Object?, Object?>).cast<int, Uint8List>(),
-      serviceData:
-          (result[7]! as Map<Object?, Object?>).cast<String, Uint8List>(),
+      manufacturerData: (result[6]! as Map<Object?, Object?>)
+          .cast<int, Uint8List>(),
+      serviceData: (result[7]! as Map<Object?, Object?>)
+          .cast<String, Uint8List>(),
       serviceUuids: (result[8]! as List<Object?>).cast<String>(),
       rssi: result[9]! as int,
     );
@@ -713,20 +655,14 @@ class BmScanAdvertisement {
 }
 
 class BmBluetoothDevice {
-  BmBluetoothDevice({
-    required this.address,
-    this.platformName,
-  });
+  BmBluetoothDevice({required this.address, this.platformName});
 
   String address;
 
   String? platformName;
 
   List<Object?> _toList() {
-    return <Object?>[
-      address,
-      platformName,
-    ];
+    return <Object?>[address, platformName];
   }
 
   Object encode() {
@@ -781,12 +717,7 @@ class BmBluetoothService {
   List<BmServiceRef> includedServices;
 
   List<Object?> _toList() {
-    return <Object?>[
-      id,
-      isPrimary,
-      characteristics,
-      includedServices,
-    ];
+    return <Object?>[id, isPrimary, characteristics, includedServices];
   }
 
   Object encode() {
@@ -798,8 +729,8 @@ class BmBluetoothService {
     return BmBluetoothService(
       id: result[0]! as BmAttributeId,
       isPrimary: result[1]! as bool,
-      characteristics:
-          (result[2]! as List<Object?>).cast<BmBluetoothCharacteristic>(),
+      characteristics: (result[2]! as List<Object?>)
+          .cast<BmBluetoothCharacteristic>(),
       includedServices: (result[3]! as List<Object?>).cast<BmServiceRef>(),
     );
   }
@@ -843,11 +774,7 @@ class BmBluetoothCharacteristic {
   BmCharacteristicProperties properties;
 
   List<Object?> _toList() {
-    return <Object?>[
-      id,
-      descriptors,
-      properties,
-    ];
+    return <Object?>[id, descriptors, properties];
   }
 
   Object encode() {
@@ -889,16 +816,12 @@ class BmBluetoothCharacteristic {
 }
 
 class BmBluetoothDescriptor {
-  BmBluetoothDescriptor({
-    required this.uuid,
-  });
+  BmBluetoothDescriptor({required this.id});
 
-  String uuid;
+  BmAttributeId id;
 
   List<Object?> _toList() {
-    return <Object?>[
-      uuid,
-    ];
+    return <Object?>[id];
   }
 
   Object encode() {
@@ -907,9 +830,7 @@ class BmBluetoothDescriptor {
 
   static BmBluetoothDescriptor decode(Object result) {
     result as List<Object?>;
-    return BmBluetoothDescriptor(
-      uuid: result[0]! as String,
-    );
+    return BmBluetoothDescriptor(id: result[0]! as BmAttributeId);
   }
 
   @override
@@ -921,7 +842,7 @@ class BmBluetoothDescriptor {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(uuid, other.uuid);
+    return _deepEquals(id, other.id);
   }
 
   @override
@@ -930,7 +851,7 @@ class BmBluetoothDescriptor {
 
   @override
   String toString() {
-    return 'BmBluetoothDescriptor(uuid: $uuid)';
+    return 'BmBluetoothDescriptor(id: $id)';
   }
 }
 
@@ -1020,11 +941,15 @@ class BmCharacteristicProperties {
         _deepEquals(notify, other.notify) &&
         _deepEquals(indicate, other.indicate) &&
         _deepEquals(
-            authenticatedSignedWrites, other.authenticatedSignedWrites) &&
+          authenticatedSignedWrites,
+          other.authenticatedSignedWrites,
+        ) &&
         _deepEquals(extendedProperties, other.extendedProperties) &&
         _deepEquals(notifyEncryptionRequired, other.notifyEncryptionRequired) &&
         _deepEquals(
-            indicateEncryptionRequired, other.indicateEncryptionRequired);
+          indicateEncryptionRequired,
+          other.indicateEncryptionRequired,
+        );
   }
 
   @override
@@ -1038,10 +963,7 @@ class BmCharacteristicProperties {
 }
 
 class BmPhySupport {
-  BmPhySupport({
-    required this.le2M,
-    required this.leCoded,
-  });
+  BmPhySupport({required this.le2M, required this.leCoded});
 
   /// High speed (PHY 2M)
   bool le2M;
@@ -1050,10 +972,7 @@ class BmPhySupport {
   bool leCoded;
 
   List<Object?> _toList() {
-    return <Object?>[
-      le2M,
-      leCoded,
-    ];
+    return <Object?>[le2M, leCoded];
   }
 
   Object encode() {
@@ -1062,10 +981,7 @@ class BmPhySupport {
 
   static BmPhySupport decode(Object result) {
     result as List<Object?>;
-    return BmPhySupport(
-      le2M: result[0]! as bool,
-      leCoded: result[1]! as bool,
-    );
+    return BmPhySupport(le2M: result[0]! as bool, leCoded: result[1]! as bool);
   }
 
   @override
@@ -1093,16 +1009,12 @@ class BmPhySupport {
 sealed class BmEvent {}
 
 class BmAdapterStateEvent extends BmEvent {
-  BmAdapterStateEvent({
-    required this.adapterState,
-  });
+  BmAdapterStateEvent({required this.adapterState});
 
-  BmAdapterStateEnum adapterState;
+  BluetoothAdapterState adapterState;
 
   List<Object?> _toList() {
-    return <Object?>[
-      adapterState,
-    ];
+    return <Object?>[adapterState];
   }
 
   Object encode() {
@@ -1112,7 +1024,7 @@ class BmAdapterStateEvent extends BmEvent {
   static BmAdapterStateEvent decode(Object result) {
     result as List<Object?>;
     return BmAdapterStateEvent(
-      adapterState: result[0]! as BmAdapterStateEnum,
+      adapterState: result[0]! as BluetoothAdapterState,
     );
   }
 
@@ -1138,41 +1050,37 @@ class BmAdapterStateEvent extends BmEvent {
   }
 }
 
-class BmScanAdvertisementsEvent extends BmEvent {
-  BmScanAdvertisementsEvent({
-    required this.advertisements,
-  });
+class BmScanAdvertisementEvent extends BmEvent {
+  BmScanAdvertisementEvent({required this.advertisement});
 
-  List<BmScanAdvertisement> advertisements;
+  BmScanAdvertisement advertisement;
 
   List<Object?> _toList() {
-    return <Object?>[
-      advertisements,
-    ];
+    return <Object?>[advertisement];
   }
 
   Object encode() {
     return _toList();
   }
 
-  static BmScanAdvertisementsEvent decode(Object result) {
+  static BmScanAdvertisementEvent decode(Object result) {
     result as List<Object?>;
-    return BmScanAdvertisementsEvent(
-      advertisements: (result[0]! as List<Object?>).cast<BmScanAdvertisement>(),
+    return BmScanAdvertisementEvent(
+      advertisement: result[0]! as BmScanAdvertisement,
     );
   }
 
   @override
   // ignore: avoid_equals_and_hash_code_on_mutable_classes
   bool operator ==(Object other) {
-    if (other is! BmScanAdvertisementsEvent ||
+    if (other is! BmScanAdvertisementEvent ||
         other.runtimeType != runtimeType) {
       return false;
     }
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(advertisements, other.advertisements);
+    return _deepEquals(advertisement, other.advertisement);
   }
 
   @override
@@ -1181,25 +1089,19 @@ class BmScanAdvertisementsEvent extends BmEvent {
 
   @override
   String toString() {
-    return 'BmScanAdvertisementsEvent(advertisements: $advertisements)';
+    return 'BmScanAdvertisementEvent(advertisement: $advertisement)';
   }
 }
 
 class BmScanFailedEvent extends BmEvent {
-  BmScanFailedEvent({
-    required this.errorCode,
-    required this.errorString,
-  });
+  BmScanFailedEvent({required this.errorCode, required this.errorString});
 
   int errorCode;
 
   String errorString;
 
   List<Object?> _toList() {
-    return <Object?>[
-      errorCode,
-      errorString,
-    ];
+    return <Object?>[errorCode, errorString];
   }
 
   Object encode() {
@@ -1247,7 +1149,7 @@ class BmConnectionStateEvent extends BmEvent {
 
   String address;
 
-  BmConnectionStateEnum connectionState;
+  BluetoothConnectionState connectionState;
 
   int? disconnectReasonCode;
 
@@ -1270,7 +1172,7 @@ class BmConnectionStateEvent extends BmEvent {
     result as List<Object?>;
     return BmConnectionStateEvent(
       address: result[0]! as String,
-      connectionState: result[1]! as BmConnectionStateEnum,
+      connectionState: result[1]! as BluetoothConnectionState,
       disconnectReasonCode: result[2] as int?,
       disconnectReasonString: result[3] as String?,
     );
@@ -1317,11 +1219,7 @@ class BmCharacteristicNotificationEvent extends BmEvent {
   Uint8List value;
 
   List<Object?> _toList() {
-    return <Object?>[
-      address,
-      characteristic,
-      value,
-    ];
+    return <Object?>[address, characteristic, value];
   }
 
   Object encode() {
@@ -1371,16 +1269,12 @@ class BmBondStateEvent extends BmEvent {
 
   String address;
 
-  BmBondStateEnum bondState;
+  BluetoothBondState bondState;
 
-  BmBondStateEnum? prevState;
+  BluetoothBondState? prevState;
 
   List<Object?> _toList() {
-    return <Object?>[
-      address,
-      bondState,
-      prevState,
-    ];
+    return <Object?>[address, bondState, prevState];
   }
 
   Object encode() {
@@ -1391,8 +1285,8 @@ class BmBondStateEvent extends BmEvent {
     result as List<Object?>;
     return BmBondStateEvent(
       address: result[0]! as String,
-      bondState: result[1]! as BmBondStateEnum,
-      prevState: result[2] as BmBondStateEnum?,
+      bondState: result[1]! as BluetoothBondState,
+      prevState: result[2] as BluetoothBondState?,
     );
   }
 
@@ -1421,20 +1315,14 @@ class BmBondStateEvent extends BmEvent {
 }
 
 class BmNameChangedEvent extends BmEvent {
-  BmNameChangedEvent({
-    required this.address,
-    required this.name,
-  });
+  BmNameChangedEvent({required this.address, required this.name});
 
   String address;
 
   String name;
 
   List<Object?> _toList() {
-    return <Object?>[
-      address,
-      name,
-    ];
+    return <Object?>[address, name];
   }
 
   Object encode() {
@@ -1472,16 +1360,12 @@ class BmNameChangedEvent extends BmEvent {
 }
 
 class BmServicesResetEvent extends BmEvent {
-  BmServicesResetEvent({
-    required this.address,
-  });
+  BmServicesResetEvent({required this.address});
 
   String address;
 
   List<Object?> _toList() {
-    return <Object?>[
-      address,
-    ];
+    return <Object?>[address];
   }
 
   Object encode() {
@@ -1490,9 +1374,7 @@ class BmServicesResetEvent extends BmEvent {
 
   static BmServicesResetEvent decode(Object result) {
     result as List<Object?>;
-    return BmServicesResetEvent(
-      address: result[0]! as String,
-    );
+    return BmServicesResetEvent(address: result[0]! as String);
   }
 
   @override
@@ -1522,20 +1404,14 @@ class BmServicesResetEvent extends BmEvent {
 /// value changes (CoreBluetooth has no MTU callback, so the plugin polls
 /// while devices are connected).
 class BmMtuChangedEvent extends BmEvent {
-  BmMtuChangedEvent({
-    required this.address,
-    required this.mtu,
-  });
+  BmMtuChangedEvent({required this.address, required this.mtu});
 
   String address;
 
   int mtu;
 
   List<Object?> _toList() {
-    return <Object?>[
-      address,
-      mtu,
-    ];
+    return <Object?>[address, mtu];
   }
 
   Object encode() {
@@ -1573,17 +1449,13 @@ class BmMtuChangedEvent extends BmEvent {
 }
 
 class BmDetachedFromEngineEvent extends BmEvent {
-  BmDetachedFromEngineEvent({
-    this.unused,
-  });
+  BmDetachedFromEngineEvent({this.unused});
 
   /// Carries no information — pigeon requires data classes to have a field.
   bool? unused;
 
   List<Object?> _toList() {
-    return <Object?>[
-      unused,
-    ];
+    return <Object?>[unused];
   }
 
   Object encode() {
@@ -1592,9 +1464,7 @@ class BmDetachedFromEngineEvent extends BmEvent {
 
   static BmDetachedFromEngineEvent decode(Object result) {
     result as List<Object?>;
-    return BmDetachedFromEngineEvent(
-      unused: result[0] as bool?,
-    );
+    return BmDetachedFromEngineEvent(unused: result[0] as bool?);
   }
 
   @override
@@ -1627,19 +1497,19 @@ class _PigeonCodec extends StandardMessageCodec {
     if (value is int) {
       buffer.putUint8(4);
       buffer.putInt64(value);
-    } else if (value is BmAdapterStateEnum) {
+    } else if (value is BluetoothAdapterState) {
       buffer.putUint8(129);
       writeValue(buffer, value.index);
-    } else if (value is BmConnectionStateEnum) {
+    } else if (value is BluetoothConnectionState) {
       buffer.putUint8(130);
       writeValue(buffer, value.index);
     } else if (value is BmWriteType) {
       buffer.putUint8(131);
       writeValue(buffer, value.index);
-    } else if (value is BmConnectionPriorityEnum) {
+    } else if (value is ConnectionPriority) {
       buffer.putUint8(132);
       writeValue(buffer, value.index);
-    } else if (value is BmBondStateEnum) {
+    } else if (value is BluetoothBondState) {
       buffer.putUint8(133);
       writeValue(buffer, value.index);
     } else if (value is LogLevel) {
@@ -1693,7 +1563,7 @@ class _PigeonCodec extends StandardMessageCodec {
     } else if (value is BmAdapterStateEvent) {
       buffer.putUint8(150);
       writeValue(buffer, value.encode());
-    } else if (value is BmScanAdvertisementsEvent) {
+    } else if (value is BmScanAdvertisementEvent) {
       buffer.putUint8(151);
       writeValue(buffer, value.encode());
     } else if (value is BmScanFailedEvent) {
@@ -1730,19 +1600,19 @@ class _PigeonCodec extends StandardMessageCodec {
     switch (type) {
       case 129:
         final value = readValue(buffer) as int?;
-        return value == null ? null : BmAdapterStateEnum.values[value];
+        return value == null ? null : BluetoothAdapterState.values[value];
       case 130:
         final value = readValue(buffer) as int?;
-        return value == null ? null : BmConnectionStateEnum.values[value];
+        return value == null ? null : BluetoothConnectionState.values[value];
       case 131:
         final value = readValue(buffer) as int?;
         return value == null ? null : BmWriteType.values[value];
       case 132:
         final value = readValue(buffer) as int?;
-        return value == null ? null : BmConnectionPriorityEnum.values[value];
+        return value == null ? null : ConnectionPriority.values[value];
       case 133:
         final value = readValue(buffer) as int?;
-        return value == null ? null : BmBondStateEnum.values[value];
+        return value == null ? null : BluetoothBondState.values[value];
       case 134:
         final value = readValue(buffer) as int?;
         return value == null ? null : LogLevel.values[value];
@@ -1780,7 +1650,7 @@ class _PigeonCodec extends StandardMessageCodec {
       case 150:
         return BmAdapterStateEvent.decode(readValue(buffer)!);
       case 151:
-        return BmScanAdvertisementsEvent.decode(readValue(buffer)!);
+        return BmScanAdvertisementEvent.decode(readValue(buffer)!);
       case 152:
         return BmScanFailedEvent.decode(readValue(buffer)!);
       case 153:
@@ -1803,8 +1673,9 @@ class _PigeonCodec extends StandardMessageCodec {
   }
 }
 
-const StandardMethodCodec pigeonMethodCodec =
-    StandardMethodCodec(_PigeonCodec());
+const StandardMethodCodec pigeonMethodCodec = StandardMethodCodec(
+  _PigeonCodec(),
+);
 
 /// Returns a broadcast [Stream] of events from the `nativeEvents` event channel.
 ///
@@ -1817,8 +1688,9 @@ Stream<BmEvent> nativeEvents({String instanceName = ''}) {
     instanceName = '.$instanceName';
   }
   final EventChannel nativeEventsChannel = EventChannel(
-      'dev.flutter.pigeon.bluebird.BluebirdEventChannelApi.nativeEvents$instanceName',
-      pigeonMethodCodec);
+    'dev.flutter.pigeon.bluebird.BluebirdEventChannelApi.nativeEvents$instanceName',
+    pigeonMethodCodec,
+  );
   return nativeEventsChannel.receiveBroadcastStream().map((dynamic event) {
     return event as BmEvent;
   });
@@ -1828,11 +1700,13 @@ class BluebirdHostApi {
   /// Constructor for [BluebirdHostApi]. The [binaryMessenger] named argument is
   /// available for dependency injection. If it is left null, the default
   /// BinaryMessenger will be used which routes to the host platform.
-  BluebirdHostApi(
-      {BinaryMessenger? binaryMessenger, String messageChannelSuffix = ''})
-      : pigeonVar_binaryMessenger = binaryMessenger,
-        pigeonVar_messageChannelSuffix =
-            messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
+  BluebirdHostApi({
+    BinaryMessenger? binaryMessenger,
+    String messageChannelSuffix = '',
+  }) : pigeonVar_binaryMessenger = binaryMessenger,
+       pigeonVar_messageChannelSuffix = messageChannelSuffix.isNotEmpty
+           ? '.$messageChannelSuffix'
+           : '';
   final BinaryMessenger? pigeonVar_binaryMessenger;
 
   static const MessageCodec<Object?> pigeonChannelCodec = _PigeonCodec();
@@ -1887,8 +1761,9 @@ class BluebirdHostApi {
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture =
-        pigeonVar_channel.send(<Object?>[level]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[level],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
@@ -1906,8 +1781,9 @@ class BluebirdHostApi {
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture =
-        pigeonVar_channel.send(<Object?>[showPowerAlert, restoreState]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[showPowerAlert, restoreState],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
@@ -1956,7 +1832,7 @@ class BluebirdHostApi {
     return pigeonVar_replyValue! as String;
   }
 
-  Future<BmAdapterStateEnum> getAdapterState() async {
+  Future<BluetoothAdapterState> getAdapterState() async {
     final pigeonVar_channelName =
         'dev.flutter.pigeon.bluebird.BluebirdHostApi.getAdapterState$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
@@ -1972,7 +1848,7 @@ class BluebirdHostApi {
       pigeonVar_channelName,
       isNullValid: false,
     );
-    return pigeonVar_replyValue! as BmAdapterStateEnum;
+    return pigeonVar_replyValue! as BluetoothAdapterState;
   }
 
   /// Android: shows the enable-bluetooth dialog; completes with user consent.
@@ -2022,8 +1898,9 @@ class BluebirdHostApi {
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture =
-        pigeonVar_channel.send(<Object?>[settings]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[settings],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
@@ -2052,7 +1929,8 @@ class BluebirdHostApi {
   }
 
   Future<List<BmBluetoothDevice>> getSystemDevices(
-      List<String> withServices) async {
+    List<String> withServices,
+  ) async {
     final pigeonVar_channelName =
         'dev.flutter.pigeon.bluebird.BluebirdHostApi.getSystemDevices$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
@@ -2060,8 +1938,9 @@ class BluebirdHostApi {
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture =
-        pigeonVar_channel.send(<Object?>[withServices]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[withServices],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
@@ -2099,8 +1978,9 @@ class BluebirdHostApi {
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture =
-        pigeonVar_channel.send(<Object?>[address]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[address],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
@@ -2118,8 +1998,9 @@ class BluebirdHostApi {
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture =
-        pigeonVar_channel.send(<Object?>[address]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[address],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
@@ -2137,8 +2018,9 @@ class BluebirdHostApi {
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture =
-        pigeonVar_channel.send(<Object?>[address]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[address],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
@@ -2150,7 +2032,9 @@ class BluebirdHostApi {
   }
 
   Future<Uint8List> readCharacteristic(
-      String address, BmCharacteristicRef characteristic) async {
+    String address,
+    BmCharacteristicRef characteristic,
+  ) async {
     final pigeonVar_channelName =
         'dev.flutter.pigeon.bluebird.BluebirdHostApi.readCharacteristic$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
@@ -2158,8 +2042,9 @@ class BluebirdHostApi {
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture =
-        pigeonVar_channel.send(<Object?>[address, characteristic]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[address, characteristic],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
@@ -2171,11 +2056,12 @@ class BluebirdHostApi {
   }
 
   Future<void> writeCharacteristic(
-      String address,
-      BmCharacteristicRef characteristic,
-      BmWriteType writeType,
-      bool allowLongWrite,
-      Uint8List value) async {
+    String address,
+    BmCharacteristicRef characteristic,
+    BmWriteType writeType,
+    bool allowLongWrite,
+    Uint8List value,
+  ) async {
     final pigeonVar_channelName =
         'dev.flutter.pigeon.bluebird.BluebirdHostApi.writeCharacteristic$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
@@ -2184,7 +2070,8 @@ class BluebirdHostApi {
       binaryMessenger: pigeonVar_binaryMessenger,
     );
     final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
-        <Object?>[address, characteristic, writeType, allowLongWrite, value]);
+      <Object?>[address, characteristic, writeType, allowLongWrite, value],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
@@ -2195,7 +2082,9 @@ class BluebirdHostApi {
   }
 
   Future<Uint8List> readDescriptor(
-      String address, BmDescriptorRef descriptor) async {
+    String address,
+    BmDescriptorRef descriptor,
+  ) async {
     final pigeonVar_channelName =
         'dev.flutter.pigeon.bluebird.BluebirdHostApi.readDescriptor$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
@@ -2203,8 +2092,9 @@ class BluebirdHostApi {
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture =
-        pigeonVar_channel.send(<Object?>[address, descriptor]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[address, descriptor],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
@@ -2216,7 +2106,10 @@ class BluebirdHostApi {
   }
 
   Future<void> writeDescriptor(
-      String address, BmDescriptorRef descriptor, Uint8List value) async {
+    String address,
+    BmDescriptorRef descriptor,
+    Uint8List value,
+  ) async {
     final pigeonVar_channelName =
         'dev.flutter.pigeon.bluebird.BluebirdHostApi.writeDescriptor$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
@@ -2224,8 +2117,9 @@ class BluebirdHostApi {
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture =
-        pigeonVar_channel.send(<Object?>[address, descriptor, value]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[address, descriptor, value],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
@@ -2237,10 +2131,10 @@ class BluebirdHostApi {
 
   /// Completes after the CCCD write confirms (or immediately if no CCCD).
   Future<bool> setNotifyValue(
-      String address,
-      BmCharacteristicRef characteristic,
-      bool forceIndications,
-      bool enable) async {
+    String address,
+    BmCharacteristicRef characteristic,
+    bool enable,
+  ) async {
     final pigeonVar_channelName =
         'dev.flutter.pigeon.bluebird.BluebirdHostApi.setNotifyValue$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
@@ -2248,8 +2142,9 @@ class BluebirdHostApi {
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel
-        .send(<Object?>[address, characteristic, forceIndications, enable]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[address, characteristic, enable],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
@@ -2268,8 +2163,9 @@ class BluebirdHostApi {
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture =
-        pigeonVar_channel.send(<Object?>[address, mtu]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[address, mtu],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
@@ -2288,8 +2184,9 @@ class BluebirdHostApi {
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture =
-        pigeonVar_channel.send(<Object?>[address]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[address],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
@@ -2301,7 +2198,9 @@ class BluebirdHostApi {
   }
 
   Future<void> requestConnectionPriority(
-      String address, BmConnectionPriorityEnum connectionPriority) async {
+    String address,
+    ConnectionPriority connectionPriority,
+  ) async {
     final pigeonVar_channelName =
         'dev.flutter.pigeon.bluebird.BluebirdHostApi.requestConnectionPriority$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
@@ -2309,8 +2208,9 @@ class BluebirdHostApi {
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture =
-        pigeonVar_channel.send(<Object?>[address, connectionPriority]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[address, connectionPriority],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
@@ -2340,7 +2240,11 @@ class BluebirdHostApi {
   }
 
   Future<void> setPreferredPhy(
-      String address, int txPhy, int rxPhy, int phyOptions) async {
+    String address,
+    int txPhy,
+    int rxPhy,
+    int phyOptions,
+  ) async {
     final pigeonVar_channelName =
         'dev.flutter.pigeon.bluebird.BluebirdHostApi.setPreferredPhy$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
@@ -2348,8 +2252,9 @@ class BluebirdHostApi {
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture =
-        pigeonVar_channel.send(<Object?>[address, txPhy, rxPhy, phyOptions]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[address, txPhy, rxPhy, phyOptions],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
@@ -2359,7 +2264,7 @@ class BluebirdHostApi {
     );
   }
 
-  Future<BmBondStateEnum> getBondState(String address) async {
+  Future<BluetoothBondState> getBondState(String address) async {
     final pigeonVar_channelName =
         'dev.flutter.pigeon.bluebird.BluebirdHostApi.getBondState$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
@@ -2367,8 +2272,9 @@ class BluebirdHostApi {
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture =
-        pigeonVar_channel.send(<Object?>[address]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[address],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
@@ -2376,7 +2282,7 @@ class BluebirdHostApi {
       pigeonVar_channelName,
       isNullValid: false,
     );
-    return pigeonVar_replyValue! as BmBondStateEnum;
+    return pigeonVar_replyValue! as BluetoothBondState;
   }
 
   Future<bool> createBond(String address, Uint8List? pin) async {
@@ -2387,8 +2293,9 @@ class BluebirdHostApi {
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture =
-        pigeonVar_channel.send(<Object?>[address, pin]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[address, pin],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
@@ -2407,8 +2314,9 @@ class BluebirdHostApi {
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture =
-        pigeonVar_channel.send(<Object?>[address]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[address],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
@@ -2427,8 +2335,9 @@ class BluebirdHostApi {
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture =
-        pigeonVar_channel.send(<Object?>[address]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[address],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(

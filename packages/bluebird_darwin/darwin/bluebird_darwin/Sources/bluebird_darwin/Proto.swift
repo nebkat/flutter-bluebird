@@ -1,4 +1,5 @@
 // Copyright 2017-2023, Charles Weinberger & Paul DeMarco.
+// Copyright 2026, Nebojša Cvetković (nebkat).
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
@@ -33,11 +34,12 @@ extension BluebirdErrorCode {
 }
 
 /// Wraps a CoreBluetooth NSError as a stable "cb_error" with the raw native
-/// code as details.
+/// error domain + code as details (e.g. "CBATTErrorDomain (3)"), so the exact
+/// cause is recoverable on the Dart side.
 func cbError(_ error: Error) -> PigeonError {
   let ns = error as NSError
   return PigeonError(
-    code: BluebirdErrorCode.cbError.wire, message: ns.localizedDescription, details: Int64(ns.code))
+    code: BluebirdErrorCode.cbError.wire, message: ns.localizedDescription, details: "\(ns.domain) (\(ns.code))")
 }
 
 func notConnectedError() -> PigeonError {
@@ -84,7 +86,7 @@ func cbManagerStateString(_ state: CBManagerState) -> String {
 // Enums
 // ─────────────────────────────────────────────────────────────────────────────
 
-func bmAdapterState(_ state: CBManagerState) -> BmAdapterStateEnum {
+func bmAdapterState(_ state: CBManagerState) -> BluetoothAdapterState {
   switch state {
   case .unknown: return .unknown
   case .unsupported: return .unavailable
@@ -124,7 +126,8 @@ func bmBluetoothService(_ service: CBService, in peripheral: CBPeripheral) -> Bm
 
 func bmBluetoothCharacteristic(_ characteristic: CBCharacteristic) -> BmBluetoothCharacteristic {
   let descriptors = (characteristic.descriptors ?? []).map {
-    BmBluetoothDescriptor(uuid: $0.uuid.uuidStr)
+    // descriptors are uuid-unique within a characteristic, so instance is 0
+    BmBluetoothDescriptor(id: BmAttributeId(uuid: $0.uuid.uuidStr, instance: 0))
   }
   return BmBluetoothCharacteristic(
     id: attributeId(characteristic),

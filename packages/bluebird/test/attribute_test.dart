@@ -35,8 +35,8 @@ void main() {
       final fake = FakePlatform()..services = services;
       FakePlatform.install(fake);
       device = Bluebird.deviceForAddress('AA:BB:CC:DD:EE:FF');
-      device.handleConnectionStateEvent(
-        BmConnectionStateEvent(address: device.remoteId, connectionState: BmConnectionStateEnum.connected),
+      device.applyEvent(
+        OnConnectionStateChangedEvent(device, BluetoothConnectionState.connected, null),
       );
       await device.discoverServices(subscribeToServicesChanged: false);
     }
@@ -74,7 +74,7 @@ void main() {
         ]),
       ]);
       final chrRef = BmCharacteristicRef(service: device.services.single.bm, characteristic: attr('b001'));
-      final descRef = BmDescriptorRef(characteristic: chrRef, uuid: Uuid('2901'));
+      final descRef = BmDescriptorRef(characteristic: chrRef, id: attr('2901'));
       expect(device.descriptorForRef(descRef).uuid, Uuid('2901'));
     });
 

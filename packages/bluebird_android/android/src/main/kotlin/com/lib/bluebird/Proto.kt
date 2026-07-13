@@ -1,4 +1,5 @@
 // Copyright 2017-2023, Charles Weinberger & Paul DeMarco.
+// Copyright 2026, Nebojša Cvetković (nebkat).
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
@@ -82,7 +83,8 @@ object Proto {
 
     fun resolveDescriptor(gatt: BluetoothGatt, ref: BmDescriptorRef): BluetoothGattDescriptor? {
         val characteristic = resolveCharacteristic(gatt, ref.characteristic) ?: return null
-        return characteristic.descriptors.firstOrNull { Uuid(it.uuid) == ref.uuid }
+        // descriptors are uuid-unique within a characteristic (instance is always 0)
+        return characteristic.descriptors.firstOrNull { Uuid(it.uuid) == ref.id.uuid }
     }
 
     //////////////////////////////////////////
@@ -114,7 +116,7 @@ object Proto {
     fun bmBluetoothCharacteristic(characteristic: BluetoothGattCharacteristic): BmBluetoothCharacteristic =
         BmBluetoothCharacteristic(
             id = attributeId(characteristic),
-            descriptors = characteristic.descriptors.map { BmBluetoothDescriptor(Uuid(it.uuid).str) },
+            descriptors = characteristic.descriptors.map { BmBluetoothDescriptor(BmAttributeId(Uuid(it.uuid), 0L)) },
             properties = bmCharacteristicProperties(characteristic.properties),
         )
 
@@ -326,25 +328,25 @@ object Proto {
     //////////////////////////////////////////
     // enum mapping
 
-    fun bmAdapterStateEnum(state: Int): BmAdapterStateEnum = when (state) {
-        BluetoothAdapter.STATE_OFF -> BmAdapterStateEnum.OFF
-        BluetoothAdapter.STATE_ON -> BmAdapterStateEnum.ON
-        BluetoothAdapter.STATE_TURNING_OFF -> BmAdapterStateEnum.TURNING_OFF
-        BluetoothAdapter.STATE_TURNING_ON -> BmAdapterStateEnum.TURNING_ON
-        else -> BmAdapterStateEnum.UNKNOWN
+    fun bmAdapterStateEnum(state: Int): BluetoothAdapterState = when (state) {
+        BluetoothAdapter.STATE_OFF -> BluetoothAdapterState.OFF
+        BluetoothAdapter.STATE_ON -> BluetoothAdapterState.ON
+        BluetoothAdapter.STATE_TURNING_OFF -> BluetoothAdapterState.TURNING_OFF
+        BluetoothAdapter.STATE_TURNING_ON -> BluetoothAdapterState.TURNING_ON
+        else -> BluetoothAdapterState.UNKNOWN
     }
 
-    fun bmBondStateEnum(state: Int): BmBondStateEnum = when (state) {
-        BluetoothDevice.BOND_NONE -> BmBondStateEnum.NONE
-        BluetoothDevice.BOND_BONDING -> BmBondStateEnum.BONDING
-        BluetoothDevice.BOND_BONDED -> BmBondStateEnum.BONDED
-        else -> BmBondStateEnum.NONE
+    fun bmBondStateEnum(state: Int): BluetoothBondState = when (state) {
+        BluetoothDevice.BOND_NONE -> BluetoothBondState.NONE
+        BluetoothDevice.BOND_BONDING -> BluetoothBondState.BONDING
+        BluetoothDevice.BOND_BONDED -> BluetoothBondState.BONDED
+        else -> BluetoothBondState.NONE
     }
 
-    fun bmConnectionPriorityParse(priority: BmConnectionPriorityEnum): Int = when (priority) {
-        BmConnectionPriorityEnum.BALANCED -> BluetoothGatt.CONNECTION_PRIORITY_BALANCED
-        BmConnectionPriorityEnum.HIGH -> BluetoothGatt.CONNECTION_PRIORITY_HIGH
-        BmConnectionPriorityEnum.LOW_POWER -> BluetoothGatt.CONNECTION_PRIORITY_LOW_POWER
+    fun bmConnectionPriorityParse(priority: ConnectionPriority): Int = when (priority) {
+        ConnectionPriority.BALANCED -> BluetoothGatt.CONNECTION_PRIORITY_BALANCED
+        ConnectionPriority.HIGH -> BluetoothGatt.CONNECTION_PRIORITY_HIGH
+        ConnectionPriority.LOW_POWER -> BluetoothGatt.CONNECTION_PRIORITY_LOW_POWER
     }
 
     fun bytesToHex(bytes: ByteArray?): String {

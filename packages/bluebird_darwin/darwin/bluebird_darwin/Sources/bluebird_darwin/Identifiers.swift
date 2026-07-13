@@ -1,4 +1,5 @@
 // Copyright 2017-2023, Charles Weinberger & Paul DeMarco.
+// Copyright 2026, Nebojša Cvetković (nebkat).
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
@@ -61,7 +62,9 @@ func descriptorRef(for descriptor: CBDescriptor, in peripheral: CBPeripheral) ->
   guard let characteristic = descriptor.characteristic,
     let charRef = characteristicRef(for: characteristic, in: peripheral)
   else { return nil }
-  return BmDescriptorRef(characteristic: charRef, uuid: descriptor.uuid.uuidStr)
+  // descriptors are uuid-unique within a characteristic, so instance is 0
+  return BmDescriptorRef(
+    characteristic: charRef, id: BmAttributeId(uuid: descriptor.uuid.uuidStr, instance: 0))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -116,11 +119,11 @@ func locateDescriptor(_ ref: BmDescriptorRef, in peripheral: CBPeripheral) throw
   let characteristic = try locateCharacteristic(ref.characteristic, in: peripheral)
   guard
     let descriptor = characteristic.descriptors?.first(where: {
-      $0.uuid.uuidStr == ref.uuid.lowercased()
+      $0.uuid.uuidStr == ref.id.uuid.lowercased()
     })
   else {
     throw invalidIdentifier(
-      "descriptor not found in characteristic (desc: '\(ref.uuid)', chr: '\(ref.characteristic.characteristic.uuid)')")
+      "descriptor not found in characteristic (desc: '\(ref.id.uuid)', chr: '\(ref.characteristic.characteristic.uuid)')")
   }
   return descriptor
 }

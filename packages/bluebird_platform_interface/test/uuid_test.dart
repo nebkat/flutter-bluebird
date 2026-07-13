@@ -19,9 +19,10 @@ void main() {
     });
 
     test('well-known constants match parsed instances', () {
-      expect(Uuids.cccdDescriptor, equals(Uuid('2902')));
-      expect(Uuids.gattService, equals(Uuid('1801')));
-      expect(Uuids.servicesChangedCharacteristic, equals(Uuid('2a05')));
+      expect(Uuids.descriptor.clientCharacteristicConfiguration, equals(Uuid('2902')));
+      expect(Uuids.descriptor.characteristicUserDescription, equals(Uuid('2901')));
+      expect(Uuids.service.genericAttribute, equals(Uuid('1801')));
+      expect(Uuids.characteristic.serviceChanged, equals(Uuid('2a05')));
     });
 
     test('different uuids compare unequal', () {
@@ -72,6 +73,20 @@ void main() {
     test('fromBytes requires 2, 4, or 16 bytes', () {
       expect(() => Uuid.fromBytes([1, 2, 3]), throwsA(isA<AssertionError>()));
       expect(Uuid.fromBytes([1, 2]).bytes.length, 2);
+    });
+  });
+
+  group('Uuid.name', () {
+    test('resolves well-known SIG names, short or long form', () {
+      expect(Uuid('2A24').name, 'Model Number String');
+      expect(Uuid('0000180a-0000-1000-8000-00805f9b34fb').name, 'Device Information');
+      expect(Uuid('2902').name, 'Client Characteristic Configuration');
+      expect(Uuids.characteristic.pnpId.name, 'PnP ID');
+    });
+
+    test('is null for unknown and non-SIG UUIDs', () {
+      expect(Uuid('2AFF').name, isNull); // unassigned in our subset
+      expect(Uuid('6e400001-b5a3-f393-e0a9-e50e24dcca9e').name, isNull); // custom 128-bit
     });
   });
 }

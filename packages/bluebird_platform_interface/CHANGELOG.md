@@ -1,3 +1,2 @@
-## 1.0.0
-
-* Initial release of `bluebird_platform_interface`.
+### 0.1.0
+  * Initial release.

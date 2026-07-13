@@ -192,7 +192,7 @@ class FlutterError (
   val details: Any? = null
 ) : RuntimeException()
 
-enum class BmAdapterStateEnum(val raw: Int) {
+enum class BluetoothAdapterState(val raw: Int) {
   UNKNOWN(0),
   UNAVAILABLE(1),
   UNAUTHORIZED(2),
@@ -202,18 +202,18 @@ enum class BmAdapterStateEnum(val raw: Int) {
   OFF(6);
 
   companion object {
-    fun ofRaw(raw: Int): BmAdapterStateEnum? {
+    fun ofRaw(raw: Int): BluetoothAdapterState? {
       return values().firstOrNull { it.raw == raw }
     }
   }
 }
 
-enum class BmConnectionStateEnum(val raw: Int) {
+enum class BluetoothConnectionState(val raw: Int) {
   DISCONNECTED(0),
   CONNECTED(1);
 
   companion object {
-    fun ofRaw(raw: Int): BmConnectionStateEnum? {
+    fun ofRaw(raw: Int): BluetoothConnectionState? {
       return values().firstOrNull { it.raw == raw }
     }
   }
@@ -230,25 +230,25 @@ enum class BmWriteType(val raw: Int) {
   }
 }
 
-enum class BmConnectionPriorityEnum(val raw: Int) {
+enum class ConnectionPriority(val raw: Int) {
   BALANCED(0),
   HIGH(1),
   LOW_POWER(2);
 
   companion object {
-    fun ofRaw(raw: Int): BmConnectionPriorityEnum? {
+    fun ofRaw(raw: Int): ConnectionPriority? {
       return values().firstOrNull { it.raw == raw }
     }
   }
 }
 
-enum class BmBondStateEnum(val raw: Int) {
+enum class BluetoothBondState(val raw: Int) {
   NONE(0),
   BONDING(1),
   BONDED(2);
 
   companion object {
-    fun ofRaw(raw: Int): BmBondStateEnum? {
+    fun ofRaw(raw: Int): BluetoothBondState? {
       return values().firstOrNull { it.raw == raw }
     }
   }
@@ -438,21 +438,25 @@ data class BmCharacteristicRef (
 /** Generated class from Pigeon that represents data sent in messages. */
 data class BmDescriptorRef (
   val characteristic: BmCharacteristicRef,
-  /** Descriptor uuids are unique within a characteristic; no instance needed. */
-  val uuid: Uuid
+  /**
+   * Descriptors are uuid-unique within a characteristic, so [id]'s instance is
+   * always 0; the [BmAttributeId] keeps descriptors uniform with services and
+   * characteristics.
+   */
+  val id: BmAttributeId
 )
  {
   companion object {
     fun fromList(pigeonVar_list: List<Any?>): BmDescriptorRef {
       val characteristic = pigeonVar_list[0] as BmCharacteristicRef
-      val uuid = Uuid.parse(pigeonVar_list[1] as String)
-      return BmDescriptorRef(characteristic, uuid)
+      val id = pigeonVar_list[1] as BmAttributeId
+      return BmDescriptorRef(characteristic, id)
     }
   }
   fun toList(): List<Any?> {
     return listOf(
       characteristic,
-      uuid.str,
+      id,
     )
   }
   override fun equals(other: Any?): Boolean {
@@ -463,17 +467,17 @@ data class BmDescriptorRef (
       return true
     }
     val other = other as BmDescriptorRef
-    return MessagesPigeonUtils.deepEquals(this.characteristic, other.characteristic) && MessagesPigeonUtils.deepEquals(this.uuid, other.uuid)
+    return MessagesPigeonUtils.deepEquals(this.characteristic, other.characteristic) && MessagesPigeonUtils.deepEquals(this.id, other.id)
   }
 
   override fun hashCode(): Int {
     var result = javaClass.hashCode()
     result = 31 * result + MessagesPigeonUtils.deepHash(this.characteristic)
-    result = 31 * result + MessagesPigeonUtils.deepHash(this.uuid)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.id)
     return result
   }
   override fun toString(): String {
-    return "BmDescriptorRef(characteristic=$characteristic, uuid=$uuid)"
+    return "BmDescriptorRef(characteristic=$characteristic, id=$id)"
   }
 }
 
@@ -859,18 +863,18 @@ data class BmBluetoothCharacteristic (
 
 /** Generated class from Pigeon that represents data sent in messages. */
 data class BmBluetoothDescriptor (
-  val uuid: String
+  val id: BmAttributeId
 )
  {
   companion object {
     fun fromList(pigeonVar_list: List<Any?>): BmBluetoothDescriptor {
-      val uuid = pigeonVar_list[0] as String
-      return BmBluetoothDescriptor(uuid)
+      val id = pigeonVar_list[0] as BmAttributeId
+      return BmBluetoothDescriptor(id)
     }
   }
   fun toList(): List<Any?> {
     return listOf(
-      uuid,
+      id,
     )
   }
   override fun equals(other: Any?): Boolean {
@@ -881,16 +885,16 @@ data class BmBluetoothDescriptor (
       return true
     }
     val other = other as BmBluetoothDescriptor
-    return MessagesPigeonUtils.deepEquals(this.uuid, other.uuid)
+    return MessagesPigeonUtils.deepEquals(this.id, other.id)
   }
 
   override fun hashCode(): Int {
     var result = javaClass.hashCode()
-    result = 31 * result + MessagesPigeonUtils.deepHash(this.uuid)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.id)
     return result
   }
   override fun toString(): String {
-    return "BmBluetoothDescriptor(uuid=$uuid)"
+    return "BmBluetoothDescriptor(id=$id)"
   }
 }
 
@@ -1017,12 +1021,12 @@ data class BmPhySupport (
 sealed class BmEvent 
 /** Generated class from Pigeon that represents data sent in messages. */
 data class BmAdapterStateEvent (
-  val adapterState: BmAdapterStateEnum
+  val adapterState: BluetoothAdapterState
 ) : BmEvent()
  {
   companion object {
     fun fromList(pigeonVar_list: List<Any?>): BmAdapterStateEvent {
-      val adapterState = pigeonVar_list[0] as BmAdapterStateEnum
+      val adapterState = pigeonVar_list[0] as BluetoothAdapterState
       return BmAdapterStateEvent(adapterState)
     }
   }
@@ -1053,19 +1057,19 @@ data class BmAdapterStateEvent (
 }
 
 /** Generated class from Pigeon that represents data sent in messages. */
-data class BmScanAdvertisementsEvent (
-  val advertisements: List<BmScanAdvertisement>
+data class BmScanAdvertisementEvent (
+  val advertisement: BmScanAdvertisement
 ) : BmEvent()
  {
   companion object {
-    fun fromList(pigeonVar_list: List<Any?>): BmScanAdvertisementsEvent {
-      val advertisements = pigeonVar_list[0] as List<BmScanAdvertisement>
-      return BmScanAdvertisementsEvent(advertisements)
+    fun fromList(pigeonVar_list: List<Any?>): BmScanAdvertisementEvent {
+      val advertisement = pigeonVar_list[0] as BmScanAdvertisement
+      return BmScanAdvertisementEvent(advertisement)
     }
   }
   fun toList(): List<Any?> {
     return listOf(
-      advertisements,
+      advertisement,
     )
   }
   override fun equals(other: Any?): Boolean {
@@ -1075,17 +1079,17 @@ data class BmScanAdvertisementsEvent (
     if (this === other) {
       return true
     }
-    val other = other as BmScanAdvertisementsEvent
-    return MessagesPigeonUtils.deepEquals(this.advertisements, other.advertisements)
+    val other = other as BmScanAdvertisementEvent
+    return MessagesPigeonUtils.deepEquals(this.advertisement, other.advertisement)
   }
 
   override fun hashCode(): Int {
     var result = javaClass.hashCode()
-    result = 31 * result + MessagesPigeonUtils.deepHash(this.advertisements)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.advertisement)
     return result
   }
   override fun toString(): String {
-    return "BmScanAdvertisementsEvent(advertisements=$advertisements)"
+    return "BmScanAdvertisementEvent(advertisement=$advertisement)"
   }
 }
 
@@ -1133,7 +1137,7 @@ data class BmScanFailedEvent (
 /** Generated class from Pigeon that represents data sent in messages. */
 data class BmConnectionStateEvent (
   val address: String,
-  val connectionState: BmConnectionStateEnum,
+  val connectionState: BluetoothConnectionState,
   val disconnectReasonCode: Long? = null,
   val disconnectReasonString: String? = null
 ) : BmEvent()
@@ -1141,7 +1145,7 @@ data class BmConnectionStateEvent (
   companion object {
     fun fromList(pigeonVar_list: List<Any?>): BmConnectionStateEvent {
       val address = pigeonVar_list[0] as String
-      val connectionState = pigeonVar_list[1] as BmConnectionStateEnum
+      val connectionState = pigeonVar_list[1] as BluetoothConnectionState
       val disconnectReasonCode = pigeonVar_list[2] as Long?
       val disconnectReasonString = pigeonVar_list[3] as String?
       return BmConnectionStateEvent(address, connectionState, disconnectReasonCode, disconnectReasonString)
@@ -1232,15 +1236,15 @@ data class BmCharacteristicNotificationEvent (
 /** Generated class from Pigeon that represents data sent in messages. */
 data class BmBondStateEvent (
   val address: String,
-  val bondState: BmBondStateEnum,
-  val prevState: BmBondStateEnum? = null
+  val bondState: BluetoothBondState,
+  val prevState: BluetoothBondState? = null
 ) : BmEvent()
  {
   companion object {
     fun fromList(pigeonVar_list: List<Any?>): BmBondStateEvent {
       val address = pigeonVar_list[0] as String
-      val bondState = pigeonVar_list[1] as BmBondStateEnum
-      val prevState = pigeonVar_list[2] as BmBondStateEnum?
+      val bondState = pigeonVar_list[1] as BluetoothBondState
+      val prevState = pigeonVar_list[2] as BluetoothBondState?
       return BmBondStateEvent(address, bondState, prevState)
     }
   }
@@ -1442,12 +1446,12 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
     return when (type) {
       129.toByte() -> {
         return (readValue(buffer) as Long?)?.let {
-          BmAdapterStateEnum.ofRaw(it.toInt())
+          BluetoothAdapterState.ofRaw(it.toInt())
         }
       }
       130.toByte() -> {
         return (readValue(buffer) as Long?)?.let {
-          BmConnectionStateEnum.ofRaw(it.toInt())
+          BluetoothConnectionState.ofRaw(it.toInt())
         }
       }
       131.toByte() -> {
@@ -1457,12 +1461,12 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
       }
       132.toByte() -> {
         return (readValue(buffer) as Long?)?.let {
-          BmConnectionPriorityEnum.ofRaw(it.toInt())
+          ConnectionPriority.ofRaw(it.toInt())
         }
       }
       133.toByte() -> {
         return (readValue(buffer) as Long?)?.let {
-          BmBondStateEnum.ofRaw(it.toInt())
+          BluetoothBondState.ofRaw(it.toInt())
         }
       }
       134.toByte() -> {
@@ -1552,7 +1556,7 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
       }
       151.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmScanAdvertisementsEvent.fromList(it)
+          BmScanAdvertisementEvent.fromList(it)
         }
       }
       152.toByte() -> {
@@ -1600,11 +1604,11 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
   }
   override fun writeValue(stream: ByteArrayOutputStream, value: Any?)   {
     when (value) {
-      is BmAdapterStateEnum -> {
+      is BluetoothAdapterState -> {
         stream.write(129)
         writeValue(stream, value.raw.toLong())
       }
-      is BmConnectionStateEnum -> {
+      is BluetoothConnectionState -> {
         stream.write(130)
         writeValue(stream, value.raw.toLong())
       }
@@ -1612,11 +1616,11 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
         stream.write(131)
         writeValue(stream, value.raw.toLong())
       }
-      is BmConnectionPriorityEnum -> {
+      is ConnectionPriority -> {
         stream.write(132)
         writeValue(stream, value.raw.toLong())
       }
-      is BmBondStateEnum -> {
+      is BluetoothBondState -> {
         stream.write(133)
         writeValue(stream, value.raw.toLong())
       }
@@ -1688,7 +1692,7 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
         stream.write(150)
         writeValue(stream, value.toList())
       }
-      is BmScanAdvertisementsEvent -> {
+      is BmScanAdvertisementEvent -> {
         stream.write(151)
         writeValue(stream, value.toList())
       }
@@ -1799,7 +1803,7 @@ interface BluebirdHostApi {
   fun isSupported(): Boolean
   /** @async: may need to request runtime permissions before answering. */
   fun getAdapterName(callback: (Result<String>) -> Unit)
-  fun getAdapterState(): BmAdapterStateEnum
+  fun getAdapterState(): BluetoothAdapterState
   /** Android: shows the enable-bluetooth dialog; completes with user consent. */
   fun turnOn(callback: (Result<Boolean>) -> Unit)
   fun turnOff(callback: (Result<Boolean>) -> Unit)
@@ -1815,13 +1819,13 @@ interface BluebirdHostApi {
   fun readDescriptor(address: String, descriptor: BmDescriptorRef, callback: (Result<ByteArray>) -> Unit)
   fun writeDescriptor(address: String, descriptor: BmDescriptorRef, value: ByteArray, callback: (Result<Unit>) -> Unit)
   /** Completes after the CCCD write confirms (or immediately if no CCCD). */
-  fun setNotifyValue(address: String, characteristic: BmCharacteristicRef, forceIndications: Boolean, enable: Boolean, callback: (Result<Boolean>) -> Unit)
+  fun setNotifyValue(address: String, characteristic: BmCharacteristicRef, enable: Boolean, callback: (Result<Boolean>) -> Unit)
   fun requestMtu(address: String, mtu: Long, callback: (Result<Long>) -> Unit)
   fun readRssi(address: String, callback: (Result<Long>) -> Unit)
-  fun requestConnectionPriority(address: String, connectionPriority: BmConnectionPriorityEnum)
+  fun requestConnectionPriority(address: String, connectionPriority: ConnectionPriority)
   fun getPhySupport(): BmPhySupport
   fun setPreferredPhy(address: String, txPhy: Long, rxPhy: Long, phyOptions: Long, callback: (Result<Unit>) -> Unit)
-  fun getBondState(address: String): BmBondStateEnum
+  fun getBondState(address: String): BluetoothBondState
   fun createBond(address: String, pin: ByteArray?, callback: (Result<Boolean>) -> Unit)
   fun removeBond(address: String, callback: (Result<Boolean>) -> Unit)
   fun clearGattCache(address: String, callback: (Result<Unit>) -> Unit)
@@ -2210,9 +2214,8 @@ interface BluebirdHostApi {
             val args = message as List<Any?>
             val addressArg = args[0] as String
             val characteristicArg = args[1] as BmCharacteristicRef
-            val forceIndicationsArg = args[2] as Boolean
-            val enableArg = args[3] as Boolean
-            api.setNotifyValue(addressArg, characteristicArg, forceIndicationsArg, enableArg) { result: Result<Boolean> ->
+            val enableArg = args[2] as Boolean
+            api.setNotifyValue(addressArg, characteristicArg, enableArg) { result: Result<Boolean> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(MessagesPigeonUtils.wrapError(error))
@@ -2273,7 +2276,7 @@ interface BluebirdHostApi {
           channel.setMessageHandler { message, reply ->
             val args = message as List<Any?>
             val addressArg = args[0] as String
-            val connectionPriorityArg = args[1] as BmConnectionPriorityEnum
+            val connectionPriorityArg = args[1] as ConnectionPriority
             val wrapped: List<Any?> = try {
               api.requestConnectionPriority(addressArg, connectionPriorityArg)
               listOf(null)

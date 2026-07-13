@@ -1,24 +1,23 @@
 // Copyright 2017-2023, Charles Weinberger & Paul DeMarco.
+// Copyright 2026, Nebojša Cvetković (nebkat).
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:bluebird/bluebird.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/material.dart';
 
 import 'screens/bluetooth_off_screen.dart';
 import 'screens/scan_screen.dart';
+import 'screens/web_scan_screen.dart';
 
 void main() {
   // TODO Bluebird.setLogLevel(LogLevel.verbose, color: true);
   runApp(const BluebirdApp());
 }
 
-//
-// This widget shows BluetoothOffScreen or
-// ScanScreen depending on the adapter state
-//
 class BluebirdApp extends StatefulWidget {
   const BluebirdApp({Key? key}) : super(key: key);
 
@@ -51,14 +50,10 @@ class _BluebirdAppState extends State<BluebirdApp> {
   @override
   Widget build(BuildContext context) {
     Widget screen = _adapterState == BluetoothAdapterState.on
-        ? const ScanScreen()
+        ? (kIsWeb ? const WebScanScreen() : const ScanScreen())
         : BluetoothOffScreen(adapterState: _adapterState);
 
-    return MaterialApp(
-      color: Colors.lightBlue,
-      home: screen,
-      navigatorObservers: [BluetoothAdapterStateObserver()],
-    );
+    return MaterialApp(color: Colors.lightBlue, home: screen, navigatorObservers: [BluetoothAdapterStateObserver()]);
   }
 }
 

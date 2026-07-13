@@ -1,3 +1,2 @@
-## 1.0.0
-
-* Initial release of `bluebird_darwin`.
+### 0.1.0
+  * Initial release.

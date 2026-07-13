@@ -1,4 +1,5 @@
 // Copyright 2017-2023, Charles Weinberger & Paul DeMarco.
+// Copyright 2026, Nebojša Cvetković (nebkat).
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
@@ -480,7 +481,7 @@ class BluebirdPlugin :
         } ?: ""
     }
 
-    override fun getAdapterState(): BmAdapterStateEnum {
+    override fun getAdapterState(): BluetoothAdapterState {
         val state = try {
             adapter()?.state ?: -1
         } catch (e: Exception) {
@@ -661,7 +662,7 @@ class BluebirdPlugin :
 
                 emitEvent(BmConnectionStateEvent(
                     address = address,
-                    connectionState = BmConnectionStateEnum.DISCONNECTED,
+                    connectionState = BluetoothConnectionState.DISCONNECTED,
                     disconnectReasonCode = USER_CANCELED_ERROR_CODE,
                     disconnectReasonString = "connection canceled",
                 ))
@@ -804,7 +805,6 @@ class BluebirdPlugin :
     override fun setNotifyValue(
         address: String,
         characteristic: BmCharacteristicRef,
-        forceIndications: Boolean,
         enable: Boolean,
         callback: (Result<Boolean>) -> Unit,
     ) = launch("setNotifyValue", callback) {
@@ -838,15 +838,9 @@ class BluebirdPlugin :
                 "neither NOTIFY nor INDICATE properties are supported by this BLE characteristic"
             }
 
-            check(!forceIndications || chr.canIndicate, BluebirdErrorCode.UNSUPPORTED) {
-                "INDICATE not supported by this BLE characteristic"
-            }
-
             // If a characteristic supports both notifications and indications,
             // we use notifications. This matches how CoreBluetooth works on iOS.
-            // Except of course, if forceIndications is enabled.
             descriptorValue = when {
-                forceIndications -> BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
                 chr.canNotify -> BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
                 else -> BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
             }
@@ -884,7 +878,7 @@ class BluebirdPlugin :
         }
     }
 
-    override fun requestConnectionPriority(address: String, connectionPriority: BmConnectionPriorityEnum) {
+    override fun requestConnectionPriority(address: String, connectionPriority: ConnectionPriority) {
         val gatt = registry.requireConnected(address).gatt
 
         if (!gatt.requestConnectionPriority(Proto.bmConnectionPriorityParse(connectionPriority))) {
@@ -922,7 +916,7 @@ class BluebirdPlugin :
         }
     }
 
-    override fun getBondState(address: String): BmBondStateEnum {
+    override fun getBondState(address: String): BluetoothBondState {
         val device = requireAdapter().getRemoteDevice(address)
         return Proto.bmBondStateEnum(device.bondState)
     }
@@ -1170,7 +1164,7 @@ class BluebirdPlugin :
 
                     emitEvent(BmConnectionStateEvent(
                         address = remoteId,
-                        connectionState = BmConnectionStateEnum.CONNECTED,
+                        connectionState = BluetoothConnectionState.CONNECTED,
                         disconnectReasonCode = null,
                         disconnectReasonString = null,
                     ))
@@ -1197,7 +1191,7 @@ class BluebirdPlugin :
 
                     emitEvent(BmConnectionStateEvent(
                         address = remoteId,
-                        connectionState = BmConnectionStateEnum.DISCONNECTED,
+                        connectionState = BluetoothConnectionState.DISCONNECTED,
                         disconnectReasonCode = status.toLong(),
                         disconnectReasonString = ErrorStrings.hciStatusString(status),
                     ))

@@ -16,20 +16,22 @@ class ServiceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // show the well-known SIG name if we recognize the uuid, else a generic label
+    final name = service.uuid.name ?? 'Unknown Service';
     return characteristicTiles.isNotEmpty
         ? ExpansionTile(
             title: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                const Text('Service', style: TextStyle(color: Colors.blue)),
+                Text(name, style: const TextStyle(color: Colors.blue)),
                 buildUuid(context),
               ],
             ),
             children: characteristicTiles,
           )
         : ListTile(
-            title: const Text('Service'),
+            title: Text(name),
             subtitle: buildUuid(context),
           );
   }

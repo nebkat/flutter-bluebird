@@ -1,4 +1,5 @@
 // Copyright 2017-2023, Charles Weinberger & Paul DeMarco.
+// Copyright 2026, Nebojša Cvetković (nebkat).
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
@@ -63,7 +64,7 @@ class Scanner(
                 }
             }
 
-            emitEvent(BmScanAdvertisementsEvent(listOf(Proto.bmScanAdvertisement(device, result))))
+            emitEvent(BmScanAdvertisementEvent(Proto.bmScanAdvertisement(device, result)))
         }
 
         override fun onBatchScanResults(results: List<ScanResult>) {

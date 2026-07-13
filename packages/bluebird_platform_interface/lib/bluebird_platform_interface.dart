@@ -54,7 +54,7 @@ abstract base class BluebirdPlatform {
 
   Stream<BmNameChangedEvent> get onNameChanged => _eventsOf();
 
-  Stream<BmScanAdvertisementsEvent> get onScanAdvertisements => _eventsOf();
+  Stream<BmScanAdvertisementEvent> get onScanAdvertisement => _eventsOf();
 
   Stream<BmScanFailedEvent> get onScanFailed => _eventsOf();
 
@@ -83,9 +83,9 @@ abstract base class BluebirdPlatform {
 
   Future<String> getAdapterName() => throw UnimplementedError('$runtimeType.getAdapterName');
 
-  Future<BmAdapterStateEnum> getAdapterState() => throw UnimplementedError('$runtimeType.getAdapterState');
+  Future<BluetoothAdapterState> getAdapterState() => throw UnimplementedError('$runtimeType.getAdapterState');
 
-  Future<BmBondStateEnum> getBondState(String address) => throw UnimplementedError('$runtimeType.getBondState');
+  Future<BluetoothBondState> getBondState(String address) => throw UnimplementedError('$runtimeType.getBondState');
 
   Future<List<BmBluetoothDevice>> getBondedDevices() {
     return Future.value(const []);
@@ -107,7 +107,7 @@ abstract base class BluebirdPlatform {
 
   Future<bool> removeBond(String address) => throw UnimplementedError('$runtimeType.removeBond');
 
-  Future<void> requestConnectionPriority(String address, BmConnectionPriorityEnum connectionPriority) => throw UnimplementedError('$runtimeType.requestConnectionPriority');
+  Future<void> requestConnectionPriority(String address, ConnectionPriority connectionPriority) => throw UnimplementedError('$runtimeType.requestConnectionPriority');
 
   Future<int> requestMtu(String address, int mtu) => throw UnimplementedError('$runtimeType.requestMtu');
 
@@ -117,7 +117,7 @@ abstract base class BluebirdPlatform {
     return Future.value();
   }
 
-  Future<bool> setNotifyValue(String address, BmCharacteristicRef characteristic, bool forceIndications, bool enable) => throw UnimplementedError('$runtimeType.setNotifyValue');
+  Future<bool> setNotifyValue(String address, BmCharacteristicRef characteristic, bool enable) => throw UnimplementedError('$runtimeType.setNotifyValue');
 
   Future<void> setOptions(bool showPowerAlert, bool restoreState) => throw UnimplementedError('$runtimeType.setOptions');
 

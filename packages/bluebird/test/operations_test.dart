@@ -47,16 +47,22 @@ void main() {
     );
   });
 
-  test('characteristic read returns the value and emits a received event', () async {
+  test('characteristic read reaches values but not notifications', () async {
     await connectAndDiscover();
-    final events = expectLater(
-      Bluebird.events.onCharacteristicReceived,
-      emits(isA<OnCharacteristicReceivedEvent>().having((e) => e.value, 'value', [0xab])),
-    );
-    final value = await chr().read();
+    final c = chr();
+
+    final onValues = expectLater(c.valuesPassive, emits([0xab])); // reads show up in values
+    var onNotify = false;
+    final notifySub = c.notificationsPassive.listen((_) => onNotify = true); // but not notifications
+
+    final value = await c.read();
     expect(value, [0xab]);
     expect(fake.lastCharRef?.characteristic.uuid, Uuid('b001'));
-    await events;
+
+    await onValues;
+    await pumpEventQueue();
+    expect(onNotify, isFalse);
+    await notifySub.cancel();
   });
 
   test('write passes the correct write type', () async {
@@ -70,9 +76,9 @@ void main() {
     expect(fake.lastWriteType, BmWriteType.withoutResponse);
   });
 
-  test('setNotifyValue delegates to the platform', () async {
+  test('subscribe delegates the notify enable to the platform', () async {
     await connectAndDiscover();
-    await chr().setNotifyValue(true);
+    await chr().subscribe();
     expect(fake.calls, contains('setNotifyValue'));
   });
 

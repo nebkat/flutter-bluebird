@@ -1,131 +1,134 @@
 [![pub package](https://img.shields.io/pub/v/bluebird.svg)](https://pub.dartlang.org/packages/bluebird)
-[![Chat](https://img.shields.io/discord/634853295160033301.svg?style=flat-square&colorB=758ED3)](https://discord.gg/Yk5Efra)
 
-<br>
-<p align="center">
-<img alt="Bluebird" src="https://github.com/boskokg/bluebird/blob/master/site/bluebird.png?raw=true" />
-</p>
-<br><br>
+# Bluebird
+
+A Bluetooth Low Energy plugin for Flutter.
+
+- Zero dependencies
+- Supports Android, iOS, macOS, and Web
 
 ## Contents
 
-- [Introduction](#introduction)
 - [Usage](#usage)
+- [Advanced Usage](#advanced-usage)
 - [Getting Started](#getting-started)
-- [Using Ble in App Background](#using-ble-in-app-background)
 - [Reference](#reference)
 - [Debugging](#debugging)
 - [Mocking](#mocking)
 - [Common Problems](#common-problems)
 
-## Introduction
-
-Bluebird is a Bluetooth Low Energy plugin for [Flutter](https://flutter.dev). 
-
-It supports BLE Central Role only (most common). 
-
-If you need BLE Peripheral Role, you should check out [FlutterBlePeripheral](https://pub.dev/packages/flutter_ble_peripheral), or [bluetooth_low_energy](https://pub.dev/packages/bluetooth_low_energy).
-
-## Sponsored
-
-<p align="left">
-<img width="250px" alt="Bluebird" src="https://github.com/boskokg/bluebird/blob/master/site/jamcorder.png?raw=true" />
-</p>
-
-Bluebird is proudly sponsored by [Jamcorder](https://www.jamcorder.com/). 
-
-## Tutorial
-
-If you are new to Bluetooth, you should start by reading BLE tutorials.
-* [Novel Bits BLE Tutorial](https://novelbits.io/bluetooth-low-energy-ble-complete-guide/)
-* [All About Circuits BLE Tutorial](https://www.allaboutcircuits.com/technical-articles/exploring-the-basics-of-bluetooth-low-energy-a-beginners-guide-to-ble/)
-* [Embetronicx BLE Tutorial](https://embetronicx.com/tutorials/tech_devices/bluetooth-low-energy-ble-introduction-part-1/)
-
-## ❗ Bluetooth Classic is not supported ❗
-
- i.e. **Arduino HC-05 & HC-06,** speakers, headphones, mice, keyboards, gamepads, and more are **not** supported. These all use Bluetooth Classic.
-
- Also, iBeacons are **_not_** supported on iOS. Apple requires you to use CoreLocation.
-
-## Cross-Platform Bluetooth Low Energy
-
-Bluebird supports nearly every feature on all supported platforms: iOS, macOS, Android.
-
-## No Dependencies
-
-Bluebird has zero dependencies besides Flutter, Android, iOS, and macOS themselves.
-
-This makes Bluebird very stable, and easy to maintain.
-
-## Windows Support
-
-Use [bluebird_windows](https://pub.dev/packages/bluebird_windows) if you need Windows support.
-
-It is maintained by @chan150. 
-
-## Linus & Web Support
-
-[Linux](https://github.com/chipweinberger/bluebird/issues/983) & [Web](https://github.com/chipweinberger/bluebird/issues/769) support are not planned for Bluebird.
-
-If you would like to implement `bluebird_linux`, or `bluebird_web`, please do! 
-
-See: [bluebird_windows](https://pub.dev/packages/bluebird_windows) for an example.
-
-## ⭐ Stars ⭐
-
-Please star this repo & on [pub.dev](https://pub.dev/packages/bluebird). We all benefit from having a larger community.
-
-## Discord 💬
-
-[![Chat](https://img.shields.io/discord/634853295160033301.svg?style=flat-square&colorB=758ED3)](https://discord.gg/Yk5Efra) There is a community Discord server. ([Link](https://discord.gg/Yk5Efra))
-
 ## Example
 
-Bluebird has a beautiful example app, useful to debug issues.
+Bluebird ships with an example app that is useful for debugging issues.
 
 ```
 cd ./example
 flutter run
 ```
 
-<p align="center">
-<img alt="Bluebird" src="https://github.com/boskokg/bluebird/blob/master/site/example.png?raw=true" />
-</p>
-
 ## Usage
 
-### 🔥 Error Handling 🔥
+### Scan for devices
 
-Bluebird takes error handling seriously. 
+`Bluebird.scan()` streams `ScanResult` advertisements for as long as you listen —
+`break` out of the loop (or cancel the subscription) to stop. Only one scan runs at
+a time. Setting filters reduces platform-channel load.
+
+```dart
+await Bluebird.adapterState.firstWhere((s) => s == BluetoothAdapterState.on);
+
+await for (final r in Bluebird.scan(withServices: [Uuid("180D")], withNames: ["Bluno"])) {
+  print('${r.device.remoteId}: "${r.advertisementData.advName}"');
+}
+```
+
+For a growing, de-duplicated device list, use `.accumulate()`:
+
+```dart
+await for (final results in Bluebird.scan().accumulate(removeIfGone: const Duration(seconds: 5))) {
+  // `results` is the current list of nearby devices
+}
+```
+
+`Bluebird.isScanning.value` reports whether a scan is running. If your device never
+appears, see [Common Problems](#common-problems).
+
+### Connect to a device
+
+```dart
+// Connect. Throws on failure or timeout.
+await device.connect();
+
+// Disconnect when you're done.
+await device.disconnect();
+```
+
+### Discover services & characteristics
+
+Before you can read, write, or subscribe, discover the device's GATT services, then
+look up the service and characteristic you need by UUID:
+
+```dart
+await device.discoverServices();
+
+final service = device.services.firstWhere((s) => s.uuid == Uuids.service.deviceInformation);
+final characteristic = service.characteristics.firstWhere((c) => c.uuid == Uuids.characteristic.manufacturerName);
+```
+
+You must re-discover after every reconnection, and whenever the device signals a
+[services reset](#services-changed-characteristic). Each `discoverServices()` — and
+each services reset — **invalidates every previously discovered attribute**: any
+`BluetoothService`, `BluetoothCharacteristic`, or `BluetoothDescriptor` you were
+holding becomes stale and throws if used (check `attribute.isValid`). Always re-fetch
+from `device.services` after (re-)discovering rather than reusing old references.
+
+### Subscribe to notifications
+
+`characteristic.notifications` is a stream of the values received via
+notify/indicate. **Listening enables notifications on the peripheral, and cancelling
+disables it** — there is no need for a separate "enable notifications" call.
+
+```dart
+// Enables notifications (or indications) on the peripheral
+final subscription = characteristic.notifications.listen(
+    (value) {
+        // Called for each notification/indication
+    },
+    // The stream *errors* if the peripheral fails to enable notifications
+    onError: (e) => print("failed to enable notify: $e"),
+);
+
+// Disables notifications on the peripheral
+await subscription.cancel();
+```
+
+Notes:
+- Notify is ref-counted: it is enabled for the first listener and disabled when
+  the last one cancels.
+- If you never receive a value, see [Common Problems](#common-problems).
+
+### Read & write characteristics
+
+```dart
+// Read (check c.canRead if unsure)
+List<int> value = await c.read();
+
+// Write (check c.canWrite if unsure)
+await c.write([0x12, 0x34]);
+```
+
+## Advanced Usage
+
+### Error Handling
 
 Every error returned by the native platform is checked and thrown as an exception where appropriate. See [Reference](#reference) for a list of throwable functions.
 
-**Streams:** Streams returned by Bluebird never emit any errors and never close. There's no need to handle `onError` or `onDone` for  `stream.listen(...)`. The one exception is `Bluebird.scanResults`, which you should handle `onError`.
-
----
-
-### Set Log Level
-
-```dart
-// if your terminal doesn't support color you'll see annoying logs like `\x1B[1;35m`
-Bluebird.setLogLevel(LogLevel.verbose, color:false)
-```
-
-Setting `LogLevel.verbose` shows *all* data in and out.
-
-⚫ = function name
-
-🟣 = args to platform
-
-🟡 = data from platform
-
-<img width="600" alt="Screenshot 2023-07-27 at 4 53 08 AM" src="https://github.com/boskokg/bluebird/assets/1863934/ee37d702-2752-4402-bf26-fc661728c1c3">
-
+**Streams:** Most state streams returned by Bluebird (e.g. `adapterState`, `device.connectionState`, `device.mtu`) never emit errors and never close, so there's no need to handle `onError` or `onDone`. The exceptions are the *operation* streams that can fail: `Bluebird.scan()` (errors if a scan cannot start) and `characteristic.notifications` / `characteristic.values` (error if enabling notify fails) — handle `onError` on those.
 
 ### Bluetooth On & Off
 
-**Note:** On iOS, a "*This app would like to use Bluetooth*" system dialogue appears on first call to any Bluebird method. 
- 
+**Note:** On iOS, a "*This app would like to use Bluetooth*" system dialogue appears on first call to any Bluebird method.
+
 ```dart
 // first, check if bluetooth is supported by your hardware
 // Note: The platform is initialized on the first call to any Bluebird method.
@@ -156,94 +159,96 @@ if (Platform.isAndroid) {
 subscription.cancel();
 ```
 
-### Scan for devices
-
-If your device is not found, see [Common Problems](#common-problems).
-
-**Note:** It is recommended to set scan filters to reduce main thread & platform channel usage.
+### Set Log Level
 
 ```dart
-// listen to scan results
-// Note: `onScanResults` clears the results between scans. You should use
-//  `scanResults` if you want the current scan results *or* the results from the previous scan.
-var subscription = Bluebird.onScanResults.listen((results) {
-        if (results.isNotEmpty) {
-            ScanResult r = results.last; // the most recently found device
-            print('${r.device.remoteId}: "${r.advertisementData.advName}" found!');
-        }
-    },
-    onError: (e) => print(e),
-);
-
-// cleanup: cancel subscription when scanning stops
-Bluebird.cancelWhenScanComplete(subscription);
-
-// Wait for Bluetooth enabled & permission granted
-// In your real app you should use `Bluebird.adapterState.listen` to handle all states
-await Bluebird.adapterState.where((val) => val == BluetoothAdapterState.on).first;
-
-// Start scanning w/ timeout
-// Optional: use `stopScan()` as an alternative to timeout
-await Bluebird.startScan(
-  withServices:[Guid("180D")], // match any of the specified services
-  withNames:["Bluno"], // *or* any of the specified names
-  timeout: Duration(seconds:15));
-
-// wait for scanning to stop
-await Bluebird.isScanning.where((val) => val == false).first;
+// if your terminal doesn't support color you'll see annoying logs like `\x1B[1;35m`
+Bluebird.setLogLevel(LogLevel.verbose, color:false)
 ```
 
-### Connect to a device
+Setting `LogLevel.verbose` shows *all* data in and out (⚫ = function name, 🟣 = args to platform, 🟡 = data from platform).
+
+### Large characteristic writes
+
+**allowLongWrite**: To write large characteristics (up to 512 bytes) regardless of mtu, use `allowLongWrite`:
 
 ```dart
-// listen for disconnection
-var subscription = device.connectionState.listen((BluetoothConnectionState state) async {
-    if (state == BluetoothConnectionState.disconnected) {
-        // 1. typically, start a periodic timer that tries to 
-        //    reconnect, or just call connect() again right now
-        // 2. you must always re-discover services after disconnection!
-        print("${device.disconnectReason?.code} ${device.disconnectReason?.description}");
+/// allowLongWrite should be used with caution.
+///   1. it can only be used *with* response to avoid data loss
+///   2. the peripheral device must support the 'long write' ble protocol.
+///   3. Interrupted transfers can leave the characteristic in a partially written state
+///   4. If the mtu is small, it is very very slow.
+await c.write(data, allowLongWrite:true);
+```
+
+**splitWrite**: To write lots of data (unlimited), you can define the `splitWrite` function.
+
+```dart
+import 'dart:math';
+// split write should be used with caution.
+//    1. due to splitting, `characteristic.read()` will return partial data.
+//    2. it can only be used *with* response to avoid data loss
+//    3. The characteristic must be designed to support split data
+extension splitWrite on BluetoothCharacteristic {
+  Future<void> splitWrite(List<int> value, {Duration timeout = const Duration(seconds: 15)}) async {
+    int chunk = device.maxAttrLen.value; // mtu - 3 bytes BLE overhead, capped at 512
+    for (int i = 0; i < value.length; i += chunk) {
+      List<int> subvalue = value.sublist(i, min(i + chunk, value.length));
+      await write(subvalue, withoutResponse:false, timeout: timeout);
     }
+  }
+}
+```
+
+### Values (including reads)
+
+`characteristic.values` is like `notifications` but **also includes the result of
+every `read()`**. It is convenient for characteristics that support both READ and
+NOTIFY — e.g. a "light switch toggle". Like `notifications`, listening enables
+notify; `valuesPassive` is the non-subscribing variant.
+
+```dart
+final subscription = characteristic.values.listen((value) {
+    // emitted anytime read() is called *or* a notification arrives
 });
 
-// cleanup: cancel subscription when disconnected
-//   - [delayed] This option is only meant for `connectionState` subscriptions.  
-//     When `true`, we cancel after a small delay. This ensures the `connectionState` 
-//     listener receives the `disconnected` event.
-//   - [next] if true, the the stream will be canceled only on the *next* disconnection,
-//     not the current disconnection. This is useful if you setup your subscriptions
-//     before you connect.
-device.cancelWhenDisconnected(subscription, delayed:true, next:true);
+await characteristic.read(); // also flows through `values`
+await subscription.cancel();
+```
 
-// Connect to the device
-await device.connect();
+### Keeping notify enabled independently
 
-// Disconnect from device
-await device.disconnect();
+If you want to keep notify enabled regardless of who is listening — or share it
+between several consumers — hold a `CharacteristicSubscription` from `subscribe()`
+and observe the *passive* streams (which do **not** toggle notify themselves):
 
-// cancel to prevent duplicate listeners
-subscription.cancel();
+```dart
+// enable notify and keep it on until you unsubscribe
+final handle = await characteristic.subscribe();
+
+// observe values without affecting the notify state
+final sub = characteristic.notificationsPassive.listen((value) { /* ... */ });
+
+// later — release your handle (disables notify once nothing else holds it)
+await sub.cancel();
+await handle.unsubscribe();
 ```
 
 ### Save Device
 
-To save a device between app restarts, just write the `remoteId` to a file.
+To save a device between app restarts, just store the `remoteId` to `SharedPreferences` or a file.
 
 Now you can connect without needing to scan again, like so:
 
 ```dart
 final String remoteId = await File('/remoteId.txt').readAsString();
 var device = BluetoothDevice.fromId(remoteId);
-// AutoConnect is convenient because it does not "time out"
-// even if the device is not available / turned off.
-await device.connect(autoConnect: true);
-
+await device.connect();
 ```
-
 
 ### MTU
 
-On Android, we request an mtu of 512 by default during connection (see: `connect` function arguments).
+On Android, we request an mtu of 517 by default during connection (see: `connect` function arguments).
 
 On iOS & macOS, the mtu is negotiated automatically, typically 135 to 255.
 
@@ -258,118 +263,15 @@ device.cancelWhenDisconnected(subscription);
 
 // You can also manually change the mtu yourself.
 if (Platform.isAndroid) {
-    await device.requestMtu(512);
+    await device.requestMtu(517);
 }
-```
-
-### Discover services
-
-```dart
-// Note: You must call discoverServices after every re-connection!
-List<BluetoothService> services = await device.discoverServices();
-services.forEach((service) {
-    // do something with service
-});
-```
-
-### Read Characteristics
-
-```dart
-// Reads all characteristics
-var characteristics = service.characteristics;
-for(BluetoothCharacteristic c in characteristics) {
-    if (c.properties.read) {
-        List<int> value = await c.read();
-        print(value);
-    }
-}
-```
-
-### Write Characteristic
-
-```dart
-// Writes to a characteristic
-await c.write([0x12, 0x34]);
-```
-
-**allowLongWrite**: To write large characteristics (up to 512 bytes) regardless of mtu, use `allowLongWrite`:
-
-```dart
-/// allowLongWrite should be used with caution. 
-///   1. it can only be used *with* response to avoid data loss
-///   2. the peripheral device must support the 'long write' ble protocol.
-///   3. Interrupted transfers can leave the characteristic in a partially written state
-///   4. If the mtu is small, it is very very slow.
-await c.write(data, allowLongWrite:true);
-```
-
-**splitWrite**: To write lots of data (unlimited), you can define the `splitWrite` function. 
-
-```dart
-import 'dart:math';
-// split write should be used with caution.
-//    1. due to splitting, `characteristic.read()` will return partial data.
-//    2. it can only be used *with* response to avoid data loss
-//    3. The characteristic must be designed to support split data
-extension splitWrite on BluetoothCharacteristic {
-  Future<void> splitWrite(List<int> value, {Duration timeout = const Duration(seconds: 15)}) async {
-    int chunk = min(device.mtuNow - 3, 512); // 3 bytes BLE overhead, 512 bytes max
-    for (int i = 0; i < value.length; i += chunk) {
-      List<int> subvalue = value.sublist(i, min(i + chunk, value.length));
-      await write(subvalue, withoutResponse:false, timeout: timeout);
-    }
-  }
-}
-```
-
-### Subscribe to a characteristic
-
-If `onValueReceived` is never called, see [Common Problems](#common-problems) in the README.
-
-```dart
-final subscription = characteristic.onValueReceived.listen((value) {
-    // onValueReceived is updated:
-    //   - anytime read() is called
-    //   - anytime a notification arrives (if subscribed)
-});
-
-// cleanup: cancel subscription when disconnected
-device.cancelWhenDisconnected(subscription);
-
-// subscribe
-// Note: If a characteristic supports both **notifications** and **indications**,
-// it will default to **notifications**. This matches how CoreBluetooth works on iOS.
-await characteristic.setNotifyValue(true);
-```
-
-### Last Value Stream
-
-`lastValueStream` is an alternative to `onValueReceived`. It emits a value any time the characteristic changes, **including writes.**
-
-It is very convenient for simple characteristics that support both WRITE and READ (and/or NOTIFY). **e.g.** a "light switch toggle" characteristic. 
-
-```dart
-final subscription = characteristic.lastValueStream.listen((value) {
-    // lastValueStream` is updated:
-    //   - anytime read() is called
-    //   - anytime write() is called
-    //   - anytime a notification arrives (if subscribed)
-    //   - also when first listened to, it re-emits the last value for convenience.
-});
-
-// cleanup: cancel subscription when disconnected
-device.cancelWhenDisconnected(subscription);
-
-// enable notifications
-await characteristic.setNotifyValue(true);
 ```
 
 ### Read and write descriptors
 
 ```dart
 // Reads all descriptors
-var descriptors = characteristic.descriptors;
-for(BluetoothDescriptor d in descriptors) {
+for (BluetoothDescriptor d in characteristic.descriptors) {
     List<int> value = await d.read();
     print(value);
 }
@@ -389,6 +291,8 @@ In Bluebird, we call it `onServicesReset` because you must re-discover services.
 // - you must call discoverServices() again
 device.onServicesReset.listen(() async {
     print("Services Reset");
+    // a reset invalidates every previously discovered attribute; re-discover and
+    // re-fetch anything you use, don't reuse old references.
     await device.discoverServices();
 });
 ```
@@ -398,8 +302,7 @@ device.onServicesReset.listen(() async {
 Get devices currently connected to your app.
 
 ```dart
-List<BluetoothDevice> devs = Bluebird.connectedDevices;
-for (var d in devs) {
+for (BluetoothDevice d in Bluebird.connectedDevices) {
     print(d);
 }
 ```
@@ -408,13 +311,13 @@ for (var d in devs) {
 
 Get devices connected to the system by *any* app.
 
-**Note:** before you can communicate, you must connect *your app* to these devices 
+**Note:** before you can communicate, you must connect *your app* to these devices
 
 ```dart
 // `withServices` required on iOS, ignored on android
-List<Guid> withServices = [Guid("180F")]; 
+List<Uuid> withServices = [Uuid("180F")];
 List<BluetoothDevice> devs = await Bluebird.systemDevices(withServices);
-for (var d in devs) {
+for (final d in devs) {
     await d.connect(); // Must connect *our* app to the device
     await d.discoverServices();
 }
@@ -422,7 +325,7 @@ for (var d in devs) {
 
 ### Create Bond (Android Only)
 
-**Note:** calling this is usually not necessary!! The platform will do it automatically. 
+**Note:** calling this is usually not necessary!! The platform will do it automatically.
 
 However, you can force the popup to show sooner.
 
@@ -434,7 +337,7 @@ final bsSubscription = device.bondState.listen((value) {
 // cleanup: cancel subscription when disconnected
 device.cancelWhenDisconnected(bsSubscription);
 
-// Force the bonding popup to show now (Android Only) 
+// Force the bonding popup to show now (Android Only)
 await device.createBond();
 
 // remove bond
@@ -443,27 +346,36 @@ await device.removeBond();
 
 ### Events API
 
-Access streams from all devices simultaneously.
+`Bluebird.events` is a single broadcast stream of every event, from every device.
+Each event is a subtype of the sealed `BluebirdEvent` class, so you can filter it
+by type. Event types include:
 
-There are streams for:
-* events.onConnectionStateChanged
-* events.onMtuChanged
-* events.onReadRssi
-* events.onServicesReset
-* events.onDiscoveredServices
-* events.onCharacteristicReceived
-* events.onCharacteristicWritten
-* events.onDescriptorRead
-* events.onDescriptorWritten
-* events.onNameChanged (iOS Only)
-* events.onBondStateChanged (Android Only)
+* `OnConnectionStateChangedEvent`
+* `OnMtuChangedEvent`
+* `OnServicesResetEvent`
+* `OnCharacteristicNotifiedEvent` / `OnCharacteristicReadEvent`
+* `OnAdapterStateChangedEvent`
+* `OnScanAdvertisementEvent` / `OnScanFailedEvent`
+* `OnNameChangedEvent` (iOS only)
+* `OnBondStateChangedEvent` (Android only)
 
 ```dart
-// listen to *any device* connection state changes 
-Bluebird.events.onConnectionStateChanged.listen((event)) {
-    print('${event.device} ${event.connectionState}');
-}
+// listen to *any device* connection state changes
+Bluebird.events
+    .where((e) => e is OnConnectionStateChangedEvent)
+    .cast<OnConnectionStateChangedEvent>()
+    .listen((event) {
+  print('${event.device} ${event.connectionState}');
+});
+
+// or use the typed helper, which filters and casts for you
+Bluebird.extractEventStream<OnConnectionStateChangedEvent>().listen((event) {
+  print('${event.device} ${event.connectionState}');
+});
 ```
+
+Because every event is sealed, a `switch` over `Bluebird.events` is checked for
+exhaustiveness by the compiler.
 
 ## Mocking
 
@@ -532,7 +444,7 @@ https://developer.android.com/about/versions/12/features/bluetooth-permissions -
 And set **androidUsesFineLocation** when scanning:
 ```dart
 // Start scanning
-Bluebird.startScan(timeout: Duration(seconds: 4), androidUsesFineLocation: true);
+Bluebird.scan(androidUsesFineLocation: true).listen((r) { /* ... */ });
 ```
 
 ### Android Proguard
@@ -563,44 +475,11 @@ In the **ios/Runner/Info.plist** let’s add:
 
 For location permissions on iOS see more at: [https://developer.apple.com/documentation/corelocation/requesting_authorization_for_location_services](https://developer.apple.com/documentation/corelocation/requesting_authorization_for_location_services)
 
-### Add permissions for macOS 
+### Add permissions for macOS
 
 Make sure you have granted access to the Bluetooth hardware:
 
 `Xcode -> Runners -> Targets -> Runner-> Signing & Capabilities -> App Sandbox -> Hardware -> Enable Bluetooth`
-
-<img width="528" alt="Screenshot 2023-12-11 at 10 32 04 AM" src="https://github.com/boskokg/bluebird/assets/1863934/554079ef-4627-4dfc-97e3-1f07f84a0f3c">
-
-## Using Ble in App Background
-
-**This is an advanced use case**. Bluebird does not support everything. You may have to fork it. PRs are welcome.
-
-### iOS
-
-Documentation: https://developer.apple.com/library/archive/documentation/NetworkingInternetWeb/Conceptual/CoreBluetooth_concepts/CoreBluetoothBackgroundProcessingForIOSApps/PerformingTasksWhileYourAppIsInTheBackground.html
-
-Add the following to your `Info.plist`
-
-```
-<key>UIBackgroundModes</key>
-<array>
-    <string>bluetooth-central</string>
-</array>
-```
-
-When this key-value pair is included in the app’s Info.plist file, the system wakes up your app to process ble `read`, `write`, and `subscription` events.
-
-To wake up your app even after it is killed by the OS, set the `restoreState` option to true **before** starting any Bluebird work**:
-
-```
-Bluebird.setOptions(restoreState: true);
-```
-
-**Note**: Upon being woken up, an app has around 10 seconds to complete a task. Apps that spend too much time executing in the background can be throttled back by the system or killed.
-
-### Android
-
-You can try using https://pub.dev/packages/flutter_foreground_task or possibly https://pub.dev/packages/workmanager
 
 ## Reference
 
@@ -615,34 +494,31 @@ You can try using https://pub.dev/packages/flutter_foreground_task or possibly h
 | setOptions             | :white_check_mark: | :white_check_mark: |        | Set configurable bluetooth options                         |
 | isSupported            | :white_check_mark: | :white_check_mark: |        | Checks whether the device supports Bluetooth               |
 | turnOn                 | :white_check_mark: |                    | :fire: | Turns on the bluetooth adapter                             |
-| adapterStateNow     ⚡  | :white_check_mark: | :white_check_mark: |        | Current state of the bluetooth adapter                     |
-| adapterState        🌀 | :white_check_mark: | :white_check_mark: |        | Stream of on & off states of the bluetooth adapter         |
-| startScan              | :white_check_mark: | :white_check_mark: | :fire: | Starts a scan for Ble devices                              |
-| stopScan               | :white_check_mark: | :white_check_mark: | :fire: | Stop an existing scan for Ble devices                      |
-| onScanResults       🌀 | :white_check_mark: | :white_check_mark: |        | Stream of live scan results                                |
-| scanResults         🌀 | :white_check_mark: | :white_check_mark: |        | Stream of live scan results or previous results            |
-| lastScanResults     ⚡  | :white_check_mark: | :white_check_mark: |        | The most recent scan results                               |
-| isScanning          🌀 | :white_check_mark: | :white_check_mark: |        | Stream of current scanning state                           |
-| isScanningNow       ⚡  | :white_check_mark: | :white_check_mark: |        | Is a scan currently running?                               |
+| adapterState        🌀 | :white_check_mark: | :white_check_mark: |        | Async value + stream of on/off states (`await .value` for current) |
+| scan                🌀 | :white_check_mark: | :white_check_mark: | :fire: | Stream of scan advertisements; stops when cancelled        |
+| isScanning          🌀 | :white_check_mark: | :white_check_mark: |        | Value + stream of the current scanning state (`.value`)    |
 | connectedDevices    ⚡  | :white_check_mark: | :white_check_mark: |        | List of devices connected to *your app*                    |
 | systemDevices          | :white_check_mark: | :white_check_mark: | :fire: | List of devices connected to the system, even by other apps|
 | getPhySupport          | :white_check_mark: |                    | :fire: | Get supported bluetooth phy codings                        |
 
 ### Bluebird Events API
 
-|                                    |      Android       |        iOS         | Throws | Description                                           |
-| :--------------------------------- | :----------------: | :----------------: | :----: | :-----------------------------------------------------|
-| events.onConnectionStateChanged 🌀 | :white_check_mark: | :white_check_mark: |        | Stream of connection changes of *all devices*         |
-| events.onMtuChanged             🌀 | :white_check_mark: | :white_check_mark: |        | Stream of mtu changes of *all devices*                |
-| events.onReadRssi               🌀 | :white_check_mark: | :white_check_mark: |        | Stream of rssi reads of *all devices*                 |
-| events.onServicesReset          🌀 | :white_check_mark: | :white_check_mark: |        | Stream of services resets of *all devices*            |
-| events.onDiscoveredServices     🌀 | :white_check_mark: | :white_check_mark: |        | Stream of services discovered of *all devices*        |
-| events.onCharacteristicReceived 🌀 | :white_check_mark: | :white_check_mark: |        | Stream of characteristic value reads of *all devices* |
-| events.onCharacteristicWritten  🌀 | :white_check_mark: | :white_check_mark: |        | Stream of characteristic value writes of *all devices*|
-| events.onDescriptorRead         🌀 | :white_check_mark: | :white_check_mark: |        | Stream of descriptor value reads of *all devices*     |
-| events.onDescriptorWritten      🌀 | :white_check_mark: | :white_check_mark: |        | Stream of descriptor value writes of *all devices*    |
-| events.onBondStateChanged       🌀 | :white_check_mark: |                    |        | Stream of android bond state changes of *all devices* |
-| events.onNameChanged            🌀 |                    | :white_check_mark: |        | Stream of iOS name changes of *all devices*           |
+`Bluebird.events` is a single broadcast stream of `BluebirdEvent`s from *all
+devices*. Filter it by type — either with `.where((e) => e is T)` or the typed
+`Bluebird.extractEventStream<T>()` helper. Event types:
+
+| Event                            |      Android       |        iOS         | Description                                     |
+| :------------------------------- | :----------------: | :----------------: | :-----------------------------------------------|
+| `OnConnectionStateChangedEvent`  | :white_check_mark: | :white_check_mark: | Connection state changed                        |
+| `OnMtuChangedEvent`              | :white_check_mark: | :white_check_mark: | MTU changed                                     |
+| `OnServicesResetEvent`           | :white_check_mark: | :white_check_mark: | Services changed & must be rediscovered         |
+| `OnCharacteristicNotifiedEvent`  | :white_check_mark: | :white_check_mark: | A notify/indicate value arrived                 |
+| `OnCharacteristicReadEvent`      | :white_check_mark: | :white_check_mark: | A `read()` completed                            |
+| `OnAdapterStateChangedEvent`     | :white_check_mark: | :white_check_mark: | Bluetooth adapter turned on/off                 |
+| `OnScanAdvertisementEvent`       | :white_check_mark: | :white_check_mark: | A scan advertisement was received               |
+| `OnScanFailedEvent`              | :white_check_mark: | :white_check_mark: | A scan failed to start                          |
+| `OnBondStateChangedEvent`        | :white_check_mark: |                    | Android bond state changed                      |
+| `OnNameChangedEvent`             |                    | :white_check_mark: | iOS device name changed                         |
 
 
 ### BluetoothDevice API
@@ -655,12 +531,12 @@ You can try using https://pub.dev/packages/flutter_foreground_task or possibly h
 | disconnect                | :white_check_mark: | :white_check_mark: | :fire: | Cancels an active or pending connection to the device      |
 | isConnected             ⚡ | :white_check_mark: | :white_check_mark: |        | Is this device currently connected to *your app*?          |
 | isDisonnected           ⚡ | :white_check_mark: | :white_check_mark: |        | Is this device currently disconnected from *your app*?     |
-| connectionState        🌀 | :white_check_mark: | :white_check_mark: |        | Stream of connection changes for the Bluetooth Device      |
+| connectionState        🌀 | :white_check_mark: | :white_check_mark: |        | Value + stream of connection changes (`.value` for current)|
 | discoverServices          | :white_check_mark: | :white_check_mark: | :fire: | Discover services                                          |
-| servicesList            ⚡ | :white_check_mark: | :white_check_mark: |        | The current list of available services                     |
+| services                ⚡ | :white_check_mark: | :white_check_mark: |        | The current list of discovered services                    |
 | onServicesReset        🌀 | :white_check_mark: | :white_check_mark: |        | The services changed & must be rediscovered                |
-| mtu                    🌀 | :white_check_mark: | :white_check_mark: |        | Stream of current mtu value + changes                      |
-| mtuNow                  ⚡ | :white_check_mark: | :white_check_mark: |        | The current mtu value                                      |
+| mtu                    🌀 | :white_check_mark: | :white_check_mark: |        | Value + stream of the mtu (`.value` for current)           |
+| maxAttrLen              ⚡ | :white_check_mark: | :white_check_mark: |        | Value + stream of the max writable attribute length        |
 | readRssi                  | :white_check_mark: | :white_check_mark: | :fire: | Read RSSI from a connected device                          |
 | requestMtu                | :white_check_mark: |                    | :fire: | Request to change the MTU for the device                   |
 | requestConnectionPriority | :white_check_mark: |                    | :fire: | Request to update a high priority, low latency connection  |
@@ -672,27 +548,31 @@ You can try using https://pub.dev/packages/flutter_foreground_task or possibly h
 
 ### BluetoothCharacteristic API
 
-|                    |      Android       |        iOS         | Throws | Description                                                    |
-| :----------------- | :----------------: | :----------------: | :----: | :--------------------------------------------------------------|
-| uuid             ⚡ | :white_check_mark: | :white_check_mark: |        | The uuid of characteristic                                      |
-| read               | :white_check_mark: | :white_check_mark: | :fire: | Retrieves the value of the characteristic                      |
-| write              | :white_check_mark: | :white_check_mark: | :fire: | Writes the value of the characteristic                         |
-| setNotifyValue     | :white_check_mark: | :white_check_mark: | :fire: | Sets notifications or indications on the characteristic        |
-| isNotifying      ⚡ | :white_check_mark: | :white_check_mark: |        | Are notifications or indications currently enabled             |
-| onValueReceived 🌀 | :white_check_mark: | :white_check_mark: |        | Stream of characteristic value updates received from the device|
-| lastValue        ⚡ | :white_check_mark: | :white_check_mark: |        | The most recent value of the characteristic                    |
-| lastValueStream 🌀 | :white_check_mark: | :white_check_mark: |        | Stream of onValueReceived + writes                             |
+|                        |      Android       |        iOS         | Throws | Description                                              |
+| :--------------------- | :----------------: | :----------------: | :----: | :--------------------------------------------------------|
+| uuid                 ⚡ | :white_check_mark: | :white_check_mark: |        | The uuid of the characteristic                           |
+| isValid              ⚡ | :white_check_mark: | :white_check_mark: |        | False once invalidated by a (re-)discovery; ops throw    |
+| properties           ⚡ | :white_check_mark: | :white_check_mark: |        | The characteristic's properties (read/write/notify/...)  |
+| canRead              ⚡ | :white_check_mark: | :white_check_mark: |        | Whether `read` is supported                              |
+| canWrite             ⚡ | :white_check_mark: | :white_check_mark: |        | Whether `write` is supported (with or without response)  |
+| canNotify            ⚡ | :white_check_mark: | :white_check_mark: |        | Whether notifications are supported (notify or indicate) |
+| read                   | :white_check_mark: | :white_check_mark: | :fire: | Retrieves the value of the characteristic                |
+| write                  | :white_check_mark: | :white_check_mark: | :fire: | Writes the value of the characteristic                   |
+| notifications       🌀 | :white_check_mark: | :white_check_mark: | :fire: | Notify/indicate values; enables notify while listened    |
+| notificationsPassive🌀 | :white_check_mark: | :white_check_mark: |        | Notify/indicate values *without* enabling notify         |
+| values              🌀 | :white_check_mark: | :white_check_mark: | :fire: | `notifications` + `read()` results; enables notify        |
+| valuesPassive       🌀 | :white_check_mark: | :white_check_mark: |        | `values` *without* enabling notify                       |
+| subscribe              | :white_check_mark: | :white_check_mark: | :fire: | Enable notify & keep it on until `unsubscribe()`         |
+| cccd                 ⚡ | :white_check_mark: | :white_check_mark: |        | The CCCD descriptor, if the characteristic has one       |
 
 ### BluetoothDescriptor API
 
-|                    |      Android       |        iOS         | Throws | Description                                    |
-| :----              | :----------------: | :----------------: | :----: | :----------------------------------------------|
-| uuid             ⚡ | :white_check_mark: | :white_check_mark: |        | The uuid of descriptor                         |
-| read               | :white_check_mark: | :white_check_mark: | :fire: | Retrieves the value of the descriptor          |
-| write              | :white_check_mark: | :white_check_mark: | :fire: | Writes the value of the descriptor             |
-| onValueReceived 🌀 | :white_check_mark: | :white_check_mark: |        | Stream of descriptor value reads & writes      |
-| lastValue        ⚡ | :white_check_mark: | :white_check_mark: |        | The most recent value of the descriptor        |
-| lastValueStream 🌀 | :white_check_mark: | :white_check_mark: |        | Stream of onValueReceived + writes             |
+|         |      Android       |        iOS         | Throws | Description                           |
+| :------ | :----------------: | :----------------: | :----: | :-------------------------------------|
+| uuid    ⚡ | :white_check_mark: | :white_check_mark: |        | The uuid of the descriptor            |
+| isValid ⚡ | :white_check_mark: | :white_check_mark: |        | False once invalidated by re-discovery |
+| read    | :white_check_mark: | :white_check_mark: | :fire: | Retrieves the value of the descriptor |
+| write   | :white_check_mark: | :white_check_mark: | :fire: | Writes the value of the descriptor    |
 
 ## Debugging
 
@@ -700,7 +580,7 @@ The easiest way to debug issues in Bluebird is to make your own local copy.
 
 ```
 cd /user/downloads
-git clone https://github.com/boskokg/bluebird.git
+git clone <your-bluebird-repo-url> bluebird
 ```
 
 then in `pubspec.yaml` add the repo by path:
@@ -738,9 +618,9 @@ Reading & Writing:
 - [Characteristic read fails](#characteristic-read-fails)
 
 Subscriptions:
-- [onValueReceived is never called (or lastValueStream)](#onvaluereceived-is-never-called-or-lastvaluestream)
-- [onValueReceived data is split up (or lastValueStream)](#onvaluereceived-data-is-split-up-or-lastvaluestream)
-- [onValueReceived is called with duplicate data (or lastValueStream)](#onvaluereceived-is-called-with-duplicate-data-or-lastvaluestream)
+- [notifications are never received](#notifications-are-never-received)
+- [notification data is split up](#notification-data-is-split-up)
+- [notifications arrive with duplicate data](#notifications-arrive-with-duplicate-data)
 
 Android Errors:
 - [ANDROID_SPECIFIC_ERROR](#android_specific_error)
@@ -753,7 +633,7 @@ Flutter Errors:
 
 ### "bluetooth must be turned on"
 
-You need to wait for the bluetooth adapter to fully turn on. 
+You need to wait for the bluetooth adapter to fully turn on.
 
 `await Bluebird.adapterState.where((state) => state == BluetoothAdapterState.on).first;`
 
@@ -765,12 +645,10 @@ You can also use `Bluebird.adapterState.listen(...)`. See [Usage](#usage).
 
 **For iOS:**
 
-`adapterState` always starts as `unknown`. You need to wait longer for the service to initialize. As simple as:
+`adapterState` always starts as `unknown`. Wait for the service to report a real state:
 
-```
-if (Bluebird.adapterStateNow == BluetoothAdapterState.unknown) {
-    await Future.delayed(const Duration(seconds: 1));
-}
+```dart
+await Bluebird.adapterState.firstWhere((state) => state != BluetoothAdapterState.unknown);
 ```
 
 If `adapterState` is `unavailable`, you must add access to Bluetooth Hardware in the app's Xcode settings. See [Getting Started](#getting-started).
@@ -812,7 +690,7 @@ Install a BLE scanner app on your phone. Can it find your device?
 
 **3. your device uses bluetooth classic, not BLE.**
 
-Headphones, speakers, keyboards, mice, gamepads, & printers all use Bluetooth Classic. 
+Headphones, speakers, keyboards, mice, gamepads, & printers all use Bluetooth Classic.
 
 These devices may be found in System Settings, but they cannot be connected to by Bluebird. Bluebird only supports Bluetooth Low Energy.
 
@@ -828,11 +706,11 @@ Try looking through system devices:
 
 ```dart
 // search system devices. i.e. any device connected to by *any* app
-List<BluetoothDevice> system = await Bluebird.systemDevices;
+List<BluetoothDevice> system = await Bluebird.systemDevices([]);
 for (var d in system) {
-    print('${r.device.platformName} already connected to! ${r.device.remoteId}');
+    print('${d.platformName} already connected to! ${d.remoteId}');
     if (d.platformName == "myBleDevice") {
-         await r.connect(); // must connect our app
+         await d.connect(); // must connect our app
     }
 }
 ```
@@ -842,9 +720,9 @@ for (var d in system) {
 - try removing all scan filters
 - for `withServices` to work, your device must actively advertise the serviceUUIDs it supports
 
-**6. Android: you're calling startScan too often**
+**6. Android: you're scanning too often**
 
-On Adroid you can only call `startScan` 5 times per 30 second period. This is a platform restriction.
+On Android you can only start a scan 5 times per 30 second period. This is a platform restriction.
 
 ---
 
@@ -852,7 +730,7 @@ On Adroid you can only call `startScan` 5 times per 30 second period. This is a 
 
 This is expected.
 
-You must set the `removeIfGone` scan option if you want the device to go away when no longer available.
+Use `.accumulate(removeIfGone: ...)` if you want a device to drop out of the list once it stops advertising.
 
 ---
 
@@ -865,7 +743,7 @@ iOS does not support iBeacons using CoreBluetooth. You must find a plugin meant 
 **Android:**
 
 1. you need to enable location permissions, see [Getting Started](#getting-started)
-2. you must pass `androidUsesFineLocation:true` to the `startScan` method.
+2. you must pass `androidUsesFineLocation:true` to `Bluebird.scan()`.
 
 ---
 
@@ -899,7 +777,7 @@ You are forgetting to cancel the original `device.connectionState.listen` result
 
 ```dart
 // tip: using ??= makes it easy to only make new listener when currently null
-final subscription ??= Bluebird.device.connectionState.listen((value) {
+final subscription ??= device.connectionState.listen((value) {
     // ...
 });
 
@@ -933,7 +811,7 @@ It means your device stopped working. Bluebird cannot fix it.
 
 ### List of Bluetooth GATT Errors
 
-These GATT error codes are part of the BLE Specification. 
+These GATT error codes are part of the BLE Specification.
 
 **These are *responses* from your ble device because you are sending an invalid request.**
 
@@ -1040,64 +918,61 @@ Bluetooth is wireless and will not always work.
 
 ---
 
-### onValueReceived is never called (or lastValueStream)
+### notifications are never received
 
-**1. you are not calling the right function**
+**1. you are not listening to the right stream**
 
-`lastValueStream` will receive data for `chr.read()` & `chr.write()` & `chr.setNotifyValue(true)` 
-
-`onValueReceived` will receive data for `chr.read()` & `chr.setNotifyValue(true)` 
+`chr.notifications` emits only notify/indicate values. `chr.values` also includes
+the result of `chr.read()`. Neither emits your own `chr.write()` calls.
 
 **2. your device has nothing to send**
 
-If you are using `chr.setNotifyValue(true)`, your _device_ chooses when to send data.
+With notify/indicate, your _device_ chooses when to send data.
 
 Try interacting with your device to get it to send new data.
 
 **3. your device has bugs**
 
-Try rebooting your ble device. 
+Try rebooting your ble device.
 
 Some ble devices have buggy software and stop sending data
 
 ---
 
-### onValueReceived data is split up (or lastValueStream)
+### notification data is split up
 
 Verify that the mtu is large enough to hold your message.
 
 ```dart
-device.mtu
+device.mtu.value
 ```
 
 If it still happens, it is a problem with your peripheral device.
 
 ---
 
-### onValueReceived is called with duplicate data (or lastValueStream)
+### notifications arrive with duplicate data
 
-You are probably forgetting to cancel the original `chr.onValueReceived.listen` resulting in multiple listens.
-
-The easiest solution is to use `device.cancelWhenDisconnected(subscription)` to cancel device subscriptions.
+You are probably listening to `chr.notifications` more than once. Because listening
+enables notify on the peripheral, each active listener receives every value — hold a
+single subscription (or use `subscribe()` + `notificationsPassive`).
 
 ```dart
-final subscription = chr.onValueReceived.listen((value) {
+final subscription = chr.notifications.listen((value) {
     // ...
 });
 
-// make sure you have this line!
+// cancel when you are done (this also disables notify on the peripheral)
 device.cancelWhenDisconnected(subscription);
-
-await characteristic.setNotifyValue(true);
 ```
 
 ---
 
 ### ANDROID_SPECIFIC_ERROR
 
-There is no 100% solution.  
+There is no 100% solution.
 
-Bluebird already has mitigations for this error, but Android will still fail with this code randomly. 
+Bluebird already has mitigations for this error, but Android will still fail with this code randomly.
 
 The recommended solution is to `catch` the error, and retry.
 

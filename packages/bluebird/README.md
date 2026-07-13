@@ -2,15 +2,15 @@
 
 Bluetooth Low Energy plugin for Flutter.
 
-| Android | iOS | macOS |
-| :-----: | :-: | :---: |
-|    ✅    | ✅  |  ✅   |
+| Android | iOS | macOS | Web |
+| :-----: | :-: | :---: | :-: |
+|    ✅    | ✅  |  ✅   | ✅  |
 
 ## Install
 
 ```yaml
 dependencies:
-  bluebird: ^1.0.0
+  bluebird: ^0.1.0
 ```
 
 ## Setup
@@ -52,21 +52,17 @@ Bluebird.adapterState.listen((state) {
 ### Scan
 
 ```dart
-final sub = Bluebird.onScanResults.listen((results) {
-  for (final r in results) {
-    print('${r.device.remoteId}: ${r.advertisementData.advName} (${r.rssi})');
-  }
+// scan() streams advertisements while you listen; cancel (or break) to stop
+final sub = Bluebird.scan(withServices: [Uuid('180d')]).listen((r) {
+  print('${r.device.remoteId}: ${r.advertisementData.advName} (${r.rssi})');
 });
-Bluebird.cancelWhenScanComplete(sub);
 
-await Bluebird.startScan(
-  withServices: [Uuid('180d')], // optional filters
-  timeout: const Duration(seconds: 15),
-);
+await Future.delayed(const Duration(seconds: 15));
+await sub.cancel();
 ```
 
-`scanResults` accumulates results for the current scan; `onScanResults` skips previously
-cached results. Call `Bluebird.stopScan()` to stop early.
+Use `.accumulate()` for a growing, de-duplicated device list instead of a stream of
+individual advertisements. `Bluebird.isScanning.value` reports whether a scan is running.
 
 ### Connect
 

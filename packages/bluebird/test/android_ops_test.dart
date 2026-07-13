@@ -20,8 +20,8 @@ void main() {
     fake = FakePlatform()..services = [bmService('a000', characteristics: [bmChar('b001')])];
     FakePlatform.install(fake);
     device = Bluebird.deviceForAddress('AA:BB:CC:DD:EE:FF');
-    device.handleConnectionStateEvent(
-      BmConnectionStateEvent(address: device.remoteId, connectionState: BmConnectionStateEnum.connected),
+    device.applyEvent(
+      OnConnectionStateChangedEvent(device, BluetoothConnectionState.connected, null),
     );
   });
 
@@ -34,7 +34,7 @@ void main() {
 
   test('requestConnectionPriority and setPreferredPhy delegate', () async {
     await device.requestConnectionPriority(connectionPriorityRequest: ConnectionPriority.high);
-    await device.setPreferredPhy(txPhy: Phy.le2m.mask, rxPhy: Phy.le2m.mask, option: PhyCoding.noPreferred);
+    await device.setPreferredPhy(txPhy: {Phy.le2m}, rxPhy: {Phy.le2m}, option: PhyCoding.noPreferred);
     expect(fake.calls, containsAll(['requestConnectionPriority', 'setPreferredPhy']));
   });
 
@@ -45,13 +45,13 @@ void main() {
 
   group('bonding', () {
     test('createBond succeeds when the device reaches bonded', () async {
-      fake.bondState = BmBondStateEnum.bonded;
+      fake.bondState = BluetoothBondState.bonded;
       await device.createBond();
       expect(fake.calls, contains('createBond'));
     });
 
     test('createBond throws when bonding does not complete', () async {
-      fake.bondState = BmBondStateEnum.none;
+      fake.bondState = BluetoothBondState.none;
       expect(
         () => device.createBond(),
         throwsA(isA<BluebirdException>().having((e) => e.code, 'code', BluebirdErrorCode.bondFailed)),
@@ -59,16 +59,16 @@ void main() {
     });
 
     test('removeBond throws when the bond is not removed', () async {
-      fake.bondState = BmBondStateEnum.bonded;
+      fake.bondState = BluetoothBondState.bonded;
       expect(
         () => device.removeBond(),
         throwsA(isA<BluebirdException>().having((e) => e.code, 'code', BluebirdErrorCode.removeBondFailed)),
       );
     });
 
-    test('bondStateNow reports the platform state', () async {
-      fake.bondState = BmBondStateEnum.bonded;
-      expect(await device.bondStateNow, BluetoothBondState.bonded);
+    test('bondState.value reports the platform state', () async {
+      fake.bondState = BluetoothBondState.bonded;
+      expect(await device.bondState.value, BluetoothBondState.bonded);
     });
   });
 

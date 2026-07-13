@@ -20,21 +20,15 @@ class _ScanScreenState extends State<ScanScreen> {
   List<BluetoothDevice> _systemDevices = [];
   List<ScanResult> _scanResults = [];
   bool _isScanning = false;
-  late StreamSubscription<List<ScanResult>> _scanResultsSubscription;
+
+  /// The active scan; cancelling it stops scanning.
+  StreamSubscription<List<ScanResult>>? _scanSubscription;
+  Timer? _scanTimeout;
   late StreamSubscription<bool> _isScanningSubscription;
 
   @override
   void initState() {
     super.initState();
-
-    _scanResultsSubscription = Bluebird.scanResults.listen((results) {
-      _scanResults = results;
-      if (mounted) {
-        setState(() {});
-      }
-    }, onError: (e) {
-      Snackbar.show(ABC.b, prettyException("Scan Error:", e), success: false);
-    });
 
     _isScanningSubscription = Bluebird.isScanning.listen((state) {
       _isScanning = state;
@@ -46,9 +40,24 @@ class _ScanScreenState extends State<ScanScreen> {
 
   @override
   void dispose() {
-    _scanResultsSubscription.cancel();
+    _scanTimeout?.cancel();
+    _scanSubscription?.cancel();
     _isScanningSubscription.cancel();
     super.dispose();
+  }
+
+  /// Starts a scan for [timeout], accumulating results into [_scanResults].
+  void _startScan({Duration timeout = const Duration(seconds: 15)}) {
+    _scanSubscription?.cancel();
+    _scanResults = [];
+    _scanSubscription = Bluebird.scan().accumulate().listen((results) {
+      _scanResults = results;
+      if (mounted) setState(() {});
+    }, onError: (e) {
+      Snackbar.show(ABC.b, prettyException("Scan Error:", e), success: false);
+    });
+    _scanTimeout?.cancel();
+    _scanTimeout = Timer(timeout, () => _scanSubscription?.cancel());
   }
 
   Future onScanPressed() async {
@@ -61,7 +70,7 @@ class _ScanScreenState extends State<ScanScreen> {
       print(e);
     }
     try {
-      await Bluebird.startScan(timeout: const Duration(seconds: 15));
+      _startScan();
     } catch (e) {
       Snackbar.show(ABC.b, prettyException("Start Scan Error:", e), success: false);
       print(e);
@@ -73,17 +82,22 @@ class _ScanScreenState extends State<ScanScreen> {
 
   Future onStopPressed() async {
     try {
-      Bluebird.stopScan();
+      await _scanSubscription?.cancel();
     } catch (e) {
       Snackbar.show(ABC.b, prettyException("Stop Scan Error:", e), success: false);
       print(e);
     }
   }
 
-  void onConnectPressed(BluetoothDevice device) {
-    device.connectAndUpdateStream().catchError((e) {
+  Future onConnectPressed(BluetoothDevice device) async {
+    try {
+      await device.connectAndUpdateStream();
+    } catch (e) {
+      // connection failed — surface the error and stay on the scan page
       Snackbar.show(ABC.c, prettyException("Connect Error:", e), success: false);
-    });
+      return;
+    }
+    if (!mounted) return;
     MaterialPageRoute route = MaterialPageRoute(
         builder: (context) => DeviceScreen(device: device), settings: RouteSettings(name: '/DeviceScreen'));
     Navigator.of(context).push(route);
@@ -91,7 +105,7 @@ class _ScanScreenState extends State<ScanScreen> {
 
   Future onRefresh() {
     if (_isScanning == false) {
-      Bluebird.startScan(timeout: const Duration(seconds: 15));
+      _startScan();
     }
     if (mounted) {
       setState(() {});
@@ -100,15 +114,16 @@ class _ScanScreenState extends State<ScanScreen> {
   }
 
   Widget buildScanButton(BuildContext context) {
-    if (Bluebird.isScanningNow) {
-      return FloatingActionButton(
-        child: const Icon(Icons.stop),
-        onPressed: onStopPressed,
-        backgroundColor: Colors.red,
-      );
-    } else {
-      return FloatingActionButton(child: const Text("SCAN"), onPressed: onScanPressed);
-    }
+    final scanning = Bluebird.isScanning.value;
+    return SizedBox(
+      width: double.infinity,
+      child: FilledButton.icon(
+        icon: Icon(scanning ? Icons.stop : Icons.bluetooth_searching),
+        label: Text(scanning ? 'Stop' : 'Scan'),
+        style: scanning ? FilledButton.styleFrom(backgroundColor: Colors.red) : null,
+        onPressed: scanning ? onStopPressed : onScanPressed,
+      ),
+    );
   }
 
   List<Widget> _buildSystemDeviceTiles(BuildContext context) {
@@ -145,7 +160,7 @@ class _ScanScreenState extends State<ScanScreen> {
       key: Snackbar.snackBarKeyB,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Find Devices'),
+          title: const Text('Bluebird'),
         ),
         body: RefreshIndicator(
           onRefresh: onRefresh,
@@ -156,7 +171,12 @@ class _ScanScreenState extends State<ScanScreen> {
             ],
           ),
         ),
-        floatingActionButton: buildScanButton(context),
+        bottomNavigationBar: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: buildScanButton(context),
+          ),
+        ),
       ),
     );
   }
