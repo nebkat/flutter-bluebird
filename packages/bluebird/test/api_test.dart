@@ -52,7 +52,12 @@ void main() {
     expect(fake.calls, contains('setLogLevel'));
   });
 
-  test('setOptions delegates on darwin (the test host)', () async {
+  test('setOptions delegates (darwin only)', () async {
+    // setOptions is darwin-only; pretend the host is macOS so this passes
+    // regardless of the CI runner's OS (`System.current` is a mutable static).
+    final realSystem = System.current;
+    System.current = System.macos;
+    addTearDown(() => System.current = realSystem);
     await Bluebird.setOptions(showPowerAlert: false);
     expect(fake.calls, contains('setOptions'));
   });
