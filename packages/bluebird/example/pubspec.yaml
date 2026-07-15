@@ -21,6 +21,24 @@ dev_dependencies:
     sdk: flutter
   integration_test:
     sdk: flutter
+  flutter_launcher_icons: ^0.14.1
+
+# Launcher icons for every platform, generated from the bluebird icon.
+# Regenerate after changing the source image with:
+#   dart run flutter_launcher_icons
+flutter_launcher_icons:
+  image_path: "assets/bluebird-icon.png"
+  android: true
+  ios: true
+  # iOS icons cannot have an alpha channel, so flatten it against white
+  remove_alpha_ios: true
+  background_color_ios: "#ffffff"
+  macos:
+    generate: true
+    image_path: "assets/bluebird-icon.png"
+  web:
+    generate: true
+    image_path: "assets/bluebird-icon.png"
 
 flutter:
   uses-material-design: true
