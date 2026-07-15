@@ -30,22 +30,31 @@ jobs:
               (cd "$p" && flutter test --coverage)
             fi
           done
-      - name: Generate HTML coverage report
+      - name: Generate combined HTML coverage report
         if: always()
         run: |
           set -e
+          lcovs=()
           for p in packages/*/; do
-            if [ -f "${p}coverage/lcov.info" ]; then
-              echo "== genhtml ${p} =="
-              # run inside the package so lcov.info's package-relative source
-              # paths (lib/src/...) resolve; --ignore-errors source is a safety net
-              (cd "$p" && genhtml coverage/lcov.info --output-directory coverage/html --ignore-errors source --quiet)
+            f="${p}coverage/lcov.info"
+            if [ -f "$f" ]; then
+              # rewrite package-relative source paths (lib/src/...) to repo-relative
+              # (packages/<pkg>/lib/src/...) so one report can span every package
+              # without path collisions and genhtml can resolve the sources
+              sed -i "s#^SF:#SF:${p}#" "$f"
+              cp "$f" "coverage-lcov-$(basename "$p").info"
+              lcovs+=("$f")
             fi
           done
+          if [ ${#lcovs[@]} -gt 0 ]; then
+            genhtml "${lcovs[@]}" --output-directory coverage-html --ignore-errors source --quiet
+            cp coverage-lcov-*.info coverage-html/
+          fi
       - name: Upload coverage artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage
-          path: packages/*/coverage
+          # artifact root is the report itself, so index.html sits at the top
+          path: coverage-html
           if-no-files-found: warn
