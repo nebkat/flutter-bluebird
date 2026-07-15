@@ -61,8 +61,6 @@ class WebScanScreen extends StatefulWidget {
 class _WebScanScreenState extends State<WebScanScreen> {
   final List<Uuid> _serviceFilter = [];
   final List<Uuid> _optionalServices = [
-    Uuid('b1eba000-cafe-4e5d-a2b1-1bd5ee12b1eb'), // fixture service A
-    Uuid('b1ebb000-cafe-4e5d-a2b1-1bd5ee12b1eb'), // fixture service B
     Uuids.service.deviceInformation,
     Uuids.service.battery,
   ];
