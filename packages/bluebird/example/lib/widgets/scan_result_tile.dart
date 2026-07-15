@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:bluebird/bluebird.dart';
 import 'package:flutter/material.dart';
 
+import '../utils/appearance_values.dart';
 import '../utils/manufacturer_ids.dart';
 
 class ScanResultTile extends StatefulWidget {
@@ -113,6 +114,15 @@ class _ScanResultTileState extends State<ScanResultTile> {
     return manufacturerIds[id] ?? _hex16(id);
   }
 
+  /// The appearance as `0xNNNN (Name)`, falling back to the category name when
+  /// the exact subcategory isn't a known value (the low 6 bits are the
+  /// subcategory, so masking them off gives the category).
+  String _appearanceLabel(int value) {
+    final name = appearanceValues[value] ?? appearanceValues[value & 0xFFC0];
+    final hex = '0x${value.toRadixString(16).padLeft(4, '0').toUpperCase()}';
+    return name != null ? '$hex ($name)' : hex;
+  }
+
   Widget _buildTitle(BuildContext context) {
     // prefer the platform name, but fall back to the advertised name; most
     // devices advertise no name at all, so show a muted "Unknown" placeholder
@@ -217,7 +227,7 @@ class _ScanResultTileState extends State<ScanResultTile> {
           _buildAdvRow(
             context,
             'Appearance',
-            '0x${adv.appearance!.toRadixString(16)}',
+            _appearanceLabel(adv.appearance!),
           ),
         if (adv.manufacturerData.isNotEmpty)
           _buildAdvRow(
