@@ -41,16 +41,24 @@ class _DescriptorTileState extends State<DescriptorTile> {
 
   List<int> _getRandomBytes() {
     final math = Random();
-    return [math.nextInt(255), math.nextInt(255), math.nextInt(255), math.nextInt(255)];
+    return [
+      math.nextInt(255),
+      math.nextInt(255),
+      math.nextInt(255),
+      math.nextInt(255),
+    ];
   }
 
   Future onReadPressed() async {
     try {
       final value = await d.read();
       if (mounted) setState(() => _value = value);
-      Snackbar.show(ABC.c, "Descriptor Read : Success", success: true);
+      Snackbar.show("Descriptor Read : Success", success: true);
     } catch (e) {
-      Snackbar.show(ABC.c, prettyException("Descriptor Read Error:", e), success: false);
+      Snackbar.show(
+        prettyException("Descriptor Read Error:", e),
+        success: false,
+      );
       print(e);
     }
   }
@@ -58,9 +66,12 @@ class _DescriptorTileState extends State<DescriptorTile> {
   Future onWritePressed() async {
     try {
       await d.write(_getRandomBytes());
-      Snackbar.show(ABC.c, "Descriptor Write : Success", success: true);
+      Snackbar.show("Descriptor Write : Success", success: true);
     } catch (e) {
-      Snackbar.show(ABC.c, prettyException("Descriptor Write Error:", e), success: false);
+      Snackbar.show(
+        prettyException("Descriptor Write Error:", e),
+        success: false,
+      );
       print(e);
     }
   }
@@ -76,26 +87,17 @@ class _DescriptorTileState extends State<DescriptorTile> {
   }
 
   Widget buildReadButton(BuildContext context) {
-    return TextButton(
-      child: Text("Read"),
-      onPressed: onReadPressed,
-    );
+    return TextButton(child: Text("Read"), onPressed: onReadPressed);
   }
 
   Widget buildWriteButton(BuildContext context) {
-    return TextButton(
-      child: Text("Write"),
-      onPressed: onWritePressed,
-    );
+    return TextButton(child: Text("Write"), onPressed: onWritePressed);
   }
 
   Widget buildButtonRow(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        buildReadButton(context),
-        buildWriteButton(context),
-      ],
+      children: <Widget>[buildReadButton(context), buildWriteButton(context)],
     );
   }
 

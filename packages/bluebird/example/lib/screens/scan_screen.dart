@@ -50,12 +50,15 @@ class _ScanScreenState extends State<ScanScreen> {
   void _startScan({Duration timeout = const Duration(seconds: 15)}) {
     _scanSubscription?.cancel();
     _scanResults = [];
-    _scanSubscription = Bluebird.scan().accumulate().listen((results) {
-      _scanResults = results;
-      if (mounted) setState(() {});
-    }, onError: (e) {
-      Snackbar.show(ABC.b, prettyException("Scan Error:", e), success: false);
-    });
+    _scanSubscription = Bluebird.scan().accumulate().listen(
+      (results) {
+        _scanResults = results;
+        if (mounted) setState(() {});
+      },
+      onError: (e) {
+        Snackbar.show(prettyException("Scan Error:", e), success: false);
+      },
+    );
     _scanTimeout?.cancel();
     _scanTimeout = Timer(timeout, () => _scanSubscription?.cancel());
   }
@@ -66,13 +69,16 @@ class _ScanScreenState extends State<ScanScreen> {
       var withServices = [Uuid("180f")]; // Battery Level Service
       _systemDevices = await Bluebird.systemDevices(withServices);
     } catch (e) {
-      Snackbar.show(ABC.b, prettyException("System Devices Error:", e), success: false);
+      Snackbar.show(
+        prettyException("System Devices Error:", e),
+        success: false,
+      );
       print(e);
     }
     try {
       _startScan();
     } catch (e) {
-      Snackbar.show(ABC.b, prettyException("Start Scan Error:", e), success: false);
+      Snackbar.show(prettyException("Start Scan Error:", e), success: false);
       print(e);
     }
     if (mounted) {
@@ -84,7 +90,7 @@ class _ScanScreenState extends State<ScanScreen> {
     try {
       await _scanSubscription?.cancel();
     } catch (e) {
-      Snackbar.show(ABC.b, prettyException("Stop Scan Error:", e), success: false);
+      Snackbar.show(prettyException("Stop Scan Error:", e), success: false);
       print(e);
     }
   }
@@ -94,11 +100,13 @@ class _ScanScreenState extends State<ScanScreen> {
       await device.connectAndUpdateStream();
     } catch (e) {
       // connection failed — surface the error and stay on the scan page
-      Snackbar.show(ABC.c, prettyException("Connect Error:", e), success: false);
+      Snackbar.show(prettyException("Connect Error:", e), success: false);
       return;
     }
     if (!mounted) return;
-    MaterialPageRoute route = MaterialPageRoute(builder: (context) => DeviceScreen(device: device));
+    MaterialPageRoute route = MaterialPageRoute(
+      builder: (context) => DeviceScreen(device: device),
+    );
     Navigator.of(context).push(route);
   }
 
@@ -119,7 +127,9 @@ class _ScanScreenState extends State<ScanScreen> {
       child: FilledButton.icon(
         icon: Icon(scanning ? Icons.stop : Icons.bluetooth_searching),
         label: Text(scanning ? 'Stop' : 'Scan'),
-        style: scanning ? FilledButton.styleFrom(backgroundColor: Colors.red) : null,
+        style: scanning
+            ? FilledButton.styleFrom(backgroundColor: Colors.red)
+            : null,
         onPressed: scanning ? onStopPressed : onScanPressed,
       ),
     );
@@ -131,9 +141,7 @@ class _ScanScreenState extends State<ScanScreen> {
           (d) => SystemDeviceTile(
             device: d,
             onOpen: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => DeviceScreen(device: d),
-              ),
+              MaterialPageRoute(builder: (context) => DeviceScreen(device: d)),
             ),
             onConnect: () => onConnectPressed(d),
           ),
@@ -154,51 +162,50 @@ class _ScanScreenState extends State<ScanScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return ScaffoldMessenger(
-      key: Snackbar.snackBarKeyB,
-      child: Scaffold(
-        appBar: AppBar(
-          centerTitle: false,
-          title: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Image.asset('assets/bluebird-icon.png', height: 28),
-              const SizedBox(width: 8),
-              const Text('Bluebird'),
-            ],
-          ),
+    return Scaffold(
+      appBar: AppBar(
+        centerTitle: false,
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset('assets/bluebird-icon.png', height: 28),
+            const SizedBox(width: 8),
+            const Text('Bluebird'),
+          ],
         ),
-        body: RefreshIndicator(
-          onRefresh: onRefresh,
-          child: (_systemDevices.isEmpty && _scanResults.isEmpty)
-              ? ListView(
-                  // keep it scrollable so pull-to-refresh still works when empty
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 96, bottom: 16),
-                      child: Center(child: Image.asset('assets/bluebird.png', height: 180)),
+      ),
+      body: RefreshIndicator(
+        onRefresh: onRefresh,
+        child: (_systemDevices.isEmpty && _scanResults.isEmpty)
+            ? ListView(
+                // keep it scrollable so pull-to-refresh still works when empty
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 96, bottom: 16),
+                    child: Center(
+                      child: Image.asset('assets/bluebird.png', height: 180),
                     ),
-                    Center(
-                      child: Text(
-                        'Tap Scan to find nearby devices',
-                        style: TextStyle(color: Theme.of(context).hintColor),
-                      ),
+                  ),
+                  Center(
+                    child: Text(
+                      'Tap Scan to find nearby devices',
+                      style: TextStyle(color: Theme.of(context).hintColor),
                     ),
-                  ],
-                )
-              : ListView(
-                  children: <Widget>[
-                    ..._buildSystemDeviceTiles(context),
-                    ..._buildScanResultTiles(context),
-                  ],
-                ),
-        ),
-        bottomNavigationBar: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: buildScanButton(context),
-          ),
+                  ),
+                ],
+              )
+            : ListView(
+                children: <Widget>[
+                  ..._buildSystemDeviceTiles(context),
+                  ..._buildScanResultTiles(context),
+                ],
+              ),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: buildScanButton(context),
         ),
       ),
     );

@@ -1081,7 +1081,8 @@ const Map<int, String> manufacturerIds = {
   0x0482: 'POS Tuning Udo Vosshenrich GmbH & Co. KG',
   0x0484: 'Revol Technologies Inc',
   0x0485: 'SKIDATA AG',
-  0x0486: 'DEV TECNOLOGIA INDUSTRIA, COMERCIO E MANUTENCAO DE EQUIPAMENTOS LTDA. - ME',
+  0x0486:
+      'DEV TECNOLOGIA INDUSTRIA, COMERCIO E MANUTENCAO DE EQUIPAMENTOS LTDA. - ME',
   0x0487: 'Centrica Connected Home',
   0x0488: 'Automotive Data Solutions Inc',
   0x0489: 'Igarashi Engineering',
@@ -1560,7 +1561,8 @@ const Map<int, String> manufacturerIds = {
   0x067B: 'I.FARM, INC.',
   0x067C: 'Tile, Inc.',
   0x067D: 'Form Athletica Inc.',
-  0x067F: 'NETGRID S.N.C. DI BISSOLI MATTEO, CAMPOREALE SIMONE, TOGNETTI FEDERICO',
+  0x067F:
+      'NETGRID S.N.C. DI BISSOLI MATTEO, CAMPOREALE SIMONE, TOGNETTI FEDERICO',
   0x0680: 'Mannkind Corporation',
   0x0681: 'Trade FIDES a.s.',
   0x0682: 'Photron Limited',
@@ -2049,7 +2051,8 @@ const Map<int, String> manufacturerIds = {
   0x0881: 'Optalert',
   0x0882: 'PSYONIC, Inc.',
   0x0883: 'Wintersteiger AG',
-  0x0884: 'Controlid Industria, Comercio de Hardware e Servicos de Tecnologia Ltda',
+  0x0884:
+      'Controlid Industria, Comercio de Hardware e Servicos de Tecnologia Ltda',
   0x0886: 'Movella Technologies B.V.',
   0x0887: 'Hydro-Gear Limited Partnership',
   0x0888: 'EnPointe Fencing Pty Ltd',
@@ -2159,6 +2162,7 @@ const Map<int, String> manufacturerIds = {
   0x08F7: 'MTD Products Inc & Affiliates',
   0x08F8: 'instagrid GmbH',
   0x08F9: 'Spacelabs Medical Inc.',
+  0x08FA: 'Troo Corporation',
   0x08FB: 'Darkglass Electronics Oy',
   0x08FC: 'Hill-Rom',
   0x08FD: 'BioIntelliSense, Inc.',
@@ -2368,7 +2372,8 @@ const Map<int, String> manufacturerIds = {
   0x09D2: 'Temperature Sensitive Solutions Systems Sweden AB',
   0x09D4: 'ORBIS Inc.',
   0x09D5: 'GEAR RADIO ELECTRONICS CORP.',
-  0x09D6: 'EAR TEKNIK ISITME VE ODIOMETRI CIHAZLARI SANAYI VE TICARET ANONIM SIRKETI',
+  0x09D6:
+      'EAR TEKNIK ISITME VE ODIOMETRI CIHAZLARI SANAYI VE TICARET ANONIM SIRKETI',
   0x09D7: 'Coyotta',
   0x09D8: 'Synergy Tecnologia em Sistemas Ltda',
   0x09D9: 'VivoSensMedical GmbH',
@@ -3336,7 +3341,8 @@ const Map<int, String> manufacturerIds = {
   0x0DD9: 'SCHELL GmbH & Co. KG',
   0x0DDA: 'Minebea Intec GmbH',
   0x0DDB: 'KAGA FEI Co., Ltd.',
-  0x0DDC: 'AUTHOR-ALARM, razvoj in prodaja avtomobilskih sistemov proti kraji, d.o.o.',
+  0x0DDC:
+      'AUTHOR-ALARM, razvoj in prodaja avtomobilskih sistemov proti kraji, d.o.o.',
   0x0DDD: 'Tozoa LLC',
   0x0DDE: 'SHENZHEN DNS INDUSTRIES CO., LTD.',
   0x0DDF: 'Shenzhen Lunci Technology Co., Ltd',
@@ -3925,7 +3931,8 @@ const Map<int, String> manufacturerIds = {
   0x108E: 'Industrial Computing Limited',
   0x108F: 'SkyCell AG',
   0x1090: 'NAGANO KEIKI CO., LTD.',
-  0x1091: 'COSEL ELEKTRONIK OTOMASYON SISTEMLERI SANAYI VE TICARET LIMITED SIRKETI',
+  0x1091:
+      'COSEL ELEKTRONIK OTOMASYON SISTEMLERI SANAYI VE TICARET LIMITED SIRKETI',
   0x1092: 'BXB DIGITAL PTY LIMITED',
   0x1093: 'Mindspire Limited',
   0x1094: 'Personal Products Co., Ltd.',
@@ -4001,5 +4008,6 @@ const Map<int, String> manufacturerIds = {
   0x10DA: 'SKAIChips Co.,Ltd',
   0x10DB: 'SZ Avinox Innovation Co., Ltd.',
   0x10DC: 'Spectra Precision (Kaiserslautern) GmbH',
-  0xFFFF: 'Bluetooth SIG Specification Reserved Default Vendor ID for Remote Devices Without Device ID Service Record.',
+  0xFFFF:
+      'Bluetooth SIG Specification Reserved Default Vendor ID for Remote Devices Without Device ID Service Record.',
 };

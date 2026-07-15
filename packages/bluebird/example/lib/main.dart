@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'screens/bluetooth_off_screen.dart';
 import 'screens/scan_screen.dart';
 import 'screens/web_scan_screen.dart';
+import 'utils/snackbar.dart';
 
 void main() {
   // TODO Bluebird.setLogLevel(LogLevel.verbose, color: true);
@@ -33,7 +34,11 @@ class BluebirdApp extends StatelessWidget {
             ? (kIsWeb ? const WebScanScreen() : const ScanScreen())
             : BluetoothOffScreen(adapterState: adapterState);
 
-        return MaterialApp(color: Colors.lightBlue, home: screen);
+        return MaterialApp(
+          color: Colors.lightBlue,
+          scaffoldMessengerKey: Snackbar.messengerKey,
+          home: screen,
+        );
       },
     );
   }
