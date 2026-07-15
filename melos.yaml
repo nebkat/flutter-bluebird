@@ -1,0 +1,27 @@
+name: bluebird
+repository: https://github.com/nebkat/flutter-bluebird
+
+packages:
+  - packages/*
+
+ignore:
+  - "*example*"
+
+scripts:
+  analyze:
+    description: Analyze every package.
+    run: flutter analyze
+  test:
+    description: Run the tests in every package that has them.
+    run: melos exec --dir-exists=test --order-dependents -- flutter test
+  coverage:
+    description: Run the tests with coverage in every package that has them.
+    run: melos exec --dir-exists=test -- flutter test --coverage
+
+command:
+  version:
+    # Melos can only emit `<name>-v<version>` tags, which don't match this repo's
+    # `<name>/v<version>` publish tags, so version without tagging (pass
+    # --no-git-tag-version) and create the publish tags with tool/tag_release.sh.
+    linkToCommits: true
+    branch: main
