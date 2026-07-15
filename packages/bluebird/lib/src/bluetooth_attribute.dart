@@ -74,12 +74,14 @@ abstract class BluetoothAttribute {
   /// throws if used. Re-fetch from [BluetoothDevice.services].
   bool get isValid => identical(_discovery, device.discoveryToken);
 
-  /// Throws if this attribute has been superseded by a (re-)discovery, so a
-  /// stale reference fails loudly instead of silently operating on a removed
-  /// attribute.
+  /// Throws if this attribute has been superseded by a (re-)discovery or a
+  /// disconnect, so a stale reference fails loudly instead of silently operating
+  /// on a removed attribute. A disconnect also invalidates attributes, so report
+  /// that as the cause first — it's the more useful message.
   @internal
   void requireValid(String method) {
     if (isValid) return;
+    device.ensureConnected(method); // throws deviceDisconnected if disconnected
     throw BluebirdException(
       method,
       BluebirdErrorCode.invalidIdentifier,

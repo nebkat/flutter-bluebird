@@ -65,8 +65,10 @@ final descriptor = characteristic.descriptors.firstWhere((c) => c.uuid == Uuids.
 ```
 
 > [!WARNING]
-> Calling `discoverServices` invalidates any previously discovered attributes as the underlying 
-> Bluetooth handles may have changed. Always re-fetch from `device.services` if performing re-discovery.
+> Calling `discoverServices` (and disconnecting) invalidates any previously discovered attributes, as the
+> underlying Bluetooth handles are only valid within a connection and may change on re-discovery. Always
+> re-fetch from `device.services` after (re-)connecting. Using a stale attribute throws — check
+> `attribute.isValid`.
 
 ### Subscribe to characteristic notifications
 
@@ -508,7 +510,7 @@ devices*. Filter it by type — either with `.where((e) => e is T)` or the typed
 |                        |      Android       |        iOS         | Throws | Description                                              |
 | :--------------------- | :----------------: | :----------------: | :----: | :--------------------------------------------------------|
 | uuid                 ⚡ | :white_check_mark: | :white_check_mark: |        | The uuid of the characteristic                           |
-| isValid              ⚡ | :white_check_mark: | :white_check_mark: |        | False once invalidated by a (re-)discovery; ops throw    |
+| isValid              ⚡ | :white_check_mark: | :white_check_mark: |        | False once invalidated by a (re-)discovery or disconnect; ops throw    |
 | properties           ⚡ | :white_check_mark: | :white_check_mark: |        | The characteristic's properties (read/write/notify/...)  |
 | canRead              ⚡ | :white_check_mark: | :white_check_mark: |        | Whether `read` is supported                              |
 | canWrite             ⚡ | :white_check_mark: | :white_check_mark: |        | Whether `write` is supported (with or without response)  |
@@ -527,7 +529,7 @@ devices*. Filter it by type — either with `.where((e) => e is T)` or the typed
 |         |      Android       |        iOS         | Throws | Description                           |
 | :------ | :----------------: | :----------------: | :----: | :-------------------------------------|
 | uuid    ⚡ | :white_check_mark: | :white_check_mark: |        | The uuid of the descriptor            |
-| isValid ⚡ | :white_check_mark: | :white_check_mark: |        | False once invalidated by re-discovery |
+| isValid ⚡ | :white_check_mark: | :white_check_mark: |        | False once invalidated by re-discovery or disconnect |
 | read    | :white_check_mark: | :white_check_mark: | :fire: | Retrieves the value of the descriptor |
 | write   | :white_check_mark: | :white_check_mark: | :fire: | Writes the value of the descriptor    |
 

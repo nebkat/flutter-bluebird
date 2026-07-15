@@ -85,6 +85,34 @@ void main() {
     expect(device.services.single.characteristics.first.isValid, isTrue);
   });
 
+  test('disconnect invalidates attributes and reports deviceDisconnected first', () async {
+    final fake = FakePlatform()..services = [bmService('a000', characteristics: [bmChar('b001')])];
+    FakePlatform.install(fake);
+    device = Bluebird.deviceForAddress('AA:BB:CC:DD:EE:FF');
+    device.applyEvent(connEvent(BluetoothConnectionState.connected));
+    await device.discoverServices(subscribeToServicesChanged: false);
+    final char = device.services.single.characteristics.single;
+    expect(char.isValid, isTrue);
+
+    // a disconnect invalidates held attributes; using one blames the disconnect,
+    // not a re-discovery
+    device.applyEvent(connEvent(BluetoothConnectionState.disconnected));
+    expect(char.isValid, isFalse);
+    await expectLater(
+      char.read(),
+      throwsA(isA<BluebirdException>().having((e) => e.code, 'code', BluebirdErrorCode.deviceDisconnected)),
+    );
+
+    // reconnecting (without re-discovering) leaves it stale — now the cause is
+    // that it must be re-fetched
+    device.applyEvent(connEvent(BluetoothConnectionState.connected));
+    expect(char.isValid, isFalse);
+    await expectLater(
+      char.read(),
+      throwsA(isA<BluebirdException>().having((e) => e.code, 'code', BluebirdErrorCode.invalidIdentifier)),
+    );
+  });
+
   test('bond state event stores the bond state and previous state', () {
     device.applyEvent(OnBondStateChangedEvent(device, BluetoothBondState.bonded, BluetoothBondState.bonding));
     expect(device.currentBondState, BluetoothBondState.bonded);

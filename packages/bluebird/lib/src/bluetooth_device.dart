@@ -445,9 +445,12 @@ class BluetoothDevice {
             });
           }
 
-          // Note: to make Bluebird easier to use, we do not clear `_services`,
-          // otherwise `services` would be more annoying to use. We also
-          // do not clear `_bondState`, for faster performance.
+          // A disconnect invalidates the whole GATT tree — the handles are only
+          // valid within a connection. Bump the discovery generation so held
+          // attributes report as stale (their ops then surface "device is not
+          // connected"; see BluetoothAttribute.requireValid). We keep `_services`
+          // itself (and `_bondState`) so they stay inspectable after a disconnect.
+          _discovery = DateTime.now();
         }
 
       case OnMtuChangedEvent():
