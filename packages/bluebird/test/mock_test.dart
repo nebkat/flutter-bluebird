@@ -31,4 +31,30 @@ void main() {
     expect(bluebird.isScanning.value, isTrue);
     await sub.cancel();
   });
+
+  test('forwards the cross-platform calls', () async {
+    expect(bluebird.adapterState, isA<AsyncValueStream<BluetoothAdapterState>>());
+    expect(bluebird.events, isA<Stream<BluebirdEvent>>());
+    expect(bluebird.connectedDevices, isA<List<BluetoothDevice>>());
+    expect(bluebird.deviceForAddress('AA:BB:CC:DD:EE:FF'), isA<BluetoothDevice>());
+    expect(await bluebird.systemDevices(const []), isA<List<BluetoothDevice>>());
+    await bluebird.turnOn();
+    expect(fake.calls, contains('turnOn'));
+  });
+
+  test('forwards the android-only calls', () async {
+    final realSystem = System.current;
+    System.current = System.android;
+    addTearDown(() => System.current = realSystem);
+    expect(await bluebird.bondedDevices, isA<List<BluetoothDevice>>());
+    expect(await bluebird.getPhySupport(), isA<PhySupport>());
+  });
+
+  test('forwards the darwin-only calls', () async {
+    final realSystem = System.current;
+    System.current = System.macos;
+    addTearDown(() => System.current = realSystem);
+    await bluebird.setOptions(showPowerAlert: false);
+    expect(fake.calls, contains('setOptions'));
+  });
 }

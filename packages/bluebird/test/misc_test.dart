@@ -56,4 +56,61 @@ void main() {
       expect(await c.stream.first, 3);
     });
   });
+
+  group('ScanResult', () {
+    ScanResult result(String addr, {String? advName, String? platformName, int rssi = -60}) =>
+        ScanResult.fromProto(bmAdv(addr, advName: advName, platformName: platformName, rssi: rssi));
+
+    test('equality and hashCode are by address', () {
+      final a = result('AA');
+      final b = result('AA', rssi: -40);
+      final c = result('BB');
+      expect(a, equals(b)); // same address, different rssi
+      expect(a.hashCode, b.hashCode);
+      expect(a, isNot(equals(c)));
+      expect(a.device.remoteId, 'AA');
+    });
+
+    test('mergedWith carries forward fields the newer packet omits', () {
+      final first = result('AA', advName: 'dev', platformName: 'DevName', rssi: -70);
+      final second = result('AA', rssi: -50); // scan response: no name
+      final merged = first.mergedWith(second);
+      expect(merged.rssi, -50); // newer wins
+      expect(merged.platformName, 'DevName'); // carried from first
+      expect(merged.advertisementData.advName, 'dev'); // carried from first
+      expect(first.toString(), contains('ScanResult{'));
+      expect(first.advertisementData.toString(), contains('AdvertisementData{'));
+    });
+  });
+
+  group('BluebirdException', () {
+    test('toString includes function, code, description, and optional details', () {
+      final e = BluebirdException('readCharacteristic', BluebirdErrorCode.timeout, 'timed out');
+      expect(e.toString(), contains('readCharacteristic'));
+      expect(e.toString(), contains('timed out'));
+      expect(e.toString(), isNot(contains('details')));
+
+      final withDetails = BluebirdException('f', BluebirdErrorCode.cbError, 'x', 'CBATTError 3');
+      expect(withDetails.toString(), contains('details: CBATTError 3'));
+    });
+  });
+
+  group('BluetoothDevice', () {
+    test('equality, hashCode, and toString are by remoteId', () {
+      final a = Bluebird.deviceForAddress('AA:BB');
+      final b = Bluebird.deviceForAddress('AA:BB');
+      expect(a, same(b)); // deviceForAddress caches per address
+      expect(a.hashCode, 'AA:BB'.hashCode);
+      expect(a.toString(), contains('BluetoothDevice{'));
+      expect(a.toString(), contains('AA:BB'));
+    });
+  });
+
+  group('DisconnectReason', () {
+    test('toString includes the code and description', () {
+      final r = DisconnectReason(19, 'remote user terminated connection');
+      expect(r.toString(), contains('19'));
+      expect(r.toString(), contains('remote user terminated connection'));
+    });
+  });
 }

@@ -72,14 +72,36 @@ void main() {
     expect(fake.lastWriteValue, [7]);
   });
 
-  test('metadata delegates to the wrapped characteristic', () {
+  test('metadata and streams delegate to the wrapped characteristic', () {
     final raw = chr();
-    final mapped = raw.map(decode);
+    final mapped = raw.map(decode, encode: encode);
     expect(mapped.raw, same(raw));
     expect(mapped.uuid, raw.uuid);
-    expect(mapped.canRead, raw.canRead);
+    expect(mapped.index, raw.index);
+    expect(mapped.id, raw.id);
+    expect(mapped.device, same(raw.device));
+    expect(mapped.service, same(raw.service));
     expect(mapped.properties, raw.properties);
     expect(mapped.descriptors, raw.descriptors);
+    expect(mapped.cccd, raw.cccd);
+    expect(mapped.canRead, raw.canRead);
+    expect(mapped.canWrite, raw.canWrite);
+    expect(mapped.canNotify, raw.canNotify);
+    expect(mapped.isValid, raw.isValid);
+    expect(mapped.toString(), contains('MappedBluetoothCharacteristic'));
+
+    // the stream getters just wrap the raw streams; building them covers the getters
+    expect(mapped.notifications, isA<Stream<int>>());
+    expect(mapped.notificationsPassive, isA<Stream<int>>());
+    expect(mapped.values, isA<Stream<int>>());
+    expect(mapped.valuesPassive, isA<Stream<int>>());
+  });
+
+  test('subscribe forwards to the wrapped characteristic', () async {
+    final mapped = chr().map(decode);
+    final sub = await mapped.subscribe();
+    expect(sub.isActive, isTrue);
+    await sub.unsubscribe();
   });
 
   group('descriptor', () {
@@ -100,7 +122,19 @@ void main() {
       final mapped = raw.map(decode);
       expect(mapped.raw, same(raw));
       expect(mapped.uuid, raw.uuid);
-      expect(mapped.characteristic, raw.characteristic);
+      expect(mapped.index, raw.index);
+      expect(mapped.id, raw.id);
+      expect(mapped.device, same(raw.device));
+      expect(mapped.characteristic, same(raw.characteristic));
+      expect(mapped.isValid, raw.isValid);
+      expect(mapped.toString(), contains('MappedBluetoothDescriptor'));
+    });
+
+    test('chained map composes decode and encode', () async {
+      final asText = dsc().map(decode, encode: encode).map((n) => 'v$n', encode: int.parse);
+      expect(await asText.read(), 'v205'); // 0xcd
+      await asText.write('3');
+      expect(fake.lastWriteValue, [3]);
     });
   });
 }
