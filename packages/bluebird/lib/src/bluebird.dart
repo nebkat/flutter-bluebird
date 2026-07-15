@@ -466,6 +466,22 @@ class ScanResult {
 
   BluetoothDevice get device => Bluebird.deviceForAddress(address);
 
+  /// Returns this result updated with [newer], carrying forward any field that
+  /// [newer] does not carry.
+  ///
+  /// A device's advertising and scan-response PDUs arrive as separate
+  /// advertisements, so a given packet may omit fields (commonly the name) that
+  /// an earlier one carried. [rssi], [timestamp] and a non-empty [platformName]
+  /// always take [newer]'s value; [advertisementData] is merged field-by-field
+  /// (see [AdvertisementData.mergedWith]).
+  ScanResult mergedWith(ScanResult newer) => ScanResult(
+    address: newer.address,
+    platformName: newer.platformName.isNotEmpty ? newer.platformName : platformName,
+    advertisementData: advertisementData.mergedWith(newer.advertisementData),
+    rssi: newer.rssi,
+    timestamp: newer.timestamp,
+  );
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) || other is ScanResult && runtimeType == other.runtimeType && address == other.address;
@@ -486,13 +502,18 @@ class ScanResult {
 /// Layers on top of a raw [Bluebird.scan] stream of individual advertisements.
 extension ScanResultAccumulate on Stream<ScanResult> {
   /// Accumulates advertisements into a growing, de-duplicated device list,
-  /// keyed by address (the latest advertisement per device wins).
+  /// keyed by address.
   ///   - emits `[]` first, then the updated list on every advertisement.
+  ///   - [coalesce] (default `true`): when a device re-advertises, merge the new
+  ///     advertisement onto the stored one via [ScanResult.mergedWith] rather
+  ///     than replacing it, so fields split across the advertising and
+  ///     scan-response PDUs (commonly the name) don't flicker. Set `false` to
+  ///     keep the latest advertisement verbatim.
   ///   - [removeIfGone]: if set, a device that has not re-advertised within this
   ///     duration is evicted from the list. This only makes sense when the
   ///     underlying scan uses `continuousUpdates: true` (otherwise duplicate
   ///     advertisements are suppressed and every device looks "gone").
-  Stream<List<ScanResult>> accumulate({Duration? removeIfGone}) {
+  Stream<List<ScanResult>> accumulate({Duration? removeIfGone, bool coalesce = true}) {
     final output = <String, ScanResult>{};
     StreamSubscription<ScanResult>? source;
     Timer? evictTimer;
@@ -502,7 +523,8 @@ extension ScanResultAccumulate on Stream<ScanResult> {
         controller.add(const []);
         source = listen(
           (sr) {
-            output[sr.address] = sr;
+            final prev = output[sr.address];
+            output[sr.address] = (coalesce && prev != null) ? prev.mergedWith(sr) : sr;
             controller.add(output.values.toList());
           },
           onError: controller.addError,
@@ -552,6 +574,22 @@ class AdvertisementData {
       manufacturerData = p.manufacturerData,
       serviceData = p.serviceData.map((uuid, data) => MapEntry(Uuid(uuid), data)),
       serviceUuids = p.serviceUuids.map(Uuid.new).toList();
+
+  /// Returns this data updated with [newer], carrying forward any field that
+  /// [newer] does not carry (its advertising and scan-response PDUs each carry
+  /// only part of the picture). For each field, [newer]'s value wins when it is
+  /// present — a non-empty string/list/map, or a non-null number — otherwise the
+  /// prior value is kept. [connectable] is a per-packet header flag with no
+  /// "absent" state, so [newer]'s value is always taken.
+  AdvertisementData mergedWith(AdvertisementData newer) => AdvertisementData(
+    advName: newer.advName.isNotEmpty ? newer.advName : advName,
+    txPowerLevel: newer.txPowerLevel ?? txPowerLevel,
+    appearance: newer.appearance ?? appearance,
+    connectable: newer.connectable,
+    manufacturerData: newer.manufacturerData.isNotEmpty ? newer.manufacturerData : manufacturerData,
+    serviceData: newer.serviceData.isNotEmpty ? newer.serviceData : serviceData,
+    serviceUuids: newer.serviceUuids.isNotEmpty ? newer.serviceUuids : serviceUuids,
+  );
 
   @override
   String toString() =>
