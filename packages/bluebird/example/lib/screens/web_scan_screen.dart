@@ -81,11 +81,13 @@ class _WebScanScreenState extends State<WebScanScreen> {
 
       // whatever the chooser returns lands as the (single) scan result;
       // taking .first stops the scan
+      // no timeout: the browser's device chooser gives the user unlimited time,
+      // and .first resolves when they pick (or errors if they cancel)
       final result = await Bluebird.scan(
         withServices: _serviceFilter,
         withNames: name.isEmpty ? const [] : [name],
         webOptionalServices: _optionalServices,
-      ).first.timeout(const Duration(seconds: 5));
+      ).first;
       final device = result.device;
 
       await device.connectAndUpdateStream();
