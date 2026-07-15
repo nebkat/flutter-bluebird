@@ -6,8 +6,6 @@ packages:
 ignore:
   - "*example*"
 
-# Melos is used purely as a cross-package task runner here (linking is handled by
-# the pub workspace, versioning by tool/release.sh, publishing by publish.yml).
 scripts:
   analyze:
     description: Analyze every package.

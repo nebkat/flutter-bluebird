@@ -8,8 +8,7 @@
 #     tag pattern: v{{version}}          (the same pattern for every package)
 # and create a GitHub environment named `pub.dev` (Settings -> Environments).
 #
-# Cut a release with `tool/release.sh <version>` (bumps every package + tag), then
-# push the tag.
+# Release: bump every package to the new version, commit, then push tag `vX.Y.Z`.
 
 name: publish
 
