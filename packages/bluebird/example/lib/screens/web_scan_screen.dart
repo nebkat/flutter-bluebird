@@ -93,11 +93,15 @@ class _WebScanScreenState extends State<WebScanScreen> {
       await device.connectAndUpdateStream();
 
       if (!mounted) return;
-      Navigator.of(context).push(MaterialPageRoute(
-        builder: (context) => DeviceScreen(device: device),
-      ));
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (context) => DeviceScreen(device: device)),
+      );
     } catch (e) {
-      Snackbar.show(ABC.b, prettyException("Connect Error:", e), success: false);
+      Snackbar.show(
+        ABC.b,
+        prettyException("Connect Error:", e),
+        success: false,
+      );
     } finally {
       if (mounted) setState(() => _connecting = false);
     }
@@ -108,52 +112,67 @@ class _WebScanScreenState extends State<WebScanScreen> {
     return ScaffoldMessenger(
       key: Snackbar.snackBarKeyB,
       child: Scaffold(
-        appBar: AppBar(title: const Text('Bluebird')),
-        body: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: ListView(
-              padding: const EdgeInsets.all(24),
-              shrinkWrap: true,
-              children: [
-                Text('Connect a device', style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 4),
-                Text(
-                  'The browser will show a device chooser. On web you can only access '
-                  'services you list up front — narrow the chooser with filters if you like.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _nameFilter,
-                  decoration: const InputDecoration(
-                    labelText: 'Filter by name',
-                    hintText: 'exact device name (optional)',
-                    border: OutlineInputBorder(),
-                    isDense: true,
+        // no app bar on web — the logo is the header
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: ListView(
+                padding: const EdgeInsets.all(24),
+                shrinkWrap: true,
+                children: [
+                  Center(
+                    child: Image.asset('assets/bluebird.png', height: 140),
                   ),
-                ),
-                const SizedBox(height: 12),
-                _ServiceSelector(
-                  label: 'Filter by service',
-                  values: _serviceFilter,
-                  onChanged: () => setState(() {}),
-                ),
-                const SizedBox(height: 12),
-                _ServiceSelector(
-                  label: 'Optional services',
-                  values: _optionalServices,
-                  onChanged: () => setState(() {}),
-                ),
-                const SizedBox(height: 20),
-                FilledButton.icon(
-                  icon: _connecting
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Icons.bluetooth),
-                  label: Text(_connecting ? 'Connecting…' : 'Connect a device'),
-                  onPressed: _connecting ? null : onConnectPressed,
-                ),
-              ],
+                  const SizedBox(height: 24),
+                  Text(
+                    'Connect a device',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'The browser will show a device chooser. On web you can only access '
+                    'services you list up front — narrow the chooser with filters if you like.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _nameFilter,
+                    decoration: const InputDecoration(
+                      labelText: 'Filter by name',
+                      hintText: 'exact device name (optional)',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _ServiceSelector(
+                    label: 'Filter by service',
+                    values: _serviceFilter,
+                    onChanged: () => setState(() {}),
+                  ),
+                  const SizedBox(height: 12),
+                  _ServiceSelector(
+                    label: 'Optional services',
+                    values: _optionalServices,
+                    onChanged: () => setState(() {}),
+                  ),
+                  const SizedBox(height: 20),
+                  FilledButton.icon(
+                    icon: _connecting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.bluetooth),
+                    label: Text(
+                      _connecting ? 'Connecting…' : 'Connect a device',
+                    ),
+                    onPressed: _connecting ? null : onConnectPressed,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -166,7 +185,11 @@ class _WebScanScreenState extends State<WebScanScreen> {
 /// press enter to add it. Selections are shown as compact list tiles (UUID with
 /// the known name as subtitle). [values] is mutated in place.
 class _ServiceSelector extends StatefulWidget {
-  const _ServiceSelector({required this.label, required this.values, required this.onChanged});
+  const _ServiceSelector({
+    required this.label,
+    required this.values,
+    required this.onChanged,
+  });
 
   final String label;
   final List<Uuid> values;
@@ -195,7 +218,9 @@ class _ServiceSelectorState extends State<_ServiceSelector> {
         Autocomplete<String>(
           optionsBuilder: (value) => value.text.isEmpty
               ? const Iterable<String>.empty()
-              : _knownServices.keys.where((n) => n.toLowerCase().contains(value.text.toLowerCase())),
+              : _knownServices.keys.where(
+                  (n) => n.toLowerCase().contains(value.text.toLowerCase()),
+                ),
           fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
             _controller = controller;
             return TextField(
@@ -211,7 +236,11 @@ class _ServiceSelectorState extends State<_ServiceSelector> {
               onSubmitted: (text) {
                 final uuid = _resolve(text);
                 if (uuid == null) {
-                  Snackbar.show(ABC.b, 'Not a known service or valid UUID: $text', success: false);
+                  Snackbar.show(
+                    ABC.b,
+                    'Not a known service or valid UUID: $text',
+                    success: false,
+                  );
                 } else {
                   _add(uuid);
                 }
@@ -226,7 +255,10 @@ class _ServiceSelectorState extends State<_ServiceSelector> {
               child: Material(
                 elevation: 4,
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 260, maxWidth: 472),
+                  constraints: const BoxConstraints(
+                    maxHeight: 260,
+                    maxWidth: 472,
+                  ),
                   child: ListView(
                     padding: EdgeInsets.zero,
                     shrinkWrap: true,
@@ -251,7 +283,9 @@ class _ServiceSelectorState extends State<_ServiceSelector> {
             dense: true,
             contentPadding: const EdgeInsets.only(left: 12),
             title: Text(uuid.string),
-            subtitle: _serviceName(uuid) != null ? Text(_serviceName(uuid)!) : null,
+            subtitle: _serviceName(uuid) != null
+                ? Text(_serviceName(uuid)!)
+                : null,
             trailing: IconButton(
               icon: const Icon(Icons.close),
               onPressed: () {
