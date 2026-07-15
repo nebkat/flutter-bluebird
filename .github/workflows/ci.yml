@@ -45,3 +45,6 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           file: coverage.lcov
+          # don't fail CI on a coverage-upload hiccup (e.g. before the repo is
+          # enabled on coveralls.io) — remove once Coveralls is confirmed working
+          fail-on-error: false
