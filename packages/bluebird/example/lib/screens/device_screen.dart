@@ -191,60 +191,129 @@ class _DeviceScreenState extends State<DeviceScreen> {
     );
   }
 
-  Widget buildSpinner(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(14.0),
-      child: AspectRatio(
-        aspectRatio: 1.0,
-        child: CircularProgressIndicator(
-          backgroundColor: Colors.black12,
-          color: Colors.black26,
+  // Same signal presentation as the scan page: a dBm reading over a colored
+  // strength bar. When not connected there's no live RSSI, so show an empty
+  // grey bar and a "disconnected" icon.
+  Widget _buildRssiBar(BuildContext context) {
+    final rssi = _rssi;
+    final live = isConnected && rssi != null;
+    final strength = live ? ((rssi + 100) / 60).clamp(0.0, 1.0) : 0.0;
+    final color = !live
+        ? Colors.grey
+        : strength > 0.6
+        ? Colors.green
+        : strength > 0.3
+        ? Colors.orange
+        : Colors.red;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          isConnected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
+          color: isConnected ? Colors.blue : Colors.grey,
         ),
+        const SizedBox(width: 12),
+        SizedBox(
+          width: 64,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                live ? '$rssi dBm' : '—',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 4),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(2),
+                child: LinearProgressIndicator(
+                  value: strength,
+                  minHeight: 6,
+                  backgroundColor: Colors.grey.shade300,
+                  valueColor: AlwaysStoppedAnimation<Color>(color),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Row(
+        children: [
+          _buildRssiBar(context),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.device.remoteId,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  isConnected ? 'Connected' : 'Disconnected',
+                  style: TextStyle(
+                    color: isConnected ? Colors.green : Colors.grey,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget buildRemoteId(BuildContext context) {
+  Widget _buildActions(BuildContext context) {
+    final busy = _isConnecting || _isDisconnecting;
+    Widget spinner() => const SizedBox(
+      width: 16,
+      height: 16,
+      child: CircularProgressIndicator(strokeWidth: 2),
+    );
     return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: Text('${widget.device.remoteId}'),
-    );
-  }
-
-  Widget buildRssiTile(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        isConnected
-            ? const Icon(Icons.bluetooth_connected)
-            : const Icon(Icons.bluetooth_disabled),
-        Text(
-          ((isConnected && _rssi != null) ? '${_rssi!} dBm' : ''),
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-      ],
-    );
-  }
-
-  Widget buildGetServices(BuildContext context) {
-    return IndexedStack(
-      index: (_isDiscoveringServices) ? 1 : 0,
-      children: <Widget>[
-        TextButton(
-          child: const Text("Get Services"),
-          onPressed: onDiscoverServicesPressed,
-        ),
-        const IconButton(
-          icon: SizedBox(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation(Colors.grey),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Row(
+        children: [
+          Expanded(
+            child: FilledButton.icon(
+              icon: busy
+                  ? spinner()
+                  : Icon(isConnected ? Icons.link_off : Icons.link),
+              label: Text(
+                _isConnecting
+                    ? 'Cancel'
+                    : (isConnected ? 'Disconnect' : 'Connect'),
+              ),
+              style: isConnected
+                  ? FilledButton.styleFrom(backgroundColor: Colors.red)
+                  : null,
+              onPressed: _isConnecting
+                  ? onCancelPressed
+                  : (isConnected ? onDisconnectPressed : onConnectPressed),
             ),
-            width: 18.0,
-            height: 18.0,
           ),
-          onPressed: null,
-        ),
-      ],
+          const SizedBox(width: 12),
+          Expanded(
+            child: OutlinedButton.icon(
+              icon: _isDiscoveringServices
+                  ? spinner()
+                  : const Icon(Icons.search),
+              label: const Text('Get Services'),
+              onPressed: (isConnected && !_isDiscoveringServices)
+                  ? onDiscoverServicesPressed
+                  : null,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -263,43 +332,21 @@ class _DeviceScreenState extends State<DeviceScreen> {
     );
   }
 
-  Widget buildConnectButton(BuildContext context) {
-    return Row(
-      children: [
-        if (_isConnecting || _isDisconnecting) buildSpinner(context),
-        TextButton(
-          onPressed: _isConnecting
-              ? onCancelPressed
-              : (isConnected ? onDisconnectPressed : onConnectPressed),
-          child: Text(
-            _isConnecting ? "CANCEL" : (isConnected ? "DISCONNECT" : "CONNECT"),
-            style: Theme.of(
-              context,
-            ).primaryTextTheme.labelLarge?.copyWith(color: Colors.white),
-          ),
-        ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final name = widget.device.platformName.isNotEmpty
+        ? widget.device.platformName
+        : 'Unknown';
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.device.platformName),
-        actions: [buildConnectButton(context)],
-      ),
+      appBar: AppBar(title: Text(name)),
       body: SingleChildScrollView(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            buildRemoteId(context),
-            ListTile(
-              leading: buildRssiTile(context),
-              title: Text(
-                'Device is ${_connectionState.toString().split('.')[1]}.',
-              ),
-              trailing: buildGetServices(context),
-            ),
+            _buildHeader(context),
+            const SizedBox(height: 8),
+            _buildActions(context),
+            const Divider(height: 24),
             buildMtuTile(context),
             ..._buildServiceTiles(context, widget.device),
           ],
