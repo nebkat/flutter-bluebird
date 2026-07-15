@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:bluebird/bluebird.dart';
+import 'package:flutter/material.dart';
 
 class ScanResultTile extends StatefulWidget {
   const ScanResultTile({Key? key, required this.result, this.onTap}) : super(key: key);
@@ -14,8 +14,6 @@ class ScanResultTile extends StatefulWidget {
 }
 
 class _ScanResultTileState extends State<ScanResultTile> {
-  BluetoothConnectionState _connectionState = BluetoothConnectionState.disconnected;
-
   late StreamSubscription<BluetoothConnectionState> _connectionStateSubscription;
 
   @override
@@ -23,7 +21,6 @@ class _ScanResultTileState extends State<ScanResultTile> {
     super.initState();
 
     _connectionStateSubscription = widget.result.device.connectionState.listen((state) {
-      _connectionState = state;
       if (mounted) {
         setState(() {});
       }
@@ -55,9 +52,7 @@ class _ScanResultTileState extends State<ScanResultTile> {
     return serviceUuids.join(', ').toUpperCase();
   }
 
-  bool get isConnected {
-    return _connectionState == BluetoothConnectionState.connected;
-  }
+  bool get isConnected => widget.result.device.isConnected;
 
   Widget _buildSignal(BuildContext context) {
     final rssi = widget.result.rssi;
@@ -66,8 +61,8 @@ class _ScanResultTileState extends State<ScanResultTile> {
     final color = strength > 0.6
         ? Colors.green
         : strength > 0.3
-            ? Colors.orange
-            : Colors.red;
+        ? Colors.orange
+        : Colors.red;
     return SizedBox(
       width: 42,
       child: Column(
@@ -100,14 +95,8 @@ class _ScanResultTileState extends State<ScanResultTile> {
         mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(
-            name,
-            overflow: TextOverflow.ellipsis,
-          ),
-          Text(
-            widget.result.device.remoteId,
-            style: Theme.of(context).textTheme.bodySmall,
-          )
+          Text(name, overflow: TextOverflow.ellipsis),
+          Text(widget.result.device.remoteId, style: Theme.of(context).textTheme.bodySmall),
         ],
       );
     } else {
@@ -118,10 +107,7 @@ class _ScanResultTileState extends State<ScanResultTile> {
   Widget _buildConnectButton(BuildContext context) {
     return ElevatedButton(
       child: isConnected ? const Text('OPEN') : const Text('CONNECT'),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-      ),
+      style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white),
       onPressed: (widget.result.advertisementData.connectable) ? widget.onTap : null,
     );
   }
@@ -133,13 +119,8 @@ class _ScanResultTileState extends State<ScanResultTile> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           // fixed-width label column so all values align
-          SizedBox(
-            width: 120.0,
-            child: Text(title, style: Theme.of(context).textTheme.bodySmall),
-          ),
-          const SizedBox(
-            width: 12.0,
-          ),
+          SizedBox(width: 120.0, child: Text(title, style: Theme.of(context).textTheme.bodySmall)),
+          const SizedBox(width: 12.0),
           Expanded(
             child: Text(
               value,

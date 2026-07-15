@@ -33,6 +33,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
   late StreamSubscription<bool> _isConnectingSubscription;
   late StreamSubscription<bool> _isDisconnectingSubscription;
   late StreamSubscription<int> _mtuSubscription;
+  late StreamSubscription<BluetoothAdapterState> _adapterStateSubscription;
 
   @override
   void initState() {
@@ -71,6 +72,13 @@ class _DeviceScreenState extends State<DeviceScreen> {
         setState(() {});
       }
     });
+
+    // this screen requires Bluetooth; dismiss it if the adapter is turned off
+    _adapterStateSubscription = Bluebird.adapterState.listen((state) {
+      if (state != BluetoothAdapterState.on && mounted) {
+        Navigator.of(context).pop();
+      }
+    });
   }
 
   @override
@@ -79,6 +87,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
     _mtuSubscription.cancel();
     _isConnectingSubscription.cancel();
     _isDisconnectingSubscription.cancel();
+    _adapterStateSubscription.cancel();
     super.dispose();
   }
 

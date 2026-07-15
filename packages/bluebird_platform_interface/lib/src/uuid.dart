@@ -3,6 +3,75 @@
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+/// A Bluetooth UUID which can be 16-bit, 32-bit, or 128-bit.
+class Uuid {
+  final List<int> bytes;
+
+  const Uuid.constant(this.bytes);
+
+  Uuid.fromBytes(this.bytes)
+    : assert(bytes.length == 2 || bytes.length == 4 || bytes.length == 16, "UUID must be 16, 32, or 128 bits long");
+
+  factory Uuid(String input) {
+    if (input.length == 4 || input.length == 8) {
+      return Uuid.fromBytes(_tryHexDecode(input) ?? (throw FormatException("UUID invalid hex", input)));
+    } else if (input.length == 36) {
+      if (input[8] != '-' || input[13] != '-' || input[18] != '-' || input[23] != '-') {
+        throw FormatException("UUID 128-bit must be in the format XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX", input);
+      }
+      input = input.replaceAll('-', '');
+      return Uuid.fromBytes(_tryHexDecode(input) ?? (throw FormatException("UUID invalid hex", input)));
+    } else {
+      throw FormatException("UUID must be 4, 8, or 36 characters long", input);
+    }
+  }
+
+  // 128-bit representation
+  String get string128 => switch (bytes.length) {
+    2 => '0000${bytes.toHexString()}-0000-1000-8000-00805f9b34fb'.toLowerCase(),
+    4 => '${bytes.toHexString()}-0000-1000-8000-00805f9b34fb'.toLowerCase(),
+    _ =>
+      "${bytes.sublist(0, 4).toHexString()}-"
+              "${bytes.sublist(4, 6).toHexString()}-"
+              "${bytes.sublist(6, 8).toHexString()}-"
+              "${bytes.sublist(8, 10).toHexString()}-"
+              "${bytes.sublist(10, 16).toHexString()}"
+          .toLowerCase(),
+  };
+
+  // Shortest representation
+  String get string => switch (bytes.length) {
+    2 || 4 => bytes.toHexString(),
+    _ => string128,
+  };
+
+  /// The human-readable name of this UUID if it is a well-known Bluetooth SIG
+  /// assigned number (e.g. `Uuid('2A24').name == 'Model Number String'`), else
+  /// null. See [Uuids.nameOf].
+  String? get name => Uuids.nameOf(this);
+
+  /// The 16-bit SIG short code if this is a 16-bit assigned-number UUID (i.e. it
+  /// uses the standard `0000xxxx-0000-1000-8000-00805f9b34fb` base), else null.
+  int? get _sigShortCode {
+    final s = string128;
+    if (s.startsWith('0000') && s.endsWith('-0000-1000-8000-00805f9b34fb')) {
+      return int.tryParse(s.substring(4, 8), radix: 16);
+    }
+    return null;
+  }
+
+  @override
+  String toString() => string;
+
+  /// Uuids are compared by value in their 128-bit form, so the same uuid
+  /// expressed in short (16/32-bit) and long form compare equal.
+  @override
+  operator ==(Object other) => other is Uuid && string128 == other.string128;
+
+  @override
+  int get hashCode => string128.hashCode;
+}
+
 /// Well-known Bluetooth SIG assigned UUIDs, grouped by kind:
 /// `Uuids.service.*`, `Uuids.characteristic.*`, `Uuids.descriptor.*`.
 class Uuids {
@@ -125,77 +194,6 @@ class _Descriptors {
   final environmentalSensingMeasurement = const Uuid.constant([0x29, 0x0C]);
   final environmentalSensingTriggerSetting = const Uuid.constant([0x29, 0x0D]);
   final timeTriggerSetting = const Uuid.constant([0x29, 0x0E]);
-}
-
-/// A Bluetooth UUID which can be 16-bit, 32-bit, or 128-bit.
-class Uuid {
-  final List<int> bytes;
-
-  const Uuid.constant(this.bytes);
-
-  Uuid.fromBytes(this.bytes)
-      : assert(
-          bytes.length == 2 || bytes.length == 4 || bytes.length == 16,
-          "UUID must be 16, 32, or 128 bits long",
-        );
-
-  factory Uuid(String input) {
-    if (input.length == 4 || input.length == 8) {
-      return Uuid.fromBytes(_tryHexDecode(input) ?? (throw FormatException("UUID invalid hex", input)));
-    } else if (input.length == 36) {
-      if (input[8] != '-' || input[13] != '-' || input[18] != '-' || input[23] != '-') {
-        throw FormatException("UUID 128-bit must be in the format XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX", input);
-      }
-      input = input.replaceAll('-', '');
-      return Uuid.fromBytes(_tryHexDecode(input) ?? (throw FormatException("UUID invalid hex", input)));
-    } else {
-      throw FormatException("UUID must be 4, 8, or 36 characters long", input);
-    }
-  }
-
-  // 128-bit representation
-  String get string128 => switch (bytes.length) {
-        2 => '0000${bytes.toHexString()}-0000-1000-8000-00805f9b34fb'.toLowerCase(),
-        4 => '${bytes.toHexString()}-0000-1000-8000-00805f9b34fb'.toLowerCase(),
-        _ => "${bytes.sublist(0, 4).toHexString()}-"
-                "${bytes.sublist(4, 6).toHexString()}-"
-                "${bytes.sublist(6, 8).toHexString()}-"
-                "${bytes.sublist(8, 10).toHexString()}-"
-                "${bytes.sublist(10, 16).toHexString()}"
-            .toLowerCase(),
-      };
-
-  // Shortest representation
-  String get string => switch (bytes.length) {
-        2 || 4 => bytes.toHexString(),
-        _ => string128,
-      };
-
-  /// The human-readable name of this UUID if it is a well-known Bluetooth SIG
-  /// assigned number (e.g. `Uuid('2A24').name == 'Model Number String'`), else
-  /// null. See [Uuids.nameOf].
-  String? get name => Uuids.nameOf(this);
-
-  /// The 16-bit SIG short code if this is a 16-bit assigned-number UUID (i.e. it
-  /// uses the standard `0000xxxx-0000-1000-8000-00805f9b34fb` base), else null.
-  int? get _sigShortCode {
-    final s = string128;
-    if (s.startsWith('0000') && s.endsWith('-0000-1000-8000-00805f9b34fb')) {
-      return int.tryParse(s.substring(4, 8), radix: 16);
-    }
-    return null;
-  }
-
-  @override
-  String toString() => string;
-
-  /// Uuids are compared by value in their 128-bit form, so the same uuid
-  /// expressed in short (16/32-bit) and long form compare equal.
-  @override
-  operator ==(Object other) => other is Uuid && string128 == other.string128;
-
-  @override
-  int get hashCode => string128.hashCode;
 }
 
 extension _IntHexString on int {

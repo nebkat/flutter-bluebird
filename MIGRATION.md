@@ -1,242 +1,128 @@
+# Migrating from flutter_blue_plus
 
-# migration guide
+Bluebird began as a rework of [flutter_blue_plus], so the shape of a session is
+unchanged — scan, connect, discover, read/write/subscribe — and most of
+`BluetoothDevice`, `BluetoothService`, and `BluetoothCharacteristic` works the
+same. This guide covers what changed.
 
-Breaking changes in Bluebird, listed version by version.
+[flutter_blue_plus]: https://pub.dev/packages/flutter_blue_plus
 
-## 2.0.0 (unreleased)
+## Package
 
-Complete rework of the plugin architecture:
-
-* **Federated plugin**: the package is now split into `bluebird` (app-facing),
-  `bluebird_platform_interface`, `bluebird_android` (Kotlin), and
-  `bluebird_darwin` (Swift, shared iOS/macOS). Web and Linux are parked.
-* **Pigeon codegen**: all platform communication is generated from
-  `packages/bluebird_platform_interface/pigeons/messages.dart`. The hand-written
-  `Bm*` message classes with `toMap`/`fromMap` are gone; pigeon-generated classes are the
-  platform interface types.
-* **Typed attribute refs**: attributes are addressed by `BmAttributeId` (uuid + platform
-  instance token) composed into `BmServiceRef`/`BmCharacteristicRef`/`BmDescriptorRef`,
-  replacing the `"uuid:index/uuid:index"` identifier strings.
-  `BluetoothAttribute.identifier`/`identifierPath` were removed.
-* **True async operations**: native methods now complete their Future when the operation
-  actually finishes (including `connect()`, which completes on connection success/failure
-  rather than when the request is filed). Operation results no longer arrive as separate
-  events that are correlated Dart-side.
-* **Events**: unsolicited platform events arrive on a single typed
-  `Stream<BmEvent>` (pigeon event channel). `onCharacteristicReceived` on the platform
-  interface was renamed `onCharacteristicNotified` and carries notify/indicate values
-  only; `read()` results are emitted app-side. Scan failures are a `BmScanFailedEvent`
-  rather than an embedded success flag.
-* **Errors**: natives throw typed errors with stable string codes (`gatt_error`,
-  `cb_error`, `device_disconnected`, `adapter_off`, `user_canceled`, `unsupported`, ...)
-  which surface as `BluebirdException`. The `BmStatus` success/errorCode envelope
-  is gone.
-* **Values are `Uint8List`** end-to-end on the wire; uuids cross as strings.
-
-## 1.8.6
-* **renamed:** `BluetoothDevice.id` -> `remoteId`
-* **renamed:** `Bluebird.name` -> `adapterName`
-* **renamed:** `BluetoothDevice.name` -> `platformName`
-* **renamed:** `Bluebird.state` -> `adapterState`
-* **renamed:** `BluetoothDevice.state` -> `connectionState`
-
-## 1.9.0
-
-* **Behavior Change:** Android: push to `onValueReceived` when `read()` is called, to match iOS behavior
-* **renamed:** `BluetoothCharacteristic.value` -> `lastValueStream`
-* **renamed:** `BluetoothDescriptor.value` -> `lastValueStream`
-* **renamed:** `BluetoothCharacteristic.onValueChangedStream` -> `onValueReceived`
-* **renamed:** `BluetoothDescriptor.onValueChangedStream` -> `onValueReceived`
-
-## 1.10.0
-
-### .instance removed
-
-You no longer need to use `.instance`
-
-i.e. `Bluebird.instance.startScan` becomes `Bluebird.startScan`
-
-### turnOn and turnOff
-
-* they now wait for completion if you use `await`
-* they throw on error, instead of returning false
-
-## 1.11.0
-
-* **renamed:** `connectedDevices` -> `systemDevices`
-
-## 1.15.0
-
-### `Bluebird.scan` was removed
-
-**Option 1:** migrate to `Bluebird.startScan` with `oneByOne` parameter
-
-**Option 2:** use the following extension (below)
-
+```yaml
+dependencies:
+  bluebird: ^0.1.0   # was: flutter_blue_plus
 ```
-extension Scan on Bluebird {
-  static Stream<ScanResult> scan({
-    List<Guid> withServices = const [],
-    Duration? timeout,
-    bool androidUsesFineLocation = false,
-  }) {
-    if (Bluebird.isScanningNow) {
-        throw Exception("Another scan is already in progress");
-    }
 
-    final controller = StreamController<ScanResult>();
+```dart
+import 'package:bluebird/bluebird.dart';   // was: package:flutter_blue_plus/flutter_blue_plus.dart
+```
 
-    var subscription = Bluebird.scanResults.listen(
-      (r){if(r.isNotEmpty){controller.add(r.first);}},
-      onError: (e, stackTrace) => controller.addError(e, stackTrace),
-    );
+## Renames
 
-    Future scanComplete = Bluebird.isScanning.skip(1).where((e) => e == false).first;
+| flutter_blue_plus | bluebird |
+| --- | --- |
+| `FlutterBluePlus` | `Bluebird` |
+| `Guid` | `Uuid` |
+| `FlutterBluePlusException` | `BluebirdException` |
+| `FbpErrorCode` | `BluebirdErrorCode` |
 
-    Bluebird.startScan(
-      withServices: withServices,
-      timeout: timeout,
-      removeIfGone: null,
-      oneByOne: true,
-      androidUsesFineLocation: androidUsesFineLocation,
-    );
+`Guid('180d')` becomes `Uuid('180d')` (same 16-/32-/128-bit forms). Anywhere you
+passed `List<Guid>` — e.g. `withServices` — now takes `List<Uuid>`.
 
-    scanComplete.whenComplete(() {
-      subscription.cancel();
-      controller.close();
-    });
+## Scanning
 
-    return controller.stream;
-  }
+Scanning is now a single stream you listen to, rather than a start/stop pair
+plus a separate results stream. `scan()` starts when you listen and stops when
+you cancel.
+
+```dart
+// flutter_blue_plus
+var sub = FlutterBluePlus.scanResults.listen((results) { ... });
+await FlutterBluePlus.startScan(withServices: [Guid('180d')], timeout: Duration(seconds: 15));
+await FlutterBluePlus.stopScan();
+
+// bluebird
+final sub = Bluebird.scan(withServices: [Uuid('180d')]).accumulate().listen((results) { ... });
+// ... later, to stop scanning:
+await sub.cancel();
+```
+
+| flutter_blue_plus | bluebird |
+| --- | --- |
+| `FlutterBluePlus.startScan(...)` + `FlutterBluePlus.stopScan()` | listen to / cancel `Bluebird.scan(...)` |
+| `FlutterBluePlus.scanResults` (growing device list) | `Bluebird.scan(...).accumulate()` |
+| `FlutterBluePlus.onScanResults` | `Bluebird.scan(...).accumulate()` (a fresh `scan()` never replays a previous scan) |
+| `oneByOne: true` / individual advertisements | `Bluebird.scan(...)` — the base stream yields one `ScanResult` at a time |
+| `removeIfGone:` on `startScan` | `Bluebird.scan(...).accumulate(removeIfGone: ...)` |
+| `FlutterBluePlus.isScanningNow` | `Bluebird.isScanning.value` |
+| `FlutterBluePlus.isScanning` (`Stream<bool>`) | `Bluebird.isScanning` (`ValueStream<bool>`; listen the same way) |
+
+Scan filter arguments (`withServices`, `withNames`, `withKeywords`, `withMsd`,
+`withServiceData`, `androidScanMode`, `continuousUpdates`, …) are unchanged apart
+from `Guid` → `Uuid`.
+
+## Adapter state
+
+```dart
+// flutter_blue_plus
+var now = FlutterBluePlus.adapterStateNow;
+
+// bluebird
+var now = Bluebird.adapterState.value;
+```
+
+`Bluebird.adapterState` is still a stream you can `listen` to; it just also
+exposes the current value via `.value`. The `BluetoothAdapterState`,
+`BluetoothConnectionState`, and `BluetoothBondState` enums keep the same names
+and values.
+
+## Characteristic values & notifications
+
+flutter_blue_plus separated "enable notify" from "receive values" and cached the
+last value. In bluebird, **listening to `notifications` enables notify/indicate**,
+and `read()` returns the value directly — there is no `lastValueStream`.
+
+```dart
+// flutter_blue_plus
+await c.setNotifyValue(true);
+c.onValueReceived.listen((value) { ... });   // or c.lastValueStream
+final value = await c.read();                // then read from c.lastValue / onValueReceived
+
+// bluebird
+final sub = c.notifications.listen((value) { ... });   // listening turns notify on
+await sub.cancel();                                     // cancelling turns it off
+final value = await c.read();                           // read() returns the value
+```
+
+| flutter_blue_plus | bluebird |
+| --- | --- |
+| `c.setNotifyValue(true)` + `c.onValueReceived` / `c.lastValueStream` | `c.notifications.listen(...)` |
+| `c.setNotifyValue(false)` | cancel the `notifications` subscription |
+| `c.lastValue` | not retained — keep the value from `read()` or the latest notification |
+| `c.read()` (then read `lastValue`) | `c.read()` returns the value |
+| `c.isNotifying` | track your own subscription, or use `c.notificationsPassive` to observe without enabling |
+
+Descriptors work the same way; `write(value, withoutResponse:, allowLongWrite:)`
+is unchanged.
+
+## Errors
+
+```dart
+try {
+  await c.read();
+} on BluebirdException catch (e) {          // was: FlutterBluePlusException
+  if (e.code == BluebirdErrorCode.deviceDisconnected) { ... }
 }
 ```
 
----
+## Other differences
 
-### `Bluebird.startScan` doesn't return List<ScanResult> anymore
-
-**Option 1:** migrate to `Bluebird.scanResults`. Example code:
-
-```
-Stream<BluetoothDevice?> myDeviceStream = Bluebird.scanResults
-    .map((list) => list.first)
-    .where((r) => r.advertisementData.advName == "myDeviceName")
-    .map((r) => r.device);
-
-// start listening before we call startScan so we do not miss the result
-Future<BluetoothDevice?> myDeviceFuture = myDeviceStream.first
-    .timeout(Duration(seconds: 10))
-    .catchError((error) => null);
-
-await Bluebird.startScan(timeout: Duration(seconds: 10), oneByOne:true);
-
-BluetoothDevice? myDevice = await myDeviceFuture;
-```
-
-**Option 2:** use this extension
-
-```
-extension Scan on Bluebird {
-  static Future<List<ScanResult>> startScanWithResult({
-    List<Guid> withServices = const [],
-    Duration? timeout,
-    bool androidUsesFineLocation = false,
-  }) async {
-    if (Bluebird.isScanningNow) {
-      throw Exception("Another scan is already in progress");
-    }
-
-    List<ScanResult> output = [];
-
-    var subscription = Bluebird.scanResults.listen((result) {
-      output = result;
-    }, onError: (e, stackTrace) {
-      throw Exception(e);
-    });
-
-    Bluebird.startScan(
-      withServices: withServices,
-      timeout: timeout,
-      removeIfGone: null,
-      oneByOne: false,
-      androidUsesFineLocation: androidUsesFineLocation,
-    );
-
-    // wait scan complete
-    await Bluebird.isScanning.where((e) => e == false).first;
-
-    subscription.cancel();
-
-    return output;
-  }
-}
-```
-
----
-
-### `await Bluebird.startScan()` does not wait for scan completion anymore
-
-Use `isScanning` to detect completion instead.
-
-```
-await Bluebird.startScan(timeout: Duration(seconds:15));
-await Bluebird.isScanning.where((value) => value == false).first;
-```
-
-## 1.16.0
-
-* **renamed:** `BluetoothDevice.localName` -> `platformName`
-* **deleted:** `BluetoothDevice.type` & `BluetoothDevice.localName` from constructor
-* **deleted:** `servicesStream` & `isDiscoveringServices` 
-
-## 1.17.0
-
-* **Behavior Change:** `lastValue` & `lastValueStream` are now updated when `write()` is called
-
-## 1.18.0
-
-* **Breaking Change** bondState: directly expose prevBond instead of lost/failed flags
-
-## 1.20.0
-
-* **renamed:** `connectedSystemDevices` -> `systemDevices`, because they must be re-connected by *your* app.
-
-## 1.20.3
-
- **Caution:** this release introduces a new function called `connectedDevices`. Before `1.11.0`, there used to be a function with this same name. That older function has since been renamed to `systemDevices`.
-
-## 1.21.0
-
-* **Behavior Change:** only allow a single ble operation at a time.
-
-This change was made to increase reliability, at the cost of throughput.
-
-## 1.22.0
-
-* **Breaking Change:** on android, we now request an mtu of 512 by default during connection.
-
-## 1.22.1 to 1.26.0
-These releases changed multiple things but then changed them back. For brevity, here are the actual changes:
-* **[Behavior Change]** android: always listen to Services Changed characteristic, to match iOS behavior
-* **[Rename]** `device.onServicesChanged` -> `device.onServicesReset`
-* **[Remove]** `device.onNameChanged`, in favor of only exposing `events.onNameChanged`
-* **[Rename]** events api: most functions & classes were renamed for consistency
-
-## 1.27.0
-
-* **[Breaking Change]** scanning: `continousUpdates` is now false by default - it is not typically needed & hurts perf. 
-
-If your app uses `startScan.removeIfGone`, or your app continually checks the value of `scanResult.timestamp` or `scanResult.rssi`, then you will need to explicitly set `continousUpdates` to true.
-
-## 1.27.2
-
-* **[Rename]** `advertisementData.localName` -> `advertisementData.advName`
-
-## 1.28.0
-
-* **[Breaking Change]** `guid.toString()` now returns 16-bit short uuid when possibe
-* **[Breaking Change]** use GUID for `advertisingData.serviceUuids` & `advertisingData.serviceData` instead of String
-
-## 1.29.0
-
-* **[Breaking Change]** scanResults: do not clear results after `stopScan`. If you want results cleared, use `onScanResults` instead.
+- **`device.connect()`** no longer takes `autoConnect`; it's `connect({timeout, mtu})`.
+- **`FlutterBluePlus.events`** is now **`Bluebird.events`** (same event classes).
+- Everything else on `BluetoothDevice` — `disconnect()`, `discoverServices()`,
+  `readRssi()`, `requestMtu()`, `connectionState`, `mtu`, `bondState`,
+  `createBond()`, `removeBond()`, `clearGattCache()`, `setPreferredPhy()`,
+  `requestConnectionPriority()` — and `Bluebird.connectedDevices`,
+  `systemDevices()`, `bondedDevices`, `turnOn()`, `setOptions()`,
+  `setLogLevel()`, `isSupported` keep the same names.

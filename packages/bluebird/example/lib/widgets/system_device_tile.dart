@@ -1,27 +1,21 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:bluebird/bluebird.dart';
+import 'package:flutter/material.dart';
 
 class SystemDeviceTile extends StatefulWidget {
   final BluetoothDevice device;
   final VoidCallback onOpen;
   final VoidCallback onConnect;
 
-  const SystemDeviceTile({
-    required this.device,
-    required this.onOpen,
-    required this.onConnect,
-    Key? key,
-  }) : super(key: key);
+  const SystemDeviceTile({required this.device, required this.onOpen, required this.onConnect, Key? key})
+    : super(key: key);
 
   @override
   State<SystemDeviceTile> createState() => _SystemDeviceTileState();
 }
 
 class _SystemDeviceTileState extends State<SystemDeviceTile> {
-  BluetoothConnectionState _connectionState = BluetoothConnectionState.disconnected;
-
   late StreamSubscription<BluetoothConnectionState> _connectionStateSubscription;
 
   @override
@@ -29,7 +23,6 @@ class _SystemDeviceTileState extends State<SystemDeviceTile> {
     super.initState();
 
     _connectionStateSubscription = widget.device.connectionState.listen((state) {
-      _connectionState = state;
       if (mounted) {
         setState(() {});
       }
@@ -42,19 +35,57 @@ class _SystemDeviceTileState extends State<SystemDeviceTile> {
     super.dispose();
   }
 
-  bool get isConnected {
-    return _connectionState == BluetoothConnectionState.connected;
+  bool get isConnected => widget.device.isConnected;
+
+  Widget _buildField(BuildContext context, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          SizedBox(width: 120.0, child: Text(label, style: Theme.of(context).textTheme.bodySmall)),
+          const SizedBox(width: 12.0),
+          Expanded(
+            child: Text(
+              value,
+              style: Theme.of(context).textTheme.bodySmall?.apply(color: Colors.black),
+              softWrap: true,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
+    // An ExpansionTile (like ScanResultTile) so the row is hoverable and can
+    // reveal the few fields a system device has.
+    return ExpansionTile(
+      // same 42px width as ScanResultTile's RSSI widget, so the columns align;
+      // a system device has no advertisement/RSSI, so show a "system" icon instead
+      leading: SizedBox(
+        width: 42,
+        child: Center(
+          child: Tooltip(
+            message: 'System device (connected via the OS, not discovered by scanning)',
+            child: Icon(Icons.settings_bluetooth, color: Colors.blueGrey.shade400),
+          ),
+        ),
+      ),
       title: Text(widget.device.platformName),
       subtitle: Text(widget.device.remoteId),
-      trailing: ElevatedButton(
+      trailing: OutlinedButton(
         child: isConnected ? const Text('OPEN') : const Text('CONNECT'),
         onPressed: isConnected ? widget.onOpen : widget.onConnect,
       ),
+      children: <Widget>[
+        _buildField(context, 'Remote ID', widget.device.remoteId),
+        if (widget.device.platformName.isNotEmpty) _buildField(context, 'Name', widget.device.platformName),
+        _buildField(context, 'Status', isConnected ? 'Connected' : 'Not connected to this app'),
+        if (isConnected) _buildField(context, 'MTU', '${widget.device.mtu.value} bytes'),
+        _buildField(context, 'Note', 'System device — connected via the OS, so it has no advertisement/RSSI data.'),
+      ],
     );
   }
 }

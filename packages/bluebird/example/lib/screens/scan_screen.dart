@@ -98,8 +98,7 @@ class _ScanScreenState extends State<ScanScreen> {
       return;
     }
     if (!mounted) return;
-    MaterialPageRoute route = MaterialPageRoute(
-        builder: (context) => DeviceScreen(device: device), settings: RouteSettings(name: '/DeviceScreen'));
+    MaterialPageRoute route = MaterialPageRoute(builder: (context) => DeviceScreen(device: device));
     Navigator.of(context).push(route);
   }
 
@@ -134,7 +133,6 @@ class _ScanScreenState extends State<ScanScreen> {
             onOpen: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (context) => DeviceScreen(device: d),
-                settings: RouteSettings(name: '/DeviceScreen'),
               ),
             ),
             onConnect: () => onConnectPressed(d),
@@ -160,16 +158,41 @@ class _ScanScreenState extends State<ScanScreen> {
       key: Snackbar.snackBarKeyB,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Bluebird'),
+          centerTitle: false,
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset('assets/bluebird-icon.png', height: 28),
+              const SizedBox(width: 8),
+              const Text('Bluebird'),
+            ],
+          ),
         ),
         body: RefreshIndicator(
           onRefresh: onRefresh,
-          child: ListView(
-            children: <Widget>[
-              ..._buildSystemDeviceTiles(context),
-              ..._buildScanResultTiles(context),
-            ],
-          ),
+          child: (_systemDevices.isEmpty && _scanResults.isEmpty)
+              ? ListView(
+                  // keep it scrollable so pull-to-refresh still works when empty
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 96, bottom: 16),
+                      child: Center(child: Image.asset('assets/bluebird.png', height: 180)),
+                    ),
+                    Center(
+                      child: Text(
+                        'Tap Scan to find nearby devices',
+                        style: TextStyle(color: Theme.of(context).hintColor),
+                      ),
+                    ),
+                  ],
+                )
+              : ListView(
+                  children: <Widget>[
+                    ..._buildSystemDeviceTiles(context),
+                    ..._buildScanResultTiles(context),
+                  ],
+                ),
         ),
         bottomNavigationBar: SafeArea(
           child: Padding(

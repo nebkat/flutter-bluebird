@@ -95,7 +95,6 @@ class _WebScanScreenState extends State<WebScanScreen> {
       if (!mounted) return;
       Navigator.of(context).push(MaterialPageRoute(
         builder: (context) => DeviceScreen(device: device),
-        settings: const RouteSettings(name: '/DeviceScreen'),
       ));
     } catch (e) {
       Snackbar.show(ABC.b, prettyException("Connect Error:", e), success: false);
