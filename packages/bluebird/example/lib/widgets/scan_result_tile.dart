@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:bluebird/bluebird.dart';
 import 'package:flutter/material.dart';
 
+import '../utils/manufacturer_ids.dart';
+
 class ScanResultTile extends StatefulWidget {
   const ScanResultTile({Key? key, required this.result, this.onTap}) : super(key: key);
 
@@ -39,9 +41,14 @@ class _ScanResultTileState extends State<ScanResultTile> {
 
   String _hex16(int id) => '0x${id.toRadixString(16).padLeft(4, '0').toUpperCase()}';
 
-  // manufacturerData maps a 16-bit company id to its payload
+  // manufacturerData maps a 16-bit company id to its payload; append the SIG
+  // company name in brackets when the id is a known assigned number
   String getNiceManufacturerData(Map<int, List<int>> data) {
-    return data.entries.map((e) => '${_hex16(e.key)} ${getNiceHexArray(e.value)}').join('\n');
+    return data.entries.map((e) {
+      final name = manufacturerIds[e.key];
+      final id = name != null ? '${_hex16(e.key)} ($name)' : _hex16(e.key);
+      return '$id ${getNiceHexArray(e.value)}';
+    }).join('\n');
   }
 
   String getNiceServiceData(Map<Uuid, List<int>> data) {
