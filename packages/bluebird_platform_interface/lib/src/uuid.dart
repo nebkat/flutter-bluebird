@@ -39,10 +39,13 @@ class Uuid {
           .toLowerCase(),
   };
 
-  // Shortest representation
+  // Shortest representation: a 16-bit SIG assigned number collapses to its
+  // 4-hex short code whether it is stored as 2 bytes or as the full 128-bit
+  // SIG-base form (`0000xxxx-0000-1000-8000-00805f9b34fb`); a genuine 128-bit
+  // uuid stays full.
   String get string => switch (bytes.length) {
     2 || 4 => bytes.toHexString(),
-    _ => string128,
+    _ => _sigShortCode?.toRadixString(16).padLeft(4, '0') ?? string128,
   };
 
   /// The human-readable name of this UUID if it is a well-known Bluetooth SIG

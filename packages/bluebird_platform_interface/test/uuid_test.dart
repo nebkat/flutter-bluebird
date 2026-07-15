@@ -46,6 +46,8 @@ void main() {
       expect(Uuid('180a').string, '180a');
       expect(Uuid('180a').string128, '0000180a-0000-1000-8000-00805f9b34fb');
       expect(Uuid('0000180a').string, '0000180a');
+      // a 128-bit uuid on the SIG base collapses to its 16-bit short code
+      expect(Uuid('0000180a-0000-1000-8000-00805f9b34fb').string, '180a');
       final full = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
       expect(Uuid(full).string, full);
       expect(Uuid(full).string128, full);
