@@ -97,6 +97,7 @@ void main() {
     // a disconnect invalidates held attributes; using one blames the disconnect,
     // not a re-discovery
     device.applyEvent(connEvent(BluetoothConnectionState.disconnected));
+    expect(device.services, isEmpty);
     expect(char.isValid, isFalse);
     await expectLater(
       char.read(),

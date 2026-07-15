@@ -446,10 +446,11 @@ class BluetoothDevice {
           }
 
           // A disconnect invalidates the whole GATT tree — the handles are only
-          // valid within a connection. Bump the discovery generation so held
-          // attributes report as stale (their ops then surface "device is not
-          // connected"; see BluetoothAttribute.requireValid). We keep `_services`
-          // itself (and `_bondState`) so they stay inspectable after a disconnect.
+          // valid within a connection. Clear `_services` and bump the discovery
+          // generation, so `device.services` is empty and any still-held attribute
+          // reports as stale (its ops then surface "device is not connected"; see
+          // BluetoothAttribute.requireValid) until the next discoverServices().
+          _services = [];
           _discovery = DateTime.now();
         }
 
