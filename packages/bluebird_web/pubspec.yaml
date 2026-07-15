@@ -13,7 +13,7 @@ resolution: workspace
 dependencies:
   flutter:
     sdk: flutter
-  bluebird_platform_interface: 0.1.0
+  bluebird_platform_interface: ^0.1.0
   flutter_web_plugins:
     sdk: flutter
   web: '>=0.5.0 <2.0.0'

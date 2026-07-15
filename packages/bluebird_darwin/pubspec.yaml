@@ -13,7 +13,7 @@ resolution: workspace
 dependencies:
   flutter:
     sdk: flutter
-  bluebird_platform_interface: 0.1.0
+  bluebird_platform_interface: ^0.1.0
 
 dev_dependencies:
   flutter_lints: ^6.0.0
