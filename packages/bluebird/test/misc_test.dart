@@ -45,18 +45,6 @@ void main() {
     });
   });
 
-  group('StreamControllerReEmit', () {
-    test('re-emits the latest value to new listeners', () async {
-      final c = StreamControllerReEmit<int>(initialValue: 0);
-      c.add(1);
-      c.add(2);
-      expect(c.value, 2);
-      expect(await c.stream.first, 2); // late listener still sees the latest
-      c.add(3);
-      expect(await c.stream.first, 3);
-    });
-  });
-
   group('ScanResult', () {
     ScanResult result(String addr, {String? advName, String? platformName, int rssi = -60}) =>
         ScanResult.fromProto(bmAdv(addr, advName: advName, platformName: platformName, rssi: rssi));

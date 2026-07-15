@@ -30,8 +30,15 @@ class Bluebird {
   );
 
   /// tracks whether a [scan] is currently running (also the guard that prevents
-  /// two concurrent scans on the single radio)
-  static final _isScanning = StreamControllerReEmit<bool>(initialValue: false);
+  /// two concurrent scans on the single radio). Scanning is driven entirely by
+  /// us (not the platform), so we own the value and re-emit it via [isScanning].
+  static bool _isScanningNow = false;
+  static final _isScanningController = StreamController<bool>.broadcast();
+
+  static void _setScanning(bool value) {
+    _isScanningNow = value;
+    _isScanningController.add(value);
+  }
 
   /// the last known adapter state
   static BluetoothAdapterState? _adapterStateNow;
@@ -45,7 +52,7 @@ class Bluebird {
   static void resetForTest() {
     _devices.clear();
     _adapterStateNow = null;
-    _isScanning.add(false);
+    _setScanning(false);
     _logLevel = LogLevel.debug;
     _initialized = false;
   }
@@ -65,7 +72,8 @@ class Bluebird {
   /// whether a [scan] is currently running, as a stream that also exposes the
   /// current value:
   ///   - `Bluebird.isScanning.value` is `true` if scanning right now
-  static ValueStream<bool> get isScanning => _isScanning.stream;
+  static ValueStream<bool> get isScanning =>
+      ValueStream(value: () => _isScanningNow, changes: () => _isScanningController.stream);
 
   /// The raw stream of all app-level events, of every type.
   ///   - [BluebirdEvent] is `sealed`, so you can `switch` over it exhaustively,
@@ -200,10 +208,10 @@ class Bluebird {
     }
 
     // one scan at a time — claim synchronously so concurrent listens can't race
-    if (_isScanning.value) {
+    if (_isScanningNow) {
       throw BluebirdException("scan", BluebirdErrorCode.operationInProgress, "a scan is already in progress");
     }
-    _isScanning.add(true);
+    _setScanning(true);
 
     final settings = BmScanSettings(
       withServices: withServices.map((s) => s.string).toList(),
@@ -262,7 +270,7 @@ class Bluebird {
         // a new scan can't start before this one's stopScan lands
         if (started && !nativeScanDead) await invoke("stopScan", (p) => p.stopScan());
       } finally {
-        _isScanning.add(false);
+        _setScanning(false);
       }
     }
   }

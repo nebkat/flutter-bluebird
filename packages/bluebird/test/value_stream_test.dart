@@ -4,43 +4,6 @@ import 'package:bluebird/src/utils.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('StreamControllerReEmit', () {
-    test('caches the latest value and re-emits it on listen', () async {
-      final s = StreamControllerReEmit<int>(initialValue: 0);
-      expect(s.value, 0);
-
-      s.add(1);
-      expect(s.value, 1);
-
-      // a late listener still sees the latest value first, then changes
-      final events = <int>[];
-      final sub = s.stream.listen(events.add);
-      await pumpEventQueue();
-      expect(events, [1]);
-
-      s.add(2);
-      await pumpEventQueue();
-      expect(events, [1, 2]);
-
-      await sub.cancel();
-      await s.close();
-    });
-
-    test('addError forwards errors to listeners', () async {
-      final s = StreamControllerReEmit<int>(initialValue: 0);
-      Object? captured;
-      final sub = s.stream.listen((_) {}, onError: (Object e) => captured = e);
-      await pumpEventQueue();
-
-      s.addError(StateError('boom'));
-      await pumpEventQueue();
-      expect(captured, isStateError);
-
-      await sub.cancel();
-      await s.close();
-    });
-  });
-
   group('ValueStream', () {
     test('value reads synchronously and listen re-emits it first', () async {
       final ctrl = StreamController<int>.broadcast();

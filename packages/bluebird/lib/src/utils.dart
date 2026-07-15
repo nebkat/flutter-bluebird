@@ -53,33 +53,6 @@ extension FutureGuards<T> on Future<T> {
   );
 }
 
-// This is a reimplementation of BehaviorSubject from RxDart library.
-// It is essentially a stream but:
-//  1. we cache the latestValue of the stream
-//  2. the "latestValue" is re-emitted whenever the stream is listened to
-class StreamControllerReEmit<T> {
-  T latestValue;
-
-  final StreamController<T> _controller = StreamController<T>.broadcast();
-
-  StreamControllerReEmit({required T initialValue}) : latestValue = initialValue;
-
-  /// A [ValueStream] view: `.value` reads [latestValue], listening re-emits it
-  /// then streams subsequent changes.
-  ValueStream<T> get stream => ValueStream(value: () => latestValue, changes: () => _controller.stream);
-
-  T get value => latestValue;
-
-  void add(T newValue) {
-    latestValue = newValue;
-    _controller.add(newValue);
-  }
-
-  void addError(Object error) => _controller.addError(error);
-
-  Future<void> close() => _controller.close();
-}
-
 /// A [Stream] that also exposes its current [value] synchronously.
 ///
 /// Modeled on rxdart's `ValueStream`/`BehaviorSubject`: listening re-emits the
