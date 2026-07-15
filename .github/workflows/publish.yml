@@ -1,24 +1,22 @@
-# Publishes a single package to pub.dev via OIDC (no long-lived token).
+# Publishes every package to pub.dev via OIDC (no long-lived token) on a
+# `vX.Y.Z` tag. Lockstep: one version for the whole repo, one tag, all packages
+# published together in dependency order.
 #
-# One-time setup, per package, on pub.dev:
+# One-time pub.dev setup, PER package:
 #   Admin -> Automated publishing -> Enable publishing from GitHub Actions
-#     repository:   nebkat/flutter-bluebird
-#     tag pattern:  {{package}}/v{{version}}   (e.g. bluebird/v0.1.0)
+#     repository:  nebkat/flutter-bluebird
+#     tag pattern: v{{version}}          (the same pattern for every package)
 # and create a GitHub environment named `pub.dev` (Settings -> Environments).
 #
-# Tags use hyphens and a `/v` separator: `<hyphenated-package>/v<version>`. Because
-# packages depend on each other, publish in dependency order and wait for each to
-# appear on pub.dev before the next:
-#   bluebird-platform-interface/v0.1.0
-#   bluebird-android/v0.1.0 / bluebird-darwin/v0.1.0 / bluebird-web/v0.1.0
-#   bluebird/v0.1.0
+# Cut a release with `tool/release.sh <version>` (bumps every package + tag), then
+# push the tag.
 
 name: publish
 
 on:
   push:
     tags:
-      - '*/v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+'
 
 jobs:
   publish:
@@ -31,17 +29,13 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-      - name: Resolve package directory from tag
-        id: pkg
-        run: |
-          # tag is <hyphenated-name>/v<version>, e.g. bluebird-platform-interface/v0.1.0
-          name="${GITHUB_REF_NAME%/v*}"   # -> bluebird-platform-interface
-          name="${name//-/_}"             # -> bluebird_platform_interface (package dir)
-          echo "dir=packages/${name}" >> "$GITHUB_OUTPUT"
-          echo "Publishing '${name}' from packages/${name}"
       - name: Install dependencies
-        working-directory: ${{ steps.pkg.outputs.dir }}
         run: flutter pub get
-      - name: Publish
-        working-directory: ${{ steps.pkg.outputs.dir }}
-        run: flutter pub publish --force
+      - name: Publish all packages in dependency order
+        run: |
+          set -e
+          for pkg in bluebird_platform_interface bluebird_android bluebird_darwin bluebird_web bluebird; do
+            echo "::group::publish ${pkg}"
+            (cd "packages/${pkg}" && flutter pub publish --force)
+            echo "::endgroup::"
+          done
