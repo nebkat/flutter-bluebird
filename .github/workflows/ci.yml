@@ -36,8 +36,10 @@ jobs:
           set -e
           for p in packages/*/; do
             if [ -f "${p}coverage/lcov.info" ]; then
-              echo "== genhtml ${p}coverage/lcov.info =="
-              genhtml "${p}coverage/lcov.info" --output-directory "${p}coverage/html" --quiet
+              echo "== genhtml ${p} =="
+              # run inside the package so lcov.info's package-relative source
+              # paths (lib/src/...) resolve; --ignore-errors source is a safety net
+              (cd "$p" && genhtml coverage/lcov.info --output-directory coverage/html --ignore-errors source --quiet)
             fi
           done
       - name: Upload coverage artifact
