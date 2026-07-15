@@ -95,5 +95,23 @@ void main() {
       final ref = BmCharacteristicRef(service: secSvc.bm, characteristic: attr('c001'));
       expect(device.characteristicForRef(ref).uuid, Uuid('c001'));
     });
+
+    test('an unresolvable included-service ref throws serviceNotFound', () async {
+      final primary = bmService('a000', characteristics: [bmChar('b001')], includedServices: [
+        BmServiceRef(service: attr('a999')), // references a service that was not discovered
+      ]);
+      await expectLater(
+        discover([primary]),
+        throwsA(isA<BluebirdException>().having((e) => e.code, 'code', BluebirdErrorCode.serviceNotFound)),
+      );
+    });
+
+    test('service toString includes its type label and fields', () async {
+      await discover([bmService('a000', characteristics: [bmChar('b001')])]);
+      final s = device.services.single.toString();
+      expect(s, startsWith('BluetoothService{'));
+      expect(s, contains('uuid: a000'));
+      expect(s, contains('isPrimary: true'));
+    });
   });
 }
