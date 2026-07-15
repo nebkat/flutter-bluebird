@@ -15,8 +15,6 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-      - name: Install lcov (for the coverage HTML report)
-        run: sudo apt-get update && sudo apt-get install -y lcov
       - name: Install dependencies
         run: flutter pub get
       - name: Analyze
@@ -30,31 +28,20 @@ jobs:
               (cd "$p" && flutter test --coverage)
             fi
           done
-      - name: Generate combined HTML coverage report
-        if: always()
+      - name: Merge coverage into a single lcov (repo-relative paths)
         run: |
           set -e
-          lcovs=()
+          : > coverage.lcov
           for p in packages/*/; do
             f="${p}coverage/lcov.info"
             if [ -f "$f" ]; then
               # rewrite package-relative source paths (lib/src/...) to repo-relative
-              # (packages/<pkg>/lib/src/...) so one report can span every package
-              # without path collisions and genhtml can resolve the sources
-              sed -i "s#^SF:#SF:${p}#" "$f"
-              cp "$f" "coverage-lcov-$(basename "$p").info"
-              lcovs+=("$f")
+              # (packages/<pkg>/lib/src/...) so Coveralls maps them to the repo
+              sed "s#^SF:#SF:${p}#" "$f" >> coverage.lcov
             fi
           done
-          if [ ${#lcovs[@]} -gt 0 ]; then
-            genhtml "${lcovs[@]}" --output-directory coverage-html --ignore-errors source --quiet
-            cp coverage-lcov-*.info coverage-html/
-          fi
-      - name: Upload coverage artifact
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Upload coverage to Coveralls
+        uses: coverallsapp/github-action@v2
         with:
-          name: coverage
-          # artifact root is the report itself, so index.html sits at the top
-          path: coverage-html
-          if-no-files-found: warn
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          file: coverage.lcov
