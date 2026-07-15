@@ -15,16 +15,35 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+      - name: Install lcov (for the coverage HTML report)
+        run: sudo apt-get update && sudo apt-get install -y lcov
       - name: Install dependencies
         run: flutter pub get
       - name: Analyze
         run: flutter analyze
-      - name: Test
+      - name: Test with coverage
         run: |
           set -e
           for p in packages/*/; do
             if [ -d "${p}test" ]; then
-              echo "== flutter test ${p} =="
-              (cd "$p" && flutter test)
+              echo "== flutter test --coverage ${p} =="
+              (cd "$p" && flutter test --coverage)
             fi
           done
+      - name: Generate HTML coverage report
+        if: always()
+        run: |
+          set -e
+          for p in packages/*/; do
+            if [ -f "${p}coverage/lcov.info" ]; then
+              echo "== genhtml ${p}coverage/lcov.info =="
+              genhtml "${p}coverage/lcov.info" --output-directory "${p}coverage/html" --quiet
+            fi
+          done
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: packages/*/coverage
+          if-no-files-found: warn
