@@ -162,18 +162,24 @@ class _ScanScreenState extends State<ScanScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // the empty state already shows the big logo, so hide the app bar until a
+    // scan has started (or produced results)
+    final hasDevices = _systemDevices.isNotEmpty || _scanResults.isNotEmpty;
+    final showAppBar = _isScanning || hasDevices;
     return Scaffold(
-      appBar: AppBar(
-        centerTitle: false,
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset('assets/bluebird-icon.png', height: 28),
-            const SizedBox(width: 8),
-            const Text('Bluebird'),
-          ],
-        ),
-      ),
+      appBar: showAppBar
+          ? AppBar(
+              centerTitle: false,
+              title: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset('assets/bluebird-icon.png', height: 28),
+                  const SizedBox(width: 8),
+                  const Text('bluebird'),
+                ],
+              ),
+            )
+          : null,
       body: RefreshIndicator(
         onRefresh: onRefresh,
         child: (_systemDevices.isEmpty && _scanResults.isEmpty)
