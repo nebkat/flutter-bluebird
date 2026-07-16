@@ -146,7 +146,7 @@ class _CharacteristicTileState extends State<CharacteristicTile> {
 
   Widget buildUuid(BuildContext context) {
     String uuid = '0x${widget.characteristic.uuid.string.toUpperCase()}';
-    return Text(uuid, style: TextStyle(fontSize: 13));
+    return Text(uuid, style: Theme.of(context).textTheme.bodySmall);
   }
 
   Widget buildValue(BuildContext context) {
@@ -159,7 +159,7 @@ class _CharacteristicTileState extends State<CharacteristicTile> {
         // not valid UTF-8 — fall back to the byte view
       }
     }
-    return Text(data, style: TextStyle(fontSize: 13, color: Colors.grey));
+    return Text(data, style: Theme.of(context).textTheme.bodySmall);
   }
 
   Widget buildReadButton(BuildContext context) {

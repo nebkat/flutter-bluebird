@@ -36,15 +36,26 @@ class BluebirdApp extends StatelessWidget {
           screen = kIsWeb ? const WebScanScreen() : const ScanScreen();
         } else if (kIsWeb &&
             adapterState == BluetoothAdapterState.unavailable) {
-          // on web `unavailable` means the browser can't do Web Bluetooth, not
-          // that an adapter is switched off — send them to the right message
+          // On web `unavailable` means the browser can't do Web Bluetooth, not
+          // that an adapter is switched off - send them to the right message
           screen = const WebUnsupportedScreen();
         } else {
           screen = BluetoothOffScreen(adapterState: adapterState);
         }
 
         return MaterialApp(
-          color: Colors.lightBlue,
+          title: 'bluebird',
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+          ),
+          darkTheme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Colors.blue,
+              brightness: Brightness.dark,
+            ),
+          ),
+          // follow the OS light/dark setting
+          themeMode: ThemeMode.system,
           scaffoldMessengerKey: Snackbar.messengerKey,
           home: screen,
         );

@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:bluebird/bluebird.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:bluebird/bluebird.dart';
 
 import '../utils/extra.dart';
 import '../utils/snackbar.dart';
@@ -25,7 +25,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
   int? _mtuSize;
   BluetoothConnectionState _connectionState =
       BluetoothConnectionState.disconnected;
-  List<BluetoothService> _services = [];
+  List<BluetoothService> get _services => widget.device.services;
   bool _isDiscoveringServices = false;
   bool _isConnecting = false;
   bool _isDisconnecting = false;
@@ -45,10 +45,10 @@ class _DeviceScreenState extends State<DeviceScreen> {
       state,
     ) async {
       _connectionState = state;
-      if (state == BluetoothConnectionState.connected) {
-        _services = []; // must rediscover services
-      }
-      if (state == BluetoothConnectionState.connected && _rssi == null) {
+      // web can't read RSSI after connecting, so don't try
+      if (!kIsWeb &&
+          state == BluetoothConnectionState.connected &&
+          _rssi == null) {
         _rssi = await widget.device.readRssi();
       }
       if (mounted) {
@@ -143,11 +143,11 @@ class _DeviceScreenState extends State<DeviceScreen> {
       });
     }
     try {
-      _services = await widget.device.discoverServices();
-      Snackbar.show("Discover Services: Success", success: true);
+      await widget.device.discoverServices();
+      Snackbar.show("Discover services: Success", success: true);
     } catch (e) {
       Snackbar.show(
-        prettyException("Discover Services Error:", e),
+        prettyException("Discover services: Error:", e),
         success: false,
       );
       print(e);
@@ -212,30 +212,36 @@ class _DeviceScreenState extends State<DeviceScreen> {
           isConnected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
           color: isConnected ? Colors.blue : Colors.grey,
         ),
-        const SizedBox(width: 12),
-        SizedBox(
-          width: 64,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                live ? '$rssi dBm' : '—',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 4),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(2),
-                child: LinearProgressIndicator(
-                  value: strength,
-                  minHeight: 6,
-                  backgroundColor: Colors.grey.shade300,
-                  valueColor: AlwaysStoppedAnimation<Color>(color),
+        // web can't read RSSI post-connection, so show only the icon there
+        if (!kIsWeb) ...[
+          const SizedBox(width: 12),
+          SizedBox(
+            width: 64,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // only show a reading while connected; otherwise just the bar
+                if (live) ...[
+                  Text(
+                    '$rssi dBm',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 4),
+                ],
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: LinearProgressIndicator(
+                    value: strength,
+                    minHeight: 6,
+                    backgroundColor: Colors.grey.shade300,
+                    valueColor: AlwaysStoppedAnimation<Color>(color),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -292,8 +298,12 @@ class _DeviceScreenState extends State<DeviceScreen> {
                     ? 'Cancel'
                     : (isConnected ? 'Disconnect' : 'Connect'),
               ),
+              // destructive: error colors keep the label readable in light/dark
               style: isConnected
-                  ? FilledButton.styleFrom(backgroundColor: Colors.red)
+                  ? FilledButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                      foregroundColor: Theme.of(context).colorScheme.onError,
+                    )
                   : null,
               onPressed: _isConnecting
                   ? onCancelPressed

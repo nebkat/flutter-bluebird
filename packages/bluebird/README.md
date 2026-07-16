@@ -18,7 +18,12 @@ A Bluetooth Low Energy (BLE) plugin for Flutter.
 - Comprehensively tested
 - Permissive license ([BSD-3](./LICENSE))
 
-Migrating from [FlutterBluePlus](https://pub.dev/packages/flutter_blue_plus)? Check out the [migration guide](https://github.com/nebkat/flutter-bluebird/blob/main/MIGRATION.md).
+> [!TIP]
+> **Try the demo** [in your browser](https://nebkat.github.io/flutter-bluebird/) or download the Android
+demo APK from the [latest release](https://github.com/nebkat/flutter-bluebird/releases/latest).
+
+> [!IMPORTANT]
+> Migrating from [FlutterBluePlus](https://pub.dev/packages/flutter_blue_plus)? Check out the [migration guide](https://github.com/nebkat/flutter-bluebird/blob/main/MIGRATION.md).
 
 ## Quick Start
 
@@ -119,6 +124,10 @@ Bluebird ships with an example app that is useful for debugging issues.
 cd ./example
 flutter run
 ```
+
+You can also try it without building anything:
+- **Web:** live at [nebkat.github.io/flutter-bluebird](https://nebkat.github.io/flutter-bluebird/) (Chrome/Edge — Web Bluetooth is Chromium-only).
+- **Android:** download the demo APK attached to the [latest release](https://github.com/nebkat/flutter-bluebird/releases/latest).
 
 ## Project Setup
 

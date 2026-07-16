@@ -127,8 +127,12 @@ class _ScanScreenState extends State<ScanScreen> {
       child: FilledButton.icon(
         icon: Icon(scanning ? Icons.stop : Icons.bluetooth_searching),
         label: Text(scanning ? 'Stop' : 'Scan'),
+        // stop is destructive: error colors keep the label readable in light/dark
         style: scanning
-            ? FilledButton.styleFrom(backgroundColor: Colors.red)
+            ? FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+                foregroundColor: Theme.of(context).colorScheme.onError,
+              )
             : null,
         onPressed: scanning ? onStopPressed : onScanPressed,
       ),

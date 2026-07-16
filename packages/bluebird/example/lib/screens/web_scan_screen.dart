@@ -205,11 +205,19 @@ class _ServiceSelectorState extends State<_ServiceSelector> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Autocomplete<String>(
-          optionsBuilder: (value) => value.text.isEmpty
-              ? const Iterable<String>.empty()
-              : _knownServices.keys.where(
-                  (n) => n.toLowerCase().contains(value.text.toLowerCase()),
-                ),
+          // match on the name or the UUID (short or full form), so typing
+          // "battery", "180f", or "0000180f-…" all surface the same service
+          optionsBuilder: (value) {
+            final q = value.text.trim().toLowerCase();
+            if (q.isEmpty) return const Iterable<String>.empty();
+            return _knownServices.entries
+                .where(
+                  (e) =>
+                      e.key.toLowerCase().contains(q) ||
+                      e.value.string128.toLowerCase().contains(q),
+                )
+                .map((e) => e.key);
+          },
           fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
             _controller = controller;
             return TextField(

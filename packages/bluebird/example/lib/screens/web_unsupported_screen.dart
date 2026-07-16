@@ -32,21 +32,21 @@ class WebUnsupportedScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  "Web Bluetooth isn't available here",
+                  "Web Bluetooth isn't available",
                   textAlign: TextAlign.center,
                   style: theme.textTheme.titleLarge,
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'This demo needs the Web Bluetooth API, which is only supported '
-                  'in Chromium-based browsers — Chrome, Edge, or Opera — served '
+                  'This demo requires the Web Bluetooth API, which is only supported '
+                  'by Chromium-based browsers (Chrome, Edge, or Opera) when served '
                   'over HTTPS.',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Firefox and Safari do not support it.',
+                  'Firefox and Safari are not supported.',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.hintColor,

@@ -58,9 +58,7 @@ class _SystemDeviceTileState extends State<SystemDeviceTile> {
           Expanded(
             child: Text(
               value,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.apply(color: Colors.black),
+              style: Theme.of(context).textTheme.bodySmall,
               softWrap: true,
             ),
           ),
@@ -82,19 +80,19 @@ class _SystemDeviceTileState extends State<SystemDeviceTile> {
           child: Tooltip(
             message:
                 'System device (connected via the OS, not discovered by scanning)',
-            child: Icon(
-              Icons.settings_bluetooth,
-              color: Colors.blueGrey.shade400,
-            ),
+            child: const Icon(Icons.settings_bluetooth),
           ),
         ),
       ),
       title: Text(widget.device.platformName),
       subtitle: Text(widget.device.remoteId),
-      trailing: OutlinedButton(
-        child: isConnected ? const Text('OPEN') : const Text('CONNECT'),
-        onPressed: isConnected ? widget.onOpen : widget.onConnect,
-      ),
+      // tonal connect (lesser than a scanned device's primary), outlined open
+      trailing: isConnected
+          ? OutlinedButton(onPressed: widget.onOpen, child: const Text('OPEN'))
+          : FilledButton.tonal(
+              onPressed: widget.onConnect,
+              child: const Text('CONNECT'),
+            ),
       children: <Widget>[
         _buildField(context, 'Remote ID', widget.device.remoteId),
         if (widget.device.platformName.isNotEmpty)

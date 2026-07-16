@@ -171,16 +171,13 @@ class _ScanResultTileState extends State<ScanResultTile> {
   }
 
   Widget _buildConnectButton(BuildContext context) {
-    return ElevatedButton(
-      child: isConnected ? const Text('OPEN') : const Text('CONNECT'),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-      ),
-      onPressed: (widget.result.advertisementData.connectable)
-          ? widget.onTap
-          : null,
-    );
+    final onPressed = widget.result.advertisementData.connectable
+        ? widget.onTap
+        : null;
+    // primary filled to connect; outlined (lighter) to open once connected
+    return isConnected
+        ? OutlinedButton(onPressed: onPressed, child: const Text('OPEN'))
+        : FilledButton(onPressed: onPressed, child: const Text('CONNECT'));
   }
 
   Widget _buildAdvRow(BuildContext context, String title, String value) {
@@ -198,9 +195,7 @@ class _ScanResultTileState extends State<ScanResultTile> {
           Expanded(
             child: Text(
               value,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.apply(color: Colors.black),
+              style: Theme.of(context).textTheme.bodySmall,
               softWrap: true,
             ),
           ),
