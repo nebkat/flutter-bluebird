@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'dart:core';
-import 'dart:io';
 
 import 'package:bluebird_platform_interface/bluebird_platform_interface.dart';
 import 'package:flutter/foundation.dart';
 
 import 'bluebird.dart';
 import 'bluetooth_device.dart';
+// `dart:io` is native-only; the web variant keeps it out of the web/wasm build.
+import 'platform_web.dart' if (dart.library.io) 'platform_io.dart';
 
 void ensurePlatform(bool valid, String function) {
   if (valid) return;
@@ -236,6 +237,7 @@ class Mutex {
   }
 }
 
+/// The host operating system, used to platform-gate internal calls.
 enum System {
   android,
   ios,
@@ -244,25 +246,8 @@ enum System {
   windows,
   web;
 
-  static System current = kIsWeb
-      ? System.web
-      : switch (Platform.operatingSystem) {
-          'android' => System.android,
-          'ios' => System.ios,
-          'linux' => System.linux,
-          'macos' => System.macos,
-          'windows' => System.windows,
-          _ => throw UnsupportedError('Unsupported platform: ${Platform.operatingSystem}'),
-        };
+  static System current = currentSystem;
 
-  static bool get isWeb => current == System.web;
   static bool get isAndroid => current == System.android;
-  static bool get isIOS => current == System.ios;
-  static bool get isLinux => current == System.linux;
-  static bool get isMacOS => current == System.macos;
-  static bool get isWindows => current == System.windows;
-
   static bool get isDarwin => current == System.macos || current == System.ios;
-  static bool get isMobile => current == System.android || current == System.ios;
-  static bool get isDesktop => current == System.linux || current == System.macos || current == System.windows;
 }

@@ -4,6 +4,7 @@
 - **Breaking:** renamed `Bluebird.setLogLevel` to `setPlatformLogLevel` (and `logLevel` to `platformLogLevel`) and removed its `color` argument. It now sets only the native logcat / os_log verbosity; Dart-side output is filtered with `Bluebird.logger.level`. Records are path-scoped (`[remoteId][service][characteristic] …`), with platform-channel call tracing at `Level.FINEST`.
 - **Breaking:** reworked error codes around ATT protocol errors. `BluebirdErrorCode.gattError`/`cbError` are replaced by `androidError`/`darwinError` (local stack or link failures) and `attError` (the peer answered with an ATT Error Response). A new `BluetoothAttException` — with `AttError` constants and `attError` — surfaces peer rejections with their raw one-octet code, uniformly across platforms.
 - `characteristic.notifications` and `characteristic.values` are now broadcast streams: several listeners share one notify enable, and notify is released when the last idle listener (e.g. a mobx `ObservableStream` or `StreamBuilder`) cancels.
+- Fixed Web/WASM compatibility: platform detection no longer pulls `dart:io` into the web build (it is now behind a conditional import), so the package is Web- and WASM-compatible.
 
 ## 0.1.0
 
