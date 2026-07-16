@@ -24,9 +24,9 @@ import 'package:bluebird/bluebird.dart';
 /// static; override them in a subclass or a mocking framework
 /// (e.g. [mocktail](https://pub.dev/packages/mocktail)).
 class BluebirdMockable {
-  LogLevel get logLevel => Bluebird.logLevel;
+  LogLevel get platformLogLevel => Bluebird.platformLogLevel;
 
-  Future<void> setLogLevel(LogLevel level, {bool color = true}) => Bluebird.setLogLevel(level, color: color);
+  Future<void> setPlatformLogLevel(LogLevel level) => Bluebird.setPlatformLogLevel(level);
 
   Future<bool> get isSupported => Bluebird.isSupported;
 

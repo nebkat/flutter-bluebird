@@ -116,6 +116,30 @@ try {
 }
 ```
 
+## Logging
+
+flutter_blue_plus had a single `setLogLevel` that also drove console output. In
+bluebird these are two separate concerns:
+
+- **`Bluebird.logger`** — a [`package:logging`](https://pub.dev/packages/logging)
+  `Logger` carrying all Dart-side logs. It is silent by default; attach your own
+  listener and pick a level (nothing is printed unless you do):
+
+  ```dart
+  Bluebird.logger.onRecord.listen((r) => debugPrint('${r.level.name} ${r.message}'));
+  Bluebird.logger.level = Level.INFO;
+  ```
+
+- **`Bluebird.setPlatformLogLevel(LogLevel.verbose)`** — the native/platform log
+  verbosity (Android logcat / Apple os_log) only. This replaces `setLogLevel`; the
+  old `color:` argument is gone. (Dart-side call tracing is separate — it logs to
+  `Bluebird.logger` at `Level.FINEST`.)
+
+| flutter_blue_plus | bluebird |
+| --- | --- |
+| `FlutterBluePlus.setLogLevel(level, color: …)` | `Bluebird.setPlatformLogLevel(level)` |
+| console `print` output (on by default) | attach `Bluebird.logger.onRecord.listen(...)` (off by default) |
+
 ## Other differences
 
 - **`device.connect()`** no longer takes `autoConnect`; it's `connect({timeout, mtu})`.
@@ -125,4 +149,4 @@ try {
   `createBond()`, `removeBond()`, `clearGattCache()`, `setPreferredPhy()`,
   `requestConnectionPriority()` — and `Bluebird.connectedDevices`,
   `systemDevices()`, `bondedDevices`, `turnOn()`, `setOptions()`,
-  `setLogLevel()`, `isSupported` keep the same names.
+  `isSupported` keep the same names.

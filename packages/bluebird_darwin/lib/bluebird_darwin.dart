@@ -7,8 +7,6 @@ final class BluebirdDarwin extends BluebirdPlatform {
   final _api = BluebirdHostApi();
 
   Future<void>? _restartFuture;
-  var _logLevel = LogLevel.none;
-  var _logColor = true;
 
   late final Stream<BmEvent> _events = nativeEvents().asBroadcastStream();
 
@@ -79,11 +77,7 @@ final class BluebirdDarwin extends BluebirdPlatform {
   Future<int> requestMtu(String address, int mtu) => _call('requestMtu', () => _api.requestMtu(address, mtu));
 
   @override
-  Future<void> setLogLevel(LogLevel level, {bool color = true}) async {
-    _logLevel = level;
-    _logColor = color;
-    await _api.setLogLevel(level);
-  }
+  Future<void> setLogLevel(LogLevel level) => _api.setLogLevel(level);
 
   @override
   Future<bool> setNotifyValue(String address, BmCharacteristicRef characteristic, bool enable) =>
@@ -127,17 +121,11 @@ final class BluebirdDarwin extends BluebirdPlatform {
 
   Future<T> _call<T>(String method, Future<T> Function() fn) async {
     await (_restartFuture ??= _flutterRestart());
-
-    if (_logLevel == LogLevel.verbose) {
-      _log('<$method>');
-    }
-
+    // Trace the round-trip at FINEST; the closures are built only if the logger
+    // is actually emitting that level, so this is free when traces are off.
+    BluebirdPlatform.logger.finest(() => '<$method>');
     final result = await fn();
-
-    if (_logLevel == LogLevel.verbose) {
-      _log('($method) result: $result');
-    }
-
+    BluebirdPlatform.logger.finest(() => '($method) result: $result');
     return result;
   }
 
@@ -150,9 +138,5 @@ final class BluebirdDarwin extends BluebirdPlatform {
         await Future.delayed(const Duration(milliseconds: 50));
       }
     }
-  }
-
-  void _log(String s) {
-    BluebirdPlatform.log(_logColor ? '[Bluebird] \x1B[1;30m$s\x1B[0m' : '[Bluebird] $s');
   }
 }

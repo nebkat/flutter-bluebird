@@ -4,7 +4,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'dart:async';
-import 'dart:math';
+import 'dart:math' show min;
 
 import 'package:bluebird_platform_interface/bluebird_platform_interface.dart';
 import 'package:flutter/foundation.dart';
@@ -20,8 +20,11 @@ import 'utils.dart';
 
 const int _mtuMax = 517;
 
-class BluetoothDevice {
+class BluetoothDevice implements BluebirdLoggable {
   final String remoteId;
+
+  @override
+  String get logPath => "[$remoteId]";
 
   List<BluetoothService> _services = [];
 
@@ -405,9 +408,8 @@ class BluetoothDevice {
     Duration elapsed = DateTime.now().difference(_connectTimestamp!);
     if (elapsed.compareTo(minGap) < 0) {
       Duration timeLeft = minGap - elapsed;
-      BluebirdPlatform.log(
-        "[Bluebird] disconnect: enforcing ${minGap.inMilliseconds}ms disconnect gap,"
-        " delaying ${timeLeft.inMilliseconds}ms",
+      logger.fine(
+        "Enforcing disconnect gap: min=${minGap.inMilliseconds}ms delay=${timeLeft.inMilliseconds}ms",
       );
       await Future<void>.delayed(timeLeft);
     }

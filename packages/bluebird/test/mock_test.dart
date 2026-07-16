@@ -19,8 +19,8 @@ void main() {
     expect(await bluebird.isSupported, isTrue);
     expect(await bluebird.adapterName, 'FakeAdapter');
 
-    await bluebird.setLogLevel(LogLevel.warning);
-    expect(bluebird.logLevel, LogLevel.warning);
+    await bluebird.setPlatformLogLevel(LogLevel.warning);
+    expect(bluebird.platformLogLevel, LogLevel.warning);
     expect(fake.calls, contains('setLogLevel'));
   });
 

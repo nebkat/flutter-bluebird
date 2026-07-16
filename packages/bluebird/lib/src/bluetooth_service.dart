@@ -32,6 +32,9 @@ class BluetoothService extends BluetoothAttribute {
   @internal
   String get typeLabel => 'BluetoothService';
 
+  @override
+  String get logPath => "${device.logPath}[$id]";
+
   @internal
   BmServiceRef get bm => BmServiceRef(service: id.bm, parentService: _parentService?.id.bm);
 

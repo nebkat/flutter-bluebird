@@ -14,7 +14,11 @@ import 'screens/web_unsupported_screen.dart';
 import 'utils/snackbar.dart';
 
 void main() {
-  // TODO Bluebird.setLogLevel(LogLevel.verbose, color: true);
+  // Print Bluebird's logs to the console. For custom routing (a file,
+  // Crashlytics, …) listen to Bluebird.logger.onRecord yourself instead.
+  // Pass level: Level.FINEST to also see platform-channel call tracing.
+  Bluebird.configureLoggerPrinting();
+
   runApp(const BluebirdApp());
 }
 

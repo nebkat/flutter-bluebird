@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:logging/logging.dart';
+
 import 'src/messages.g.dart';
 
 export 'src/messages.g.dart';
@@ -60,14 +62,20 @@ abstract base class BluebirdPlatform {
 
   Stream<BmServicesResetEvent> get onServicesReset => _eventsOf();
 
-  static final _logsController = StreamController<String>.broadcast();
-  static Stream<String> get logs => _logsController.stream;
-
-  static void log(String s) {
-    _logsController.add(s);
-    // ignore: avoid_print
-    print(s);
-  }
+  /// The single logger for every Bluebird log — the platform method-channel
+  /// tracing emitted from this layer *and* the higher-level events from
+  /// `package:bluebird` (which re-exposes this as `Bluebird.logger`).
+  ///
+  /// [Logger.detached], i.e. not wired to the root logger hierarchy, so it is
+  /// entirely yours to configure and nothing is printed unless you ask:
+  /// ```dart
+  /// Bluebird.logger.onRecord.listen((r) => debugPrint('${r.level.name}: ${r.message}'));
+  /// Bluebird.logger.level = Level.FINEST; // to also see platform-channel tracing
+  /// ```
+  ///
+  /// Defaults to [Level.INFO], so `FINE`/`FINEST` diagnostics (including the
+  /// platform-channel call tracer) are off until you lower the level.
+  static final Logger logger = Logger.detached('bluebird')..level = Level.INFO;
 
   Future<void> clearGattCache(String address) => throw UnimplementedError('$runtimeType.clearGattCache');
 
@@ -114,9 +122,7 @@ abstract base class BluebirdPlatform {
 
   Future<int> requestMtu(String address, int mtu) => throw UnimplementedError('$runtimeType.requestMtu');
 
-  /// [color] only affects Dart-side log formatting; it does not cross to the
-  /// platform.
-  Future<void> setLogLevel(LogLevel level, {bool color = true}) {
+  Future<void> setLogLevel(LogLevel level) {
     return Future.value();
   }
 

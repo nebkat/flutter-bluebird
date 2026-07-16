@@ -19,6 +19,9 @@ class BluetoothDescriptor extends BluetoothAttribute {
   @internal
   String get typeLabel => 'BluetoothDescriptor';
 
+  @override
+  String get logPath => "${characteristic.logPath}[$id]";
+
   @internal
   BmDescriptorRef get bm => BmDescriptorRef(characteristic: characteristic.bm, id: id.bm);
 

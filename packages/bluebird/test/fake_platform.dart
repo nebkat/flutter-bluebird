@@ -111,7 +111,7 @@ final class FakePlatform extends BluebirdPlatform {
   Future<void> setOptions(bool showPowerAlert, bool restoreState) => _run('setOptions', null);
 
   @override
-  Future<void> setLogLevel(LogLevel level, {bool color = true}) => _run('setLogLevel', null);
+  Future<void> setLogLevel(LogLevel level) => _run('setLogLevel', null);
 
   @override
   Future<String> getAdapterName() => _run('getAdapterName', 'FakeAdapter');

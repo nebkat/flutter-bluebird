@@ -20,6 +20,7 @@ dependencies:
     sdk: flutter
   # directly imported by the generated messages.g.dart (immutable/protected/...)
   meta: ^1.15.0
+  logging: ^1.3.0
 
 dev_dependencies:
   flutter_lints: ^6.0.0

@@ -30,6 +30,9 @@ class BluetoothCharacteristic extends BluetoothAttribute {
   @internal
   String get typeLabel => 'BluetoothCharacteristic';
 
+  @override
+  String get logPath => "${service.logPath}[$id]";
+
   @internal
   BmCharacteristicRef get bm => BmCharacteristicRef(service: service.bm, characteristic: id.bm);
 
@@ -76,10 +79,7 @@ class BluetoothCharacteristic extends BluetoothAttribute {
 
   /// [source] behind a broadcast stream that holds a [subscribe] handle for as
   /// long as it has listeners: the first listener enables notify, the last to
-  /// cancel disables it, and listeners in between share the one enable. Broadcast
-  /// (not single-subscription) because mobx and `StreamBuilder` *cancel* a
-  /// broadcast source when idle but only *pause* a single-subscription one —
-  /// pausing would never release notify and would buffer a stale burst on return.
+  /// cancel disables it, and listeners in between share the one enable.
   ///
   /// An enable failure is surfaced to whoever is listening; a disable failure on
   /// teardown is swallowed (logged) because a cancel() must not throw, and it is
@@ -113,9 +113,7 @@ class BluetoothCharacteristic extends BluetoothAttribute {
         } catch (e) {
           // enable never landed (subscribe() already surfaced + released it) or
           // the disable failed — either way a cancel() must not throw.
-          if (Bluebird.logLevel.index >= LogLevel.warning.index) {
-            BluebirdPlatform.log("[Bluebird] notify teardown failed on cancel: $e");
-          }
+          logger.warning("Notify disable failed on cancel", e);
         }
       },
     );

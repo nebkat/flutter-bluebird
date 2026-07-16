@@ -5,9 +5,62 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:bluebird_platform_interface/bluebird_platform_interface.dart';
+import 'package:logging/logging.dart';
 
 import 'bluebird.dart';
 import 'bluetooth_device.dart';
+
+/// Anything that can prefix a log line with its GATT path — a [BluetoothDevice]
+/// or any [BluetoothAttribute] (service, characteristic, descriptor).
+abstract interface class BluebirdLoggable {
+  /// The bracketed path identifying this object in logs, outermost first — e.g.
+  /// a characteristic is `[remoteId][service][characteristic]`.
+  String get logPath;
+}
+
+extension BluebirdLoggableLog on BluebirdLoggable {
+  /// A [Bluebird.logger] view that prefixes every line with this object's
+  /// [logPath] (e.g. `[remoteId][service][characteristic] …`). Use the standard
+  /// [Logger] level methods, e.g. `characteristic.logger.warning('notify failed', error)`.
+  @internal
+  BluebirdScopedLogger get logger => BluebirdScopedLogger(this);
+}
+
+/// A thin [Bluebird.logger] view that prefixes messages with a
+/// [BluebirdLoggable]'s [logPath], mirroring the [Logger] level methods. The
+/// path is resolved lazily — only when the level is actually loggable — so a
+/// filtered call is free.
+///
+/// Message style (keep it consistent):
+///   - capitalize the first letter, no trailing period
+///   - `"<Event phrase>[: <key=value …>]"` — a short event phrase, then any
+///     variable data as space-separated `key=value` pairs
+///   - don't restate what `[path]` already shows (device/attribute ids)
+///   - pass exceptions as [error], never interpolated into the message
+@internal
+class BluebirdScopedLogger {
+  final BluebirdLoggable _target;
+
+  BluebirdScopedLogger(this._target);
+
+  /// Logs [message] at [level] unless filtered, prefixed with the scope path.
+  /// [message] may be an `Object` or a `() => Object?` evaluated only if emitted;
+  /// an optional [error] / [stackTrace] rides along on the [LogRecord].
+  void log(Level level, Object? message, [Object? error, StackTrace? stackTrace]) {
+    if (!Bluebird.logger.isLoggable(level)) return;
+    final resolved = message is Function ? message() : message;
+    Bluebird.logger.log(level, "${_target.logPath} $resolved", error, stackTrace);
+  }
+
+  void finest(Object? message, [Object? error, StackTrace? stackTrace]) => log(Level.FINEST, message, error, stackTrace);
+  void finer(Object? message, [Object? error, StackTrace? stackTrace]) => log(Level.FINER, message, error, stackTrace);
+  void fine(Object? message, [Object? error, StackTrace? stackTrace]) => log(Level.FINE, message, error, stackTrace);
+  void config(Object? message, [Object? error, StackTrace? stackTrace]) => log(Level.CONFIG, message, error, stackTrace);
+  void info(Object? message, [Object? error, StackTrace? stackTrace]) => log(Level.INFO, message, error, stackTrace);
+  void warning(Object? message, [Object? error, StackTrace? stackTrace]) => log(Level.WARNING, message, error, stackTrace);
+  void severe(Object? message, [Object? error, StackTrace? stackTrace]) => log(Level.SEVERE, message, error, stackTrace);
+  void shout(Object? message, [Object? error, StackTrace? stackTrace]) => log(Level.SHOUT, message, error, stackTrace);
+}
 
 /// Identifies an attribute on a device: a [uuid] plus a platform-opaque
 /// [index] disambiguating duplicate uuids.
@@ -42,7 +95,7 @@ class BluetoothAttributeId {
   String toString() => index == null ? '$uuid' : '$uuid:$index';
 }
 
-abstract class BluetoothAttribute {
+abstract class BluetoothAttribute implements BluebirdLoggable {
   final BluetoothDevice device;
 
   /// The uuid:index pair identifying this attribute on [device].

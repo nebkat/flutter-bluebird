@@ -44,9 +44,9 @@ void main() {
     expect(Bluebird.connectedDevices, [device]);
   });
 
-  test('setLogLevel records the level', () async {
-    await Bluebird.setLogLevel(LogLevel.warning);
-    expect(Bluebird.logLevel, LogLevel.warning);
+  test('setPlatformLogLevel records the level', () async {
+    await Bluebird.setPlatformLogLevel(LogLevel.warning);
+    expect(Bluebird.platformLogLevel, LogLevel.warning);
     expect(fake.calls, contains('setLogLevel'));
   });
 

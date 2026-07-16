@@ -244,14 +244,28 @@ Every error returned by the native platform is checked and thrown as an exceptio
 
 **Streams:** Most state streams returned by Bluebird (e.g. `adapterState`, `device.connectionState`, `device.mtu`) never emit errors and never close, so there's no need to handle `onError` or `onDone`. The exceptions are the *operation* streams that can fail: `Bluebird.scan()` (errors if a scan cannot start) and `characteristic.notifications` / `characteristic.values` (error if enabling notify fails) — handle `onError` on those.
 
-### Set Log Level
+### Logging
+
+All Bluebird logs flow through a single [`package:logging`](https://pub.dev/packages/logging) `Logger`, exposed as `Bluebird.logger`. It is *detached* and silent by default. For the common case — just print to the console — there's a one-liner:
 
 ```dart
-// if your terminal doesn't support color you'll see annoying logs like `\x1B[1;35m`
-Bluebird.setLogLevel(LogLevel.verbose, color:false)
+Bluebird.configureLoggerPrinting(); // prints INFO and above; pass level: to change it
 ```
 
-Setting `LogLevel.verbose` shows *all* data in and out (⚫ = function name, 🟣 = args to platform, 🟡 = data from platform).
+For anything else, routing and filtering are entirely yours — listen to `onRecord` and set the level (`Level`, `Logger`, and `LogRecord` are re-exported by `package:bluebird`, so you don't need to depend on `package:logging`):
+
+```dart
+Bluebird.logger.onRecord.listen((r) => myLogger.log(r)); // e.g. a file, Crashlytics, …
+Bluebird.logger.level = Level.INFO;                      // FINE / FINEST / … to see more
+```
+
+Low-level **platform-channel call tracing** — every call in and out — is logged at `Level.FINEST`, so lower the logger's level to see it:
+
+```dart
+Bluebird.logger.level = Level.FINEST;
+```
+
+Separately, `Bluebird.setPlatformLogLevel(LogLevel.verbose)` turns up the **native** logging (Android logcat / Apple os_log); those lines surface through the platform's own tooling, not through `Bluebird.logger`.
 
 ### Large characteristic writes
 
@@ -516,7 +530,7 @@ To mock `Bluebird` for development, refer to the [Mocking Guide](MOCKING.md).
 
 |                        |      Android       |        iOS         | Throws | Description                                                |
 | :--------------------- | :----------------: | :----------------: | :----: | :----------------------------------------------------------|
-| setLogLevel            | :white_check_mark: | :white_check_mark: |        | Configure plugin log level                                 |
+| setPlatformLogLevel    | :white_check_mark: | :white_check_mark: |        | Configure native/platform log verbosity                    |
 | setOptions             | :white_check_mark: | :white_check_mark: |        | Set configurable bluetooth options                         |
 | isSupported            | :white_check_mark: | :white_check_mark: |        | Checks whether the device supports Bluetooth               |
 | turnOn                 | :white_check_mark: |                    | :fire: | Turns on the bluetooth adapter                             |

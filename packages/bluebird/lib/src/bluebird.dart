@@ -9,7 +9,9 @@ import 'dart:collection';
 import 'package:bluebird_platform_interface/bluebird_platform_interface.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:logging/logging.dart';
 
+import 'bluetooth_attribute.dart';
 import 'bluetooth_device.dart';
 import 'bluetooth_events.dart';
 import 'bluetooth_utils.dart';
@@ -54,6 +56,8 @@ class Bluebird {
     _adapterStateNow = null;
     _setScanning(false);
     _logLevel = LogLevel.debug;
+    _loggerPrintSub?.cancel();
+    _loggerPrintSub = null;
     _initialized = false;
   }
 
@@ -61,7 +65,8 @@ class Bluebird {
   //  Public
   //
 
-  static LogLevel get logLevel => _logLevel;
+  /// The current platform log verbosity (see [setPlatformLogLevel]).
+  static LogLevel get platformLogLevel => _logLevel;
 
   /// Checks whether the hardware supports Bluetooth
   static Future<bool> get isSupported async => await invoke("isSupported", (p) => p.isSupported());
@@ -299,10 +304,48 @@ class Bluebird {
     }
   }
 
-  /// Sets the internal Bluebird log level
-  static Future<void> setLogLevel(LogLevel level, {bool color = true}) async {
+  /// Sets the verbosity of the *native* platform logging (Android logcat / Apple
+  /// os_log). Those logs surface through the platform's own tooling (logcat /
+  /// Console.app), not through [logger].
+  ///
+  /// The Dart-side platform-channel call tracer is separate and independent of
+  /// this — it logs to [logger] at [Level.FINEST], so lower `logger.level` to see
+  /// it.
+  static Future<void> setPlatformLogLevel(LogLevel level) async {
     _logLevel = level;
-    await invoke("setLogLevel", (p) => p.setLogLevel(level, color: color));
+    await invoke("setLogLevel", (p) => p.setLogLevel(level));
+  }
+
+  /// The logger for every Bluebird log, yours to configure — attach a listener
+  /// and set a level; nothing is printed unless you do:
+  /// ```dart
+  /// Bluebird.logger.onRecord.listen((r) => debugPrint('${r.level.name}: ${r.message}'));
+  /// Bluebird.logger.level = Level.INFO; // filter as you like
+  /// ```
+  /// It carries both the Dart-side events from this package — most of them
+  /// path-scoped (`[remoteId][service][characteristic] …`) via the
+  /// [BluebirdLoggable.logger] helper — and the low-level platform-channel call
+  /// tracing (at [Level.FINEST]). It is the same instance as
+  /// [BluebirdPlatform.logger], one layer down.
+  static Logger get logger => BluebirdPlatform.logger;
+
+  static StreamSubscription<LogRecord>? _loggerPrintSub;
+
+  /// Convenience for the common case: print [logger] records to the console (via
+  /// `debugPrint`) in a default format, at [level] and above. For anything else
+  /// — routing to a file or Crashlytics, a custom format, filtering by
+  /// [LogRecord.loggerName] — listen to [logger]'s `onRecord` yourself instead.
+  ///
+  /// If [level] is given, sets [logger]'s `level` to it; otherwise the current
+  /// level is left untouched (so you can start printing without changing it).
+  /// Idempotent: the console subscription is created once and reused, so repeat
+  /// calls never double-print.
+  static void configureLoggerPrinting({Level? level}) {
+    if (level != null) logger.level = level;
+    _loggerPrintSub ??= logger.onRecord.listen((r) {
+      debugPrint('[${r.loggerName}] ${r.level.name}: ${r.message}${r.error != null ? ' — ${r.error}' : ''}');
+      if (r.stackTrace != null) debugPrint('${r.stackTrace}');
+    });
   }
 
   /// Request Bluetooth PHY support
@@ -342,13 +385,12 @@ class Bluebird {
         _dispatchDeviceEvent(device, OnConnectionStateChangedEvent(device, event.connectionState, disconnectReason));
 
       case BmCharacteristicNotificationEvent():
-        final characteristic = deviceForAddress(event.address).characteristicForRefOrNull(event.characteristic);
+        final device = deviceForAddress(event.address);
+        final characteristic = device.characteristicForRefOrNull(event.characteristic);
         if (characteristic == null) {
-          if (_logLevel.index >= LogLevel.warning.index) {
-            BluebirdPlatform.log(
-              "[Bluebird] received notification for unknown characteristic: ${event.characteristic.characteristic.uuid}",
-            );
-          }
+          device.logger.warning(
+            "Dropped notification: unknown characteristic=${event.characteristic.characteristic.uuid}",
+          );
           break;
         }
         _eventStream.add(OnCharacteristicNotifiedEvent(characteristic, event.value));
