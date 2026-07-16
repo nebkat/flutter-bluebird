@@ -1,3 +1,8 @@
+## Unreleased
+
+- Platform method-channel tracing now goes to `BluebirdPlatform.logger` (at `Level.FINEST`); `setLogLevel` no longer takes a `color` argument.
+- Surface a peer's ATT Error Response as `attError` (with the raw ATT code), distinct from local GATT stack/link failures (`androidError`).
+
 ## 0.1.0
 
 - Initial release.
