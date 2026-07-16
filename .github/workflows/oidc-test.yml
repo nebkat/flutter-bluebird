@@ -1,0 +1,58 @@
+# TEST-ONLY workflow (branch test/oidc-check). Reproduces the auth setup of
+# publish.yml — same `id-token: write` permission and `pub.dev` environment —
+# but instead of publishing it requests the GitHub OIDC token and decodes its
+# claims. This tells us, without burning a real publish:
+#   * whether GitHub actually mints an id-token for this job (side 1), and
+#   * whether the token's repository/ref/environment claims match what pub.dev
+#     checks in Automated Publishing (side 2).
+# Delete this file and branch once the real publish is confirmed working.
+
+name: oidc-test
+
+on:
+  push:
+    branches: [test/oidc-check]
+  workflow_dispatch:
+
+jobs:
+  check:
+    permissions:
+      id-token: write # same permission publish.yml relies on
+    environment: pub.dev # same environment, so the `environment` claim is present
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Confirm the OIDC request vars are present
+        run: |
+          set -euo pipefail
+          if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] || [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+            echo "::error::id-token NOT available — GitHub did not grant id-token:write to this job."
+            echo "This is the same reason pub publish fell back to interactive OAuth."
+            exit 1
+          fi
+          echo "OK: ACTIONS_ID_TOKEN_REQUEST_URL / _TOKEN are set."
+
+      - name: Request a pub.dev-audience token and decode its claims
+        run: |
+          set -euo pipefail
+          # Request the JWT with the same audience pub.dev expects.
+          jwt=$(curl -sSf \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https://pub.dev" | jq -r '.value')
+          if [ -z "$jwt" ] || [ "$jwt" = "null" ]; then
+            echo "::error::Token endpoint returned no token."
+            exit 1
+          fi
+          # Decode the payload (2nd segment, base64url) without printing the raw
+          # token — the claims are what matter for matching pub.dev's config.
+          payload=$(cut -d. -f2 <<<"$jwt")
+          case $(( ${#payload} % 4 )) in
+            2) payload="${payload}==";;
+            3) payload="${payload}=";;
+          esac
+          echo "Decoded OIDC claims (must match pub.dev Automated Publishing):"
+          printf '%s' "$payload" | tr '_-' '/+' | base64 -d \
+            | jq '{repository, ref, ref_type, event_name, environment, sub, aud}'
+          echo
+          echo "Expected: repository=nebkat/flutter-bluebird, environment=pub.dev,"
+          echo "and for a real publish ref_type=tag with ref=refs/tags/vX.Y.Z."
