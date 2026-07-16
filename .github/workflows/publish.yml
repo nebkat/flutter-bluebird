@@ -1,6 +1,7 @@
-# Publishes every package to pub.dev via OIDC (no long-lived token) on a
-# `vX.Y.Z` tag. Lockstep: one version for the whole repo, one tag, all packages
-# published together in dependency order.
+# Publishes packages to pub.dev via OIDC (no long-lived token) on a `vX.Y.Z`
+# tag, in dependency order. Each package is published at the version in its
+# pubspec; versions already on pub.dev are skipped, so a tag that bumps only
+# some packages (a patch) publishes just those, not the whole repo.
 #
 # Auth model: `flutter-actions/setup-pubdev-credentials` requests the short-lived
 # OIDC token (audience pub.dev) and runs `dart pub token add`, so `dart pub
@@ -42,11 +43,21 @@ jobs:
       # and cannot be resolved individually.
       - name: Install dependencies
         run: dart pub get
-      - name: Publish all packages in dependency order
+      - name: Publish new packages in dependency order
         run: |
           set -e
           for pkg in bluebird_platform_interface bluebird_android bluebird_darwin bluebird_web bluebird; do
-            echo "::group::publish ${pkg}"
+            ver=$(awk '/^version:/{print $2; exit}' "packages/${pkg}/pubspec.yaml")
+            # Skip versions already on pub.dev so a patch that bumps only some
+            # packages doesn't fail re-publishing the unchanged ones. Only a
+            # definitive 200 skips; on any other/uncertain code we still attempt
+            # (a loud "already exists" failure beats silently missing a publish).
+            code=$(curl -s -o /dev/null -w '%{http_code}' -L "https://pub.dev/api/packages/${pkg}/versions/${ver}" || echo 000)
+            if [ "$code" = "200" ]; then
+              echo "::notice::${pkg} ${ver} already on pub.dev — skipping"
+              continue
+            fi
+            echo "::group::publish ${pkg} ${ver} (pub.dev check: HTTP ${code})"
             # timeout is a hang-guard: if auth ever regresses to the interactive
             # OAuth prompt, fail fast instead of burning the whole job budget.
             (cd "packages/${pkg}" && timeout 120 dart pub publish --force)
