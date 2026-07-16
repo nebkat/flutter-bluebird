@@ -115,6 +115,26 @@ class _ScanScreenState extends State<ScanScreen> {
     return Future.delayed(Duration(milliseconds: 500));
   }
 
+  Widget _buildMenu(BuildContext context) {
+    return PopupMenuButton<String>(
+      onSelected: (value) {
+        if (value == 'licenses') {
+          showLicensePage(
+            context: context,
+            applicationName: 'bluebird',
+            applicationIcon: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Image.asset('assets/bluebird-icon.png', height: 48),
+            ),
+          );
+        }
+      },
+      itemBuilder: (context) => const [
+        PopupMenuItem(value: 'licenses', child: Text('Open-source licenses')),
+      ],
+    );
+  }
+
   Widget buildScanButton(BuildContext context) {
     final scanning = Bluebird.isScanning.value;
     return SizedBox(
@@ -152,24 +172,26 @@ class _ScanScreenState extends State<ScanScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // the empty state already shows the big logo, so hide the app bar until a
+    // the empty state already shows the big logo, so drop the title until a
     // scan has started (or produced results)
     final hasDevices = _systemDevices.isNotEmpty || _scanResults.isNotEmpty;
     final showAppBar = _isScanning || hasDevices;
     return Scaffold(
-      appBar: showAppBar
-          ? AppBar(
-              centerTitle: false,
-              title: Row(
+      appBar: AppBar(
+        centerTitle: false,
+        // the empty state already shows the big logo, so drop the title there
+        title: showAppBar
+            ? Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Image.asset('assets/bluebird-icon.png', height: 28),
                   const SizedBox(width: 8),
                   const Text('bluebird'),
                 ],
-              ),
-            )
-          : null,
+              )
+            : null,
+        actions: [_buildMenu(context)],
+      ),
       body: RefreshIndicator(
         onRefresh: onRefresh,
         child: (_systemDevices.isEmpty && _scanResults.isEmpty)
