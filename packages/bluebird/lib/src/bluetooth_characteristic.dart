@@ -58,12 +58,12 @@ class BluetoothCharacteristic extends BluetoothAttribute {
 
   /// [notificationsPassive] with notify enabled for the duration of the
   /// subscription.
-  ///   - enabled on the first listener (ref-counted), disabled when the last
-  ///     cancels; the stream *errors* if enabling fails (e.g. the peripheral
-  ///     rejects the CCCD write).
-  ///   - single-subscription; for several concurrent consumers hold one
-  ///     [subscribe] and use [notificationsPassive] / [valuesPassive].
-  Stream<List<int>> get notifications => _subscribed(notificationsPassive);
+  ///   - enabled on the first listener (ref-counted across [notifications],
+  ///     [values] and [subscribe]), disabled when the last cancels; the stream
+  ///     *errors* if enabling fails (e.g. the peripheral rejects the CCCD write).
+  ///   - broadcast: several concurrent listeners share one notify enable. After
+  ///     an enable failure the next listen (once all have cancelled) retries.
+  late final Stream<List<int>> notifications = _subscribed(notificationsPassive);
 
   /// All values observed for this characteristic — [read] results *and*
   /// notify/indicate values — *without* enabling notify. Broadcast.
@@ -71,28 +71,55 @@ class BluetoothCharacteristic extends BluetoothAttribute {
       Bluebird.extractEventStream<OnCharacteristicValueEvent>((e) => e.characteristic == this).map((e) => e.value);
 
   /// [valuesPassive] with notify enabled while listened to (same ref-count /
-  /// error semantics as [notifications]).
-  Stream<List<int>> get values => _subscribed(valuesPassive);
+  /// error / broadcast semantics as [notifications]).
+  late final Stream<List<int>> values = _subscribed(valuesPassive);
 
-  /// [source] wrapped so listening enables notify (ref-counted) for its
-  /// duration and errors if enabling fails.
-  Stream<List<int>> _subscribed(Stream<List<int>> source) async* {
-    await _acquireNotify();
-    try {
-      yield* source;
-    } finally {
-      // A stream cancel() must not throw — a disable failure here would leak as
-      // an uncatchable, duplicated error. A failed *disable* on teardown is
-      // harmless anyway (notify resets on disconnect), so log and move on.
-      // Callers who need to observe it should use subscribe()/unsubscribe().
-      try {
-        await _releaseNotify();
-      } catch (e) {
-        if (Bluebird.logLevel.index >= LogLevel.warning.index) {
-          BluebirdPlatform.log("[Bluebird] notify disable failed on unsubscribe: $e");
+  /// [source] behind a broadcast stream that holds a [subscribe] handle for as
+  /// long as it has listeners: the first listener enables notify, the last to
+  /// cancel disables it, and listeners in between share the one enable. Broadcast
+  /// (not single-subscription) because mobx and `StreamBuilder` *cancel* a
+  /// broadcast source when idle but only *pause* a single-subscription one —
+  /// pausing would never release notify and would buffer a stale burst on return.
+  ///
+  /// An enable failure is surfaced to whoever is listening; a disable failure on
+  /// teardown is swallowed (logged) because a cancel() must not throw, and it is
+  /// harmless anyway (notify resets on disconnect). Callers who must observe a
+  /// disable failure should use [subscribe] / [CharacteristicSubscription.unsubscribe].
+  Stream<List<int>> _subscribed(Stream<List<int>> source) {
+    StreamSubscription<List<int>>? streamSubscription;
+    // The in-flight/held subscribe() while listeners are present; null when idle.
+    // onCancel awaits it so a listener that leaves mid-enable still releases the
+    // ref, and a failed enable (subscribe() self-releases) is caught, not double
+    // released.
+    Future<CharacteristicSubscription>? gattSubscription;
+    late final StreamController<List<int>> controller;
+    controller = StreamController<List<int>>.broadcast(
+      onListen: () {
+        // The passive source stays silent until notify is enabled, so pipe it
+        // straight away and enable notify alongside.
+        streamSubscription = source.listen(controller.add, onError: controller.addError);
+        gattSubscription = subscribe();
+        // surface an enable failure to listeners (without leaking it unhandled —
+        // onCancel still awaits `subscription` to release the ref).
+        unawaited(gattSubscription!.then<void>((_) {}, onError: controller.addError));
+      },
+      onCancel: () async {
+        await streamSubscription?.cancel();
+        streamSubscription = null;
+        final pending = gattSubscription;
+        gattSubscription = null;
+        try {
+          await (await pending)?.unsubscribe();
+        } catch (e) {
+          // enable never landed (subscribe() already surfaced + released it) or
+          // the disable failed — either way a cancel() must not throw.
+          if (Bluebird.logLevel.index >= LogLevel.warning.index) {
+            BluebirdPlatform.log("[Bluebird] notify teardown failed on cancel: $e");
+          }
         }
-      }
-    }
+      },
+    );
+    return controller.stream;
   }
 
   /// Enables notify/indicate and keeps it on until the returned
