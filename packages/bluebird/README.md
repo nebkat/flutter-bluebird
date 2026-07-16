@@ -27,8 +27,8 @@ Migrating from [FlutterBluePlus](https://pub.dev/packages/flutter_blue_plus)? Ch
 // On iOS this is controlled by the user
 if (Platform.isAndroid) await Bluebird.turnOn();
 
-// Wait for the adapter to become available
-await Bluebird.adapterState.where((state) => state == BluetoothAdapterState.on).first;
+// Wait for adapter to be ready
+await Bluebird.adapterReady();
 ```
 
 ### Scan for devices
@@ -308,6 +308,62 @@ await sub.cancel();
 await handle.unsubscribe();
 ```
 
+### Typed characteristic & descriptor views
+
+`characteristic.map(decode, encode:)` returns a `MappedBluetoothCharacteristic<T>` —
+a typed view whose `read`/`write`/`notifications` speak `T` instead of `List<int>`,
+so you decode/encode in one place instead of at every call site.
+
+```dart
+// decode bytes -> T on the way out; encode T -> bytes on the way in
+final level = characteristic.map(
+  (bytes) => bytes.isEmpty ? 0 : bytes.first,
+  encode: (n) => [n],
+);
+
+int battery = await level.read();     // Future<int>
+level.notifications.listen(print);     // Stream<int>
+await level.write(42);                 // encodes, then writes
+```
+
+- **`encode` is optional** — omit it for a read-only mapping; calling `write()`
+  without one throws a `StateError`.
+- **Everything else delegates** to the underlying characteristic (`uuid`,
+  `properties`, `canRead`/`canWrite`/`canNotify`, `descriptors`, `subscribe()`,
+  the passive streams, …), and the raw characteristic is always reachable via `.raw`.
+- **Mappings chain** — `.map(...).map(...)` composes the decoders (and encoders,
+  when both are present).
+
+It is *not* itself a `BluetoothCharacteristic` (its `read()` returns `Future<T>`), so
+keep the mapped view where you want typed access and use `.raw` for the byte-level API.
+
+Descriptors work the same way via `descriptor.map(...)` → `MappedBluetoothDescriptor<T>`:
+
+```dart
+final userDescription = descriptor.map(utf8.decode, encode: utf8.encode);
+String text = await userDescription.read();
+```
+
+### Accumulating scan results
+
+`Bluebird.scan()` emits one advertisement at a time. To collect them into a growing,
+de-duplicated device list (keyed by address), use `.accumulate()`:
+
+```dart
+Bluebird.scan().accumulate().listen((List<ScanResult> results) {
+  // the full list so far, updated on every advertisement
+});
+```
+
+- **`coalesce`** (default `true`): a device splits its data across the advertising and
+  scan-response packets, so any single packet may omit fields an earlier one carried
+  (commonly the name). `accumulate` merges each new advertisement onto the stored one,
+  carrying those fields forward so they don't flicker. Pass `coalesce: false` to keep
+  each latest packet verbatim. (You can also merge two results yourself with
+  `first.mergedWith(newer)`.)
+- **`removeIfGone`**: drop a device from the list once it hasn't re-advertised within
+  the given duration — see [Scanned device never goes away](#scanned-device-never-goes-away).
+
 ### Save Device
 
 To save a device between app restarts, just store the `remoteId` to `SharedPreferences` or a file.
@@ -454,6 +510,7 @@ To mock `Bluebird` for development, refer to the [Mocking Guide](MOCKING.md).
 | isSupported            | :white_check_mark: | :white_check_mark: |        | Checks whether the device supports Bluetooth               |
 | turnOn                 | :white_check_mark: |                    | :fire: | Turns on the bluetooth adapter                             |
 | adapterState        🌀 | :white_check_mark: | :white_check_mark: |        | Async value + stream of on/off states (`await .value` for current) |
+| adapterReady           | :white_check_mark: | :white_check_mark: | :fire: | Completes once the adapter is on; throws if unavailable/unauthorized |
 | scan                🌀 | :white_check_mark: | :white_check_mark: | :fire: | Stream of scan advertisements; stops when cancelled        |
 | isScanning          🌀 | :white_check_mark: | :white_check_mark: |        | Value + stream of the current scanning state (`.value`)    |
 | connectedDevices    ⚡  | :white_check_mark: | :white_check_mark: |        | List of devices connected to *your app*                    |
@@ -576,9 +633,11 @@ Flutter Errors:
 
 You need to wait for the bluetooth adapter to fully turn on.
 
-`await Bluebird.adapterState.where((state) => state == BluetoothAdapterState.on).first;`
+`await Bluebird.adapterReady();`
 
-You can also use `Bluebird.adapterState.listen(...)`. See [Usage](#usage).
+This returns as soon as the adapter is on (immediately if it already is) and throws
+if it is unavailable/unauthorized. You can also observe it yourself via
+`Bluebird.adapterState.listen(...)`. See [Usage](#usage).
 
 ---
 

@@ -134,4 +134,42 @@ void main() {
 
     expect(await Bluebird.adapterState.value, BluetoothAdapterState.on);
   });
+
+  test('adapterReady completes immediately when the adapter is already on', () async {
+    fake.adapterState = BluetoothAdapterState.on;
+    await Bluebird.adapterReady(); // completes without hanging or throwing
+  });
+
+  test('adapterReady waits until the adapter turns on', () async {
+    fake.adapterState = BluetoothAdapterState.off;
+    final ready = Bluebird.adapterReady();
+    await pumpEventQueue(); // subscribe and fetch the current (off) state
+
+    fake.emit(BmAdapterStateEvent(adapterState: BluetoothAdapterState.on));
+    await ready; // now resolves
+  });
+
+  test('adapterReady throws permissionDenied when unauthorized', () async {
+    fake.adapterState = BluetoothAdapterState.unauthorized;
+    await expectLater(
+      Bluebird.adapterReady(),
+      throwsA(isA<BluebirdException>().having((e) => e.code, 'code', BluebirdErrorCode.permissionDenied)),
+    );
+  });
+
+  test('adapterReady throws unsupported when unavailable', () async {
+    fake.adapterState = BluetoothAdapterState.unavailable;
+    await expectLater(
+      Bluebird.adapterReady(),
+      throwsA(isA<BluebirdException>().having((e) => e.code, 'code', BluebirdErrorCode.unsupported)),
+    );
+  });
+
+  test('adapterReady times out while the adapter stays off', () async {
+    fake.adapterState = BluetoothAdapterState.off;
+    await expectLater(
+      Bluebird.adapterReady(timeout: const Duration(milliseconds: 50)),
+      throwsA(isA<BluebirdException>().having((e) => e.code, 'code', BluebirdErrorCode.timeout)),
+    );
+  });
 }

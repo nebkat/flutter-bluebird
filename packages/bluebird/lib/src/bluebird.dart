@@ -96,7 +96,7 @@ class Bluebird {
     await invoke("setOptions", (p) => p.setOptions(showPowerAlert, restoreState));
   }
 
-  /// Turn on Bluetooth (Android only),
+  /// Turn on Bluetooth (Android only)
   static Future<void> turnOn({Duration timeout = const Duration(seconds: 60)}) async {
     final userAccepted = await invoke("turnOn", (p) => p.turnOn());
 
@@ -104,8 +104,8 @@ class Bluebird {
       throw BluebirdException("turnOn", BluebirdErrorCode.userRejected, "user rejected");
     }
 
-    // wait for adapter to turn on
-    await adapterState.where((s) => s == BluetoothAdapterState.on).first.bluebirdTimeout(timeout, "turnOn");
+    // Wait for adapter to turn on
+    await adapterReady(timeout: timeout);
   }
 
   /// The state of the Bluetooth adapter, as a stream that also exposes the
@@ -116,6 +116,30 @@ class Bluebird {
     value: _fetchAdapterState,
     changes: () => extractEventStream<OnAdapterStateChangedEvent>().map((e) => e.adapterState),
   );
+
+  /// Completes once the adapter is on; returns immediately if it already is.
+  ///
+  /// Fails fast on a terminal state that will never reach `on`, so it can't
+  /// silently hang: [BluebirdErrorCode.unsupported] for `unavailable`, or
+  /// [BluebirdErrorCode.permissionDenied] for `unauthorized`.
+  ///
+  /// [timeout] bounds the wait (default 60s); pass `null` to wait indefinitely.
+  static Future<void> adapterReady({Duration? timeout = const Duration(seconds: 60)}) {
+    final ready = adapterState
+        .map((s) {
+          switch (s) {
+            case BluetoothAdapterState.unavailable:
+              throw BluebirdException("adapterReady", BluebirdErrorCode.unsupported, "adapter is unavailable");
+            case BluetoothAdapterState.unauthorized:
+              throw BluebirdException("adapterReady", BluebirdErrorCode.permissionDenied, "adapter is unauthorized");
+            default:
+              return s;
+          }
+        })
+        .firstWhere((s) => s == BluetoothAdapterState.on);
+
+    return timeout == null ? ready : ready.bluebirdTimeout(timeout, "adapterReady");
+  }
 
   /// Returns the current adapter state, fetching it from the platform the first
   /// time it is needed (adapter events fire only on *changes*).
