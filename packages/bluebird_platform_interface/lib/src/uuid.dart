@@ -78,7 +78,7 @@ class Uuid {
 /// Well-known Bluetooth SIG assigned UUIDs, grouped by kind:
 /// `Uuids.service.*`, `Uuids.characteristic.*`, `Uuids.descriptor.*`.
 class Uuids {
-  const Uuids._();
+  const Uuids._(); // coverage:ignore-line
 
   static const service = _Services._();
   static const characteristic = _Characteristics._();
@@ -201,10 +201,10 @@ class _Descriptors {
 
 extension _IntHexString on int {
   String toHexString([int? width]) {
-    if (width == null) return toRadixString(16);
+    if (width == null) return toRadixString(16); // coverage:ignore-line
     assert(
       this < 1 << (width * 4),
-      "Value too large for specified width: ${toRadixString(16)} >= ${(1 << (width * 4)).toRadixString(16)}",
+      "Value too large for specified width: ${toRadixString(16)} >= ${(1 << (width * 4)).toRadixString(16)}", // coverage:ignore-line
     );
     return toRadixString(16).padLeft(width, '0');
   }

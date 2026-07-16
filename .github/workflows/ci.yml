@@ -36,8 +36,10 @@ jobs:
             f="${p}coverage/lcov.info"
             if [ -f "$f" ]; then
               # rewrite package-relative source paths (lib/src/...) to repo-relative
-              # (packages/<pkg>/lib/src/...) so Coveralls maps them to the repo
-              sed "s#^SF:#SF:${p}#" "$f" >> coverage.lcov
+              # (packages/<pkg>/lib/src/...) so Coveralls maps them to the repo,
+              # and drop generated files (*.g.dart, e.g. pigeon's messages.g.dart)
+              sed "s#^SF:#SF:${p}#" "$f" \
+                | awk '/^SF:/ { drop = ($0 ~ /\.g\.dart$/) } !drop' >> coverage.lcov
             fi
           done
       - name: Upload coverage to Coveralls
