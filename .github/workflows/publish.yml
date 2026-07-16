@@ -2,12 +2,12 @@
 # `vX.Y.Z` tag. Lockstep: one version for the whole repo, one tag, all packages
 # published together in dependency order.
 #
-# Auth model (mirrors dart-lang/setup-dart/.github/workflows/publish.yml):
-# `dart-lang/setup-dart` provisions the short-lived OIDC token that pub uses to
-# authenticate to pub.dev. Without that step, `pub publish` has no credential
-# and falls back to an interactive OAuth prompt that hangs forever in CI. The
-# Flutter SDK is set up afterwards so `dart` can resolve/publish the Flutter
-# packages; its `dart` shadows setup-dart's, but the provisioned token persists.
+# Auth model: `flutter-actions/setup-pubdev-credentials` requests the short-lived
+# OIDC token (audience pub.dev) and runs `dart pub token add`, so `dart pub
+# publish` authenticates non-interactively. Without provisioning the token like
+# this, pub has no credential and falls back to an interactive OAuth prompt that
+# hangs forever in CI. It must run after the Flutter SDK is set up (it calls
+# `dart pub token add`).
 #
 # One-time pub.dev setup, PER package:
 #   Admin -> Automated publishing -> Enable publishing from GitHub Actions
@@ -27,17 +27,17 @@ on:
 jobs:
   publish:
     permissions:
-      id-token: write # required for OIDC: setup-dart mints the JWT with this
+      id-token: write # required so setup-pubdev-credentials can request the JWT
     environment: pub.dev
     runs-on: ubuntu-latest
     timeout-minutes: 15 # backstop: never let a stuck auth prompt burn the job
     steps:
       - uses: actions/checkout@v5
-      # Provisions the OIDC token pub uses to authenticate to pub.dev. Must come
-      # before the Flutter setup and before any `pub publish`.
-      - uses: dart-lang/setup-dart@v1
-      # Flutter SDK so `dart pub` can handle the Flutter packages too.
+      # Flutter SDK (provides the `dart` used to publish and by the step below).
       - uses: flutter-actions/setup-flutter@v4.3
+      # Requests the OIDC token and runs `dart pub token add` so pub publishes
+      # non-interactively. Must come after the Flutter SDK is available.
+      - uses: flutter-actions/setup-pubdev-credentials@v1.1
       # Single resolve at the workspace root — members use `resolution: workspace`
       # and cannot be resolved individually.
       - name: Install dependencies
