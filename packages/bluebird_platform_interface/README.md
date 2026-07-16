@@ -40,5 +40,5 @@ over breaking changes for this package.
 See https://flutter.dev/go/platform-interface-breaking-changes for a discussion
 on why a less-clean interface is preferable to a breaking change.
 
-[1]: ../bluebird
+[1]: https://pub.dev/packages/bluebird
 [2]: lib/bluebird_platform_interface.dart
