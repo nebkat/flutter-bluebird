@@ -286,18 +286,36 @@ enum class BluebirdErrorCode(val raw: Int) {
   CHARACTERISTIC_NOT_FOUND(4),
   USER_REJECTED(5),
   REMOVE_BOND_FAILED(6),
-  GATT_ERROR(7),
-  CB_ERROR(8),
-  DEVICE_DISCONNECTED(9),
-  ADAPTER_OFF(10),
-  NOT_CONNECTED(11),
-  INVALID_IDENTIFIER(12),
-  BOND_FAILED(13),
-  USER_CANCELED(14),
-  UNSUPPORTED(15),
-  OPERATION_IN_PROGRESS(16),
-  PERMISSION_DENIED(17),
-  INVALID_ARGUMENT(18);
+  /**
+   * An Android-side GATT stack/link failure — e.g. a `BluetoothGatt` call
+   * returned false/null, an HCI disconnect, or `GATT_FAILURE`. Not a peer
+   * response; see [attError]. The darwin analogue is [darwinError].
+   */
+  ANDROID_ERROR(7),
+  /**
+   * A darwin-side (CoreBluetooth) stack/link failure — a non-`CBATTErrorDomain`
+   * `NSError` (e.g. connection lost). Not a peer response; see [attError]. The
+   * android analogue is [androidError].
+   */
+  DARWIN_ERROR(8),
+  /**
+   * A Bluetooth spec-level error: the peer answered a request with an ATT
+   * Error Response. Raised uniformly by every platform, with the raw one-octet
+   * code (an `int`, spanning the core ATT / application / GATT common ranges)
+   * riding along as the error details. Platform/link failures that are *not*
+   * peer responses stay [androidError] / [darwinError].
+   */
+  ATT_ERROR(9),
+  DEVICE_DISCONNECTED(10),
+  ADAPTER_OFF(11),
+  NOT_CONNECTED(12),
+  INVALID_IDENTIFIER(13),
+  BOND_FAILED(14),
+  USER_CANCELED(15),
+  UNSUPPORTED(16),
+  OPERATION_IN_PROGRESS(17),
+  PERMISSION_DENIED(18),
+  INVALID_ARGUMENT(19);
 
   companion object {
     fun ofRaw(raw: Int): BluebirdErrorCode? {

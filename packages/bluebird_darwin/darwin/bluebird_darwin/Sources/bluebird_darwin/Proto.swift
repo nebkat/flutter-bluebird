@@ -33,13 +33,19 @@ extension BluebirdErrorCode {
   }
 }
 
-/// Wraps a CoreBluetooth NSError as a stable "cb_error" with the raw native
-/// error domain + code as details (e.g. "CBATTErrorDomain (3)"), so the exact
-/// cause is recoverable on the Dart side.
+/// Wraps a CoreBluetooth NSError. An ATT protocol error (CBATTErrorDomain)
+/// carries the spec ATT code directly, so it is surfaced uniformly as
+/// "att_error" with the raw code as details — matching Android. Any other
+/// domain stays "darwin_error" with the native domain + code as details (e.g.
+/// "CBErrorDomain (3)"), so the exact cause is recoverable on the Dart side.
 func cbError(_ error: Error) -> PigeonError {
   let ns = error as NSError
+  if ns.domain == CBATTErrorDomain {
+    return PigeonError(
+      code: BluebirdErrorCode.attError.wire, message: ns.localizedDescription, details: Int64(ns.code))
+  }
   return PigeonError(
-    code: BluebirdErrorCode.cbError.wire, message: ns.localizedDescription, details: "\(ns.domain) (\(ns.code))")
+    code: BluebirdErrorCode.darwinError.wire, message: ns.localizedDescription, details: "\(ns.domain) (\(ns.code))")
 }
 
 func notConnectedError() -> PigeonError {

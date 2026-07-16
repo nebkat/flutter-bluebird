@@ -201,14 +201,14 @@ void main() {
 
     test('subscribe() throws if enabling notify fails', () async {
       final c = await discoverNotifyChar();
-      fake.stubs['setNotifyValue'] = () => throw PlatformException(code: 'cb_error', message: 'rejected');
+      fake.stubs['setNotifyValue'] = () => throw PlatformException(code: 'darwin_error', message: 'rejected');
       await expectLater(c.subscribe(), throwsA(isA<BluebirdException>()));
     });
 
     test('unsubscribe() surfaces a failed disable', () async {
       final c = await discoverNotifyChar();
       final subscription = await c.subscribe(); // enabled OK
-      fake.stubs['setNotifyValue'] = () => throw PlatformException(code: 'cb_error', message: 'disable rejected');
+      fake.stubs['setNotifyValue'] = () => throw PlatformException(code: 'darwin_error', message: 'disable rejected');
       await expectLater(subscription.unsubscribe(), throwsA(isA<BluebirdException>()));
     });
 
@@ -216,7 +216,7 @@ void main() {
       final c = await discoverNotifyChar();
       final sub = c.notifications.listen((_) {});
       await pump(); // enable completes
-      fake.stubs['setNotifyValue'] = () => throw PlatformException(code: 'cb_error', message: 'disable rejected');
+      fake.stubs['setNotifyValue'] = () => throw PlatformException(code: 'darwin_error', message: 'disable rejected');
       // a stream cancel() must not throw — the failed disable is swallowed
       // (logged) rather than leaking as an uncatchable error. Explicit
       // unsubscribe() still surfaces it (see the test above).

@@ -240,18 +240,30 @@ enum BluebirdErrorCode: Int, CaseIterable {
   case characteristicNotFound = 4
   case userRejected = 5
   case removeBondFailed = 6
-  case gattError = 7
-  case cbError = 8
-  case deviceDisconnected = 9
-  case adapterOff = 10
-  case notConnected = 11
-  case invalidIdentifier = 12
-  case bondFailed = 13
-  case userCanceled = 14
-  case unsupported = 15
-  case operationInProgress = 16
-  case permissionDenied = 17
-  case invalidArgument = 18
+  /// An Android-side GATT stack/link failure — e.g. a `BluetoothGatt` call
+  /// returned false/null, an HCI disconnect, or `GATT_FAILURE`. Not a peer
+  /// response; see [attError]. The darwin analogue is [darwinError].
+  case androidError = 7
+  /// A darwin-side (CoreBluetooth) stack/link failure — a non-`CBATTErrorDomain`
+  /// `NSError` (e.g. connection lost). Not a peer response; see [attError]. The
+  /// android analogue is [androidError].
+  case darwinError = 8
+  /// A Bluetooth spec-level error: the peer answered a request with an ATT
+  /// Error Response. Raised uniformly by every platform, with the raw one-octet
+  /// code (an `int`, spanning the core ATT / application / GATT common ranges)
+  /// riding along as the error details. Platform/link failures that are *not*
+  /// peer responses stay [androidError] / [darwinError].
+  case attError = 9
+  case deviceDisconnected = 10
+  case adapterOff = 11
+  case notConnected = 12
+  case invalidIdentifier = 13
+  case bondFailed = 14
+  case userCanceled = 15
+  case unsupported = 16
+  case operationInProgress = 17
+  case permissionDenied = 18
+  case invalidArgument = 19
 }
 
 /// The universal uuid:instance pair identifying one attribute.

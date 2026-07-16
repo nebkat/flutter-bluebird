@@ -238,8 +238,24 @@ class BluebirdPlugin :
     private fun resolveDescriptorOrThrow(gatt: BluetoothGatt, ref: BmDescriptorRef): BluetoothGattDescriptor =
         Proto.resolveDescriptor(gatt, ref) ?: throw invalidIdentifier(ref.toString())
 
-    private fun gattError(status: Int, message: String? = null) =
-        FlutterError(BluebirdErrorCode.GATT_ERROR.wire, message ?: ErrorStrings.gattErrorString(status), status)
+    private fun gattStatusError(status: Int, message: String? = null): FlutterError {
+        // gattStatusError() is only reached from GATT *operation* callbacks (read /
+        // write / etc.); link and connection failures take the separate
+        // onConnectionStateChange -> DEVICE_DISCONNECTED path. So a non-zero
+        // status here is the peer's ATT/GATT error-response code — spec-level
+        // across the whole octet: ATT 0x01..0x11, application 0x80..0x9F, and
+        // GATT common 0xE0..0xFF — which we surface uniformly as att_error. Only
+        // values that cannot be a 1-octet ATT code (e.g. GATT_FAILURE 257) are
+        // local/platform failures and stay android_error.
+        //
+        // Caveat: Android multiplexes a few internal sentinels (e.g. GATT_ERROR
+        // 133, GATT_CONNECTION_CONGESTED 143) into that same byte space with no
+        // flag to tell them apart from a peer app-error, so they ride through as
+        // att errors too — match on the code if you need to treat them as link
+        // failures rather than spec rejections.
+        val code = if (status in 0x01..0xFF) BluebirdErrorCode.ATT_ERROR else BluebirdErrorCode.ANDROID_ERROR
+        return FlutterError(code.wire, message ?: ErrorStrings.gattErrorString(status), status)
+    }
 
     /** Suspends until all [perms] are granted or denied: (granted, deniedPerm). */
     private suspend fun awaitPermissions(perms: List<String>): Pair<Boolean, String?> =
@@ -614,7 +630,7 @@ class BluebirdPlugin :
                 val device = a.getRemoteDevice(address)
                 val gatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
                     ?: return@withLock FlutterError(
-                        BluebirdErrorCode.GATT_ERROR.wire, "device.connectGatt returned null", null)
+                        BluebirdErrorCode.ANDROID_ERROR.wire, "device.connectGatt returned null", null)
 
                 // add to currently connecting peripherals
                 val conn = DeviceConnection(address, gatt)
@@ -690,7 +706,7 @@ class BluebirdPlugin :
         // completes via onServicesDiscovered
         registry.awaitGatt(conn, GattOp.DiscoverServices) {
             if (!gatt.discoverServices()) {
-                throw FlutterError(BluebirdErrorCode.GATT_ERROR.wire, "gatt.discoverServices() returned false", null)
+                throw FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire, "gatt.discoverServices() returned false", null)
             }
         }
     }
@@ -712,7 +728,7 @@ class BluebirdPlugin :
         // completes via onCharacteristicRead
         registry.awaitGatt(conn, GattOp.ReadChar(chr)) {
             if (!gatt.readCharacteristic(chr)) {
-                throw FlutterError(BluebirdErrorCode.GATT_ERROR.wire, "gatt.readCharacteristic() returned false", null)
+                throw FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire, "gatt.readCharacteristic() returned false", null)
             }
         }
     }
@@ -775,7 +791,7 @@ class BluebirdPlugin :
         // completes via onDescriptorRead
         registry.awaitGatt(conn, GattOp.ReadDesc(desc)) {
             if (!gatt.readDescriptor(desc)) {
-                throw FlutterError(BluebirdErrorCode.GATT_ERROR.wire, "gatt.readDescriptor() returned false", null)
+                throw FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire, "gatt.readDescriptor() returned false", null)
             }
         }
     }
@@ -817,7 +833,7 @@ class BluebirdPlugin :
         val chr = resolveCharacteristicOrThrow(gatt, characteristic)
 
         // configure local Android device to listen for characteristic changes
-        check(gatt.setCharacteristicNotification(chr, enable), BluebirdErrorCode.GATT_ERROR) {
+        check(gatt.setCharacteristicNotification(chr, enable), BluebirdErrorCode.ANDROID_ERROR) {
             "gatt.setCharacteristicNotification($enable) returned false"
         }
 
@@ -861,7 +877,7 @@ class BluebirdPlugin :
         // completes via onMtuChanged
         registry.awaitGatt(conn, GattOp.Mtu) {
             if (!gatt.requestMtu(mtu.toInt())) {
-                throw FlutterError(BluebirdErrorCode.GATT_ERROR.wire, "gatt.requestMtu() returned false", null)
+                throw FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire, "gatt.requestMtu() returned false", null)
             }
         }
     }
@@ -873,7 +889,7 @@ class BluebirdPlugin :
         // completes via onReadRemoteRssi
         registry.awaitGatt(conn, GattOp.Rssi) {
             if (!gatt.readRemoteRssi()) {
-                throw FlutterError(BluebirdErrorCode.GATT_ERROR.wire, "gatt.readRemoteRssi() returned false", null)
+                throw FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire, "gatt.readRemoteRssi() returned false", null)
             }
         }
     }
@@ -882,7 +898,7 @@ class BluebirdPlugin :
         val gatt = registry.requireConnected(address).gatt
 
         if (!gatt.requestConnectionPriority(Proto.bmConnectionPriorityParse(connectionPriority))) {
-            throw FlutterError(BluebirdErrorCode.GATT_ERROR.wire, "gatt.requestConnectionPriority() returned false", null)
+            throw FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire, "gatt.requestConnectionPriority() returned false", null)
         }
     }
 
@@ -1124,7 +1140,7 @@ class BluebirdPlugin :
         if (status == BluetoothGatt.GATT_SUCCESS) {
             pending.cont.resume(value)
         } else {
-            pending.cont.resumeWithException(gattError(status))
+            pending.cont.resumeWithException(gattStatusError(status))
         }
         return true
     }
@@ -1184,7 +1200,7 @@ class BluebirdPlugin :
                     if (conn != null) {
                         conn.pendingDisconnect?.also { conn.pendingDisconnect = null }?.resume(Unit)
                         conn.pendingConnect?.also { conn.pendingConnect = null }?.resumeWithException(
-                            FlutterError(BluebirdErrorCode.GATT_ERROR.wire, ErrorStrings.hciStatusString(status), status))
+                            FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire, ErrorStrings.hciStatusString(status), status))
                         conn.failAllPending(
                             FlutterError(BluebirdErrorCode.DEVICE_DISCONNECTED.wire, "device is disconnected", null))
                     }
@@ -1247,7 +1263,7 @@ class BluebirdPlugin :
             val pending = registry.takeGatt(gatt.device.address) { it is GattOp.DiscoverServices } ?: return
 
             if (status != BluetoothGatt.GATT_SUCCESS) {
-                pending.cont.resumeWithException(gattError(status))
+                pending.cont.resumeWithException(gattStatusError(status))
                 return
             }
 

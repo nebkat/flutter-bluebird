@@ -116,6 +116,49 @@ void main() {
     );
   });
 
+  test('att_error maps to a BluetoothAttException carrying the spec code', () async {
+    fake.stubs['isSupported'] = () => throw PlatformException(code: 'att_error', message: 'nope', details: 3);
+    await expectLater(
+      Bluebird.isSupported,
+      throwsA(
+        isA<BluetoothAttException>()
+            .having((e) => e.code, 'code', BluebirdErrorCode.attError)
+            .having((e) => e.attError, 'attError', AttError.writeNotPermitted),
+      ),
+    );
+
+    // application-range codes (0x80–0x9F) flow through unchanged — the Dart side
+    // never range-restricts; the platforms decide what is spec vs platform
+    fake.stubs['isSupported'] = () => throw PlatformException(code: 'att_error', details: 0x82);
+    await expectLater(
+      Bluebird.isSupported,
+      throwsA(
+        isA<BluetoothAttException>()
+            .having((e) => e.attError, 'attError', 0x82)
+            .having((e) => e.appErrorZeroIndexed, 'appErrorZeroIndexed', 2),
+      ),
+    );
+
+    // a core spec code is not in the application range → null
+    fake.stubs['isSupported'] = () => throw PlatformException(code: 'att_error', details: AttError.writeNotPermitted);
+    await expectLater(
+      Bluebird.isSupported,
+      throwsA(isA<BluetoothAttException>().having((e) => e.appErrorZeroIndexed, 'appErrorZeroIndexed', isNull)),
+    );
+
+    // a platform failure (Android stack / CoreBluetooth CBError) is a plain
+    // BluebirdException with no attError
+    fake.stubs['isSupported'] = () => throw PlatformException(code: 'android_error', message: 'boom', details: 257);
+    await expectLater(
+      Bluebird.isSupported,
+      throwsA(
+        isA<BluebirdException>()
+            .having((e) => e, 'not att', isNot(isA<BluetoothAttException>()))
+            .having((e) => e.attError, 'attError', isNull),
+      ),
+    );
+  });
+
   test('adapter state reflects platform events', () async {
     fake.adapterState = BluetoothAdapterState.off;
     expect(await Bluebird.adapterState.first, BluetoothAdapterState.off);

@@ -39,13 +39,13 @@ fun BluetoothGatt.writeCharacteristicCompat(
     if (Build.VERSION.SDK_INT >= 33) { // Android 13 (August 2022)
         val rv = writeCharacteristic(c, value, writeType)
         if (rv != BluetoothStatusCodes.SUCCESS) {
-            throw FlutterError(BluebirdErrorCode.GATT_ERROR.wire,
+            throw FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire,
                 "gatt.writeCharacteristic() returned $rv : ${ErrorStrings.bluetoothStatusString(rv)}", rv)
         }
     } else {
         // set value
         if (!c.setValue(value)) {
-            throw FlutterError(BluebirdErrorCode.GATT_ERROR.wire, "characteristic.setValue() returned false", null)
+            throw FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire, "characteristic.setValue() returned false", null)
         }
 
         // write type
@@ -53,7 +53,7 @@ fun BluetoothGatt.writeCharacteristicCompat(
 
         // write char
         if (!writeCharacteristic(c)) {
-            throw FlutterError(BluebirdErrorCode.GATT_ERROR.wire, "gatt.writeCharacteristic() returned false", null)
+            throw FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire, "gatt.writeCharacteristic() returned false", null)
         }
     }
 }
@@ -72,18 +72,18 @@ fun BluetoothGatt.writeDescriptorCompat(
     if (Build.VERSION.SDK_INT >= 33) { // Android 13 (August 2022)
         val rv = writeDescriptor(d, value)
         if (rv != BluetoothStatusCodes.SUCCESS) {
-            throw FlutterError(BluebirdErrorCode.GATT_ERROR.wire,
+            throw FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire,
                 "gatt.writeDescriptor() returned $rv : ${ErrorStrings.bluetoothStatusString(rv)}", rv)
         }
     } else {
         // set value
         if (!d.setValue(value)) {
-            throw FlutterError(BluebirdErrorCode.GATT_ERROR.wire, "$label.setValue() returned false", null)
+            throw FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire, "$label.setValue() returned false", null)
         }
 
         // write descriptor
         if (!writeDescriptor(d)) {
-            throw FlutterError(BluebirdErrorCode.GATT_ERROR.wire, "gatt.writeDescriptor() returned false", null)
+            throw FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire, "gatt.writeDescriptor() returned false", null)
         }
     }
 }

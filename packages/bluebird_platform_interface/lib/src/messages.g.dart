@@ -115,8 +115,23 @@ enum BluebirdErrorCode {
   characteristicNotFound,
   userRejected,
   removeBondFailed,
-  gattError,
-  cbError,
+
+  /// An Android-side GATT stack/link failure — e.g. a `BluetoothGatt` call
+  /// returned false/null, an HCI disconnect, or `GATT_FAILURE`. Not a peer
+  /// response; see [attError]. The darwin analogue is [darwinError].
+  androidError,
+
+  /// A darwin-side (CoreBluetooth) stack/link failure — a non-`CBATTErrorDomain`
+  /// `NSError` (e.g. connection lost). Not a peer response; see [attError]. The
+  /// android analogue is [androidError].
+  darwinError,
+
+  /// A Bluetooth spec-level error: the peer answered a request with an ATT
+  /// Error Response. Raised uniformly by every platform, with the raw one-octet
+  /// code (an `int`, spanning the core ATT / application / GATT common ranges)
+  /// riding along as the error details. Platform/link failures that are *not*
+  /// peer responses stay [androidError] / [darwinError].
+  attError,
   deviceDisconnected,
   adapterOff,
   notConnected,

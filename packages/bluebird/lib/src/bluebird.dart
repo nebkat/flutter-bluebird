@@ -406,7 +406,11 @@ class Bluebird {
       try {
         return await call(BluebirdPlatform.instance);
       } on PlatformException catch (e) {
-        throw BluebirdException(e.code, _errorCodes[e.code] ?? BluebirdErrorCode.platform, e.message, e.details);
+        final code = _errorCodes[e.code] ?? BluebirdErrorCode.platform;
+        if (code == BluebirdErrorCode.attError && e.details is int) {
+          throw BluetoothAttException(e.code, e.details as int, e.message);
+        }
+        throw BluebirdException(e.code, code, e.message, e.details);
       }
     });
     if (ensureAdapterIsOn) future = future.bluebirdEnsureAdapterIsOn(name);
@@ -651,14 +655,91 @@ class BluebirdException implements Exception {
   final String? description;
 
   /// The raw platform error detail, when available — e.g. the native error
-  /// domain + code behind a [BluebirdErrorCode.cbError]/`gattError`. Useful for
+  /// domain + code behind a [BluebirdErrorCode.darwinError]/`androidError`. Useful for
   /// pinning down the exact cause (e.g. which ATT error a write hit).
   final Object? details;
 
   BluebirdException(this.function, this.code, [this.description, this.details]);
 
+  /// The Bluetooth ATT error-response code behind this exception (e.g. 3 ==
+  /// write-not-permitted), or null when the failure was not an ATT error.
+  ///
+  /// A spec-level error means the peer answered a request with an ATT Error
+  /// Response — distinct from a platform/link failure (see the class docs).
+  /// Every platform reports these uniformly as [BluebirdErrorCode.attError]
+  /// carrying the raw code, so this is a simple accessor. See [AttError] for the
+  /// well-known codes and [BluetoothAttException] to catch these directly.
+  int? get attError => code == BluebirdErrorCode.attError && details is int ? details as int : null;
+
   @override
   String toString() =>
       'BluebirdException | $function | bluebird-code: $code | $description'
       '${details != null ? ' | details: $details' : ''}';
+}
+
+/// A [BluebirdException] raised when a GATT operation fails at the Bluetooth
+/// *spec* level — the peer answered with an ATT Error Response — as opposed to a
+/// platform/link failure (adapter off, disconnect, CoreBluetooth `CBError`,
+/// Android stack error), which stays a plain [BluebirdException]. Lets callers
+/// distinguish "the device rejected my request, and here's why" from "the
+/// operation failed locally":
+///
+/// ```dart
+/// try {
+///   await characteristic.write(value);
+/// } on BluetoothAttException catch (e) {
+///   if (e.attError == AttError.writeNotPermitted) { ... }
+/// }
+/// ```
+///
+/// [attError] is always non-null here — it carries the raw one-octet code, which
+/// spans the core ATT, application, and GATT common ranges (see [AttError]).
+class BluetoothAttException extends BluebirdException {
+  BluetoothAttException(String function, int attError, [String? description])
+    : super(function, BluebirdErrorCode.attError, description, attError);
+
+  @override
+  int get attError => details as int;
+
+  /// If [attError] is in the ATT application error range (0x80–0x9F, defined by
+  /// the peer's profile), its zero-based offset within that range — `0` for
+  /// 0x80 … `31` for 0x9F — otherwise null. Handy when a profile numbers its own
+  /// errors from zero.
+  int? get appErrorZeroIndexed => attError >= 0x80 && attError <= 0x9f ? attError - 0x80 : null;
+}
+
+/// Well-known Bluetooth ATT error-response codes, as surfaced by
+/// [BluebirdException.attError] / [BluetoothAttException].
+///
+/// The single one-octet error space carried by the ATT Error Response is
+/// layered by who defines each range:
+///   - `0x01–0x11` — the core ATT spec codes (below).
+///   - `0x80–0x9F` — **application** errors, defined by the peer's profile; not
+///     enumerated here (they're app-specific) but delivered as raw ints.
+///   - `0xE0–0xFF` — the GATT **common profile & service** codes (below).
+abstract final class AttError {
+  // Core ATT spec codes (0x01–0x11).
+  static const int invalidHandle = 0x01;
+  static const int readNotPermitted = 0x02;
+  static const int writeNotPermitted = 0x03;
+  static const int invalidPdu = 0x04;
+  static const int insufficientAuthentication = 0x05;
+  static const int requestNotSupported = 0x06;
+  static const int invalidOffset = 0x07;
+  static const int insufficientAuthorization = 0x08;
+  static const int prepareQueueFull = 0x09;
+  static const int attributeNotFound = 0x0a;
+  static const int attributeNotLong = 0x0b;
+  static const int insufficientEncryptionKeySize = 0x0c;
+  static const int invalidAttributeValueLength = 0x0d;
+  static const int unlikelyError = 0x0e;
+  static const int insufficientEncryption = 0x0f;
+  static const int unsupportedGroupType = 0x10;
+  static const int insufficientResources = 0x11;
+
+  // GATT common profile & service codes (0xE0–0xFF).
+  static const int writeRequestRejected = 0xfc;
+  static const int cccdImproperlyConfigured = 0xfd;
+  static const int procedureAlreadyInProgress = 0xfe;
+  static const int outOfRange = 0xff;
 }

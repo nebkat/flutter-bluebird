@@ -78,7 +78,7 @@ void main() {
       expect(e.toString(), contains('timed out'));
       expect(e.toString(), isNot(contains('details')));
 
-      final withDetails = BluebirdException('f', BluebirdErrorCode.cbError, 'x', 'CBATTError 3');
+      final withDetails = BluebirdException('f', BluebirdErrorCode.darwinError, 'x', 'CBATTError 3');
       expect(withDetails.toString(), contains('details: CBATTError 3'));
     });
   });

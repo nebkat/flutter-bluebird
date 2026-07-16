@@ -167,7 +167,7 @@ extension BluebirdPlugin: CBCentralManagerDelegate {
 
     let failure =
       error.map(cbError)
-      ?? PigeonError(code: BluebirdErrorCode.cbError.wire, message: "failed to connect", details: nil)
+      ?? PigeonError(code: BluebirdErrorCode.darwinError.wire, message: "failed to connect", details: nil)
     state?.takeConnect()?.resume(throwing: failure)
   }
 
