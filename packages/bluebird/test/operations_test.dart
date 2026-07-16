@@ -15,9 +15,16 @@ void main() {
   setUp(() async {
     fake = FakePlatform()
       ..services = [
-        bmService('a000', characteristics: [
-          bmChar('b001', properties: props(read: true, write: true, writeWithoutResponse: true, notify: true), descriptors: ['2901']),
-        ]),
+        bmService(
+          'a000',
+          characteristics: [
+            bmChar(
+              'b001',
+              properties: props(read: true, write: true, writeWithoutResponse: true, notify: true),
+              descriptors: ['2901'],
+            ),
+          ],
+        ),
       ];
     FakePlatform.install(fake);
     device = Bluebird.deviceForAddress('AA:BB:CC:DD:EE:FF');

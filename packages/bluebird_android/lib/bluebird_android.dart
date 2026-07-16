@@ -116,8 +116,10 @@ final class BluebirdAndroid extends BluebirdPlatform {
     BmWriteType writeType,
     bool allowLongWrite,
     Uint8List value,
-  ) =>
-      _call('writeCharacteristic', () => _api.writeCharacteristic(address, characteristic, writeType, allowLongWrite, value));
+  ) => _call(
+    'writeCharacteristic',
+    () => _api.writeCharacteristic(address, characteristic, writeType, allowLongWrite, value),
+  );
 
   @override
   Future<void> writeDescriptor(String address, BmDescriptorRef descriptor, Uint8List value) =>

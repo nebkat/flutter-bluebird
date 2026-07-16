@@ -23,15 +23,13 @@ class DeviceScreen extends StatefulWidget {
 class _DeviceScreenState extends State<DeviceScreen> {
   int? _rssi;
   int? _mtuSize;
-  BluetoothConnectionState _connectionState =
-      BluetoothConnectionState.disconnected;
+  BluetoothConnectionState _connectionState = BluetoothConnectionState.disconnected;
   List<BluetoothService> get _services => widget.device.services;
   bool _isDiscoveringServices = false;
   bool _isConnecting = false;
   bool _isDisconnecting = false;
 
-  late StreamSubscription<BluetoothConnectionState>
-  _connectionStateSubscription;
+  late StreamSubscription<BluetoothConnectionState> _connectionStateSubscription;
   late StreamSubscription<bool> _isConnectingSubscription;
   late StreamSubscription<bool> _isDisconnectingSubscription;
   late StreamSubscription<int> _mtuSubscription;
@@ -41,14 +39,10 @@ class _DeviceScreenState extends State<DeviceScreen> {
   void initState() {
     super.initState();
 
-    _connectionStateSubscription = widget.device.connectionState.listen((
-      state,
-    ) async {
+    _connectionStateSubscription = widget.device.connectionState.listen((state) async {
       _connectionState = state;
       // web can't read RSSI after connecting, so don't try
-      if (!kIsWeb &&
-          state == BluetoothConnectionState.connected &&
-          _rssi == null) {
+      if (!kIsWeb && state == BluetoothConnectionState.connected && _rssi == null) {
         _rssi = await widget.device.readRssi();
       }
       if (mounted) {
@@ -70,9 +64,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
       }
     });
 
-    _isDisconnectingSubscription = widget.device.isDisconnecting.listen((
-      value,
-    ) {
+    _isDisconnectingSubscription = widget.device.isDisconnecting.listen((value) {
       _isDisconnecting = value;
       if (mounted) {
         setState(() {});
@@ -106,8 +98,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
       await widget.device.connectAndUpdateStream();
       Snackbar.show("Connect: Success", success: true);
     } catch (e) {
-      if (e is BluebirdException &&
-          e.code == BluebirdErrorCode.userCanceled.index) {
+      if (e is BluebirdException && e.code == BluebirdErrorCode.userCanceled.index) {
         // ignore connections canceled by the user
       } else {
         Snackbar.show(prettyException("Connect Error:", e), success: false);
@@ -146,10 +137,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
       await widget.device.discoverServices();
       Snackbar.show("Discover services: Success", success: true);
     } catch (e) {
-      Snackbar.show(
-        prettyException("Discover services: Error:", e),
-        success: false,
-      );
+      Snackbar.show(prettyException("Discover services: Error:", e), success: false);
       print(e);
     }
     if (mounted) {
@@ -174,9 +162,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
         .map(
           (s) => ServiceTile(
             service: s,
-            characteristicTiles: s.characteristics
-                .map((c) => _buildCharacteristicTile(c))
-                .toList(),
+            characteristicTiles: s.characteristics.map((c) => _buildCharacteristicTile(c)).toList(),
           ),
         )
         .toList();
@@ -185,9 +171,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
   CharacteristicTile _buildCharacteristicTile(BluetoothCharacteristic c) {
     return CharacteristicTile(
       characteristic: c,
-      descriptorTiles: c.descriptors
-          .map((d) => DescriptorTile(descriptor: d))
-          .toList(),
+      descriptorTiles: c.descriptors.map((d) => DescriptorTile(descriptor: d)).toList(),
     );
   }
 
@@ -223,10 +207,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
               children: [
                 // only show a reading while connected; otherwise just the bar
                 if (live) ...[
-                  Text(
-                    '$rssi dBm',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
+                  Text('$rssi dBm', style: Theme.of(context).textTheme.bodySmall),
                   const SizedBox(height: 4),
                 ],
                 ClipRRect(
@@ -257,17 +238,11 @@ class _DeviceScreenState extends State<DeviceScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  widget.device.remoteId,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
+                Text(widget.device.remoteId, style: Theme.of(context).textTheme.bodySmall),
                 const SizedBox(height: 2),
                 Text(
                   isConnected ? 'Connected' : 'Disconnected',
-                  style: TextStyle(
-                    color: isConnected ? Colors.green : Colors.grey,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: TextStyle(color: isConnected ? Colors.green : Colors.grey, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
@@ -279,25 +254,15 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
   Widget _buildActions(BuildContext context) {
     final busy = _isConnecting || _isDisconnecting;
-    Widget spinner() => const SizedBox(
-      width: 16,
-      height: 16,
-      child: CircularProgressIndicator(strokeWidth: 2),
-    );
+    Widget spinner() => const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2));
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Row(
         children: [
           Expanded(
             child: FilledButton.icon(
-              icon: busy
-                  ? spinner()
-                  : Icon(isConnected ? Icons.link_off : Icons.link),
-              label: Text(
-                _isConnecting
-                    ? 'Cancel'
-                    : (isConnected ? 'Disconnect' : 'Connect'),
-              ),
+              icon: busy ? spinner() : Icon(isConnected ? Icons.link_off : Icons.link),
+              label: Text(_isConnecting ? 'Cancel' : (isConnected ? 'Disconnect' : 'Connect')),
               // destructive: error colors keep the label readable in light/dark
               style: isConnected
                   ? FilledButton.styleFrom(
@@ -305,21 +270,15 @@ class _DeviceScreenState extends State<DeviceScreen> {
                       foregroundColor: Theme.of(context).colorScheme.onError,
                     )
                   : null,
-              onPressed: _isConnecting
-                  ? onCancelPressed
-                  : (isConnected ? onDisconnectPressed : onConnectPressed),
+              onPressed: _isConnecting ? onCancelPressed : (isConnected ? onDisconnectPressed : onConnectPressed),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: OutlinedButton.icon(
-              icon: _isDiscoveringServices
-                  ? spinner()
-                  : const Icon(Icons.search),
+              icon: _isDiscoveringServices ? spinner() : const Icon(Icons.search),
               label: const Text('Get Services'),
-              onPressed: (isConnected && !_isDiscoveringServices)
-                  ? onDiscoverServicesPressed
-                  : null,
+              onPressed: (isConnected && !_isDiscoveringServices) ? onDiscoverServicesPressed : null,
             ),
           ),
         ],
@@ -334,19 +293,14 @@ class _DeviceScreenState extends State<DeviceScreen> {
       // requestMtu is only supported on Android; other platforms
       // negotiate the MTU automatically
       trailing: (!kIsWeb && Platform.isAndroid)
-          ? IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: onRequestMtuPressed,
-            )
+          ? IconButton(icon: const Icon(Icons.edit), onPressed: onRequestMtuPressed)
           : null,
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final name = widget.device.platformName.isNotEmpty
-        ? widget.device.platformName
-        : 'Unknown';
+    final name = widget.device.platformName.isNotEmpty ? widget.device.platformName : 'Unknown';
     return Scaffold(
       appBar: AppBar(title: Text(name)),
       body: SingleChildScrollView(

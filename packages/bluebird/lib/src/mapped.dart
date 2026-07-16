@@ -46,8 +46,7 @@ class MappedBluetoothCharacteristic<T> {
   //
 
   /// [BluetoothCharacteristic.read], decoded to [T].
-  Future<T> read({Duration timeout = const Duration(seconds: 15)}) async =>
-      _decode(await raw.read(timeout: timeout));
+  Future<T> read({Duration timeout = const Duration(seconds: 15)}) async => _decode(await raw.read(timeout: timeout));
 
   /// [BluetoothCharacteristic.write], encoding [value] first.
   /// Throws a [StateError] if this mapping has no encode function.
@@ -56,13 +55,12 @@ class MappedBluetoothCharacteristic<T> {
     bool withoutResponse = false,
     bool allowLongWrite = false,
     Duration timeout = const Duration(seconds: 15),
-  }) =>
-      raw.write(
-        _encodeOrThrow(value),
-        withoutResponse: withoutResponse,
-        allowLongWrite: allowLongWrite,
-        timeout: timeout,
-      );
+  }) => raw.write(
+    _encodeOrThrow(value),
+    withoutResponse: withoutResponse,
+    allowLongWrite: allowLongWrite,
+    timeout: timeout,
+  );
 
   /// [BluetoothCharacteristic.notifications], decoded to [T].
   Stream<T> get notifications => raw.notifications.map(_decode);
@@ -77,10 +75,7 @@ class MappedBluetoothCharacteristic<T> {
   Stream<T> get valuesPassive => raw.valuesPassive.map(_decode);
 
   /// A further-mapped view over the same underlying characteristic.
-  MappedBluetoothCharacteristic<S> map<S>(
-    S Function(T value) decode, {
-    T Function(S value)? encode,
-  }) {
+  MappedBluetoothCharacteristic<S> map<S>(S Function(T value) decode, {T Function(S value)? encode}) {
     final innerEncode = _encode;
     return MappedBluetoothCharacteristic._(
       raw,
@@ -118,10 +113,7 @@ extension BluetoothCharacteristicMapping on BluetoothCharacteristic {
   /// A typed view over this characteristic. [decode] maps received bytes to [T];
   /// [encode] (required only if you [MappedBluetoothCharacteristic.write]) maps
   /// [T] back to bytes.
-  MappedBluetoothCharacteristic<T> map<T>(
-    T Function(List<int> bytes) decode, {
-    List<int> Function(T value)? encode,
-  }) =>
+  MappedBluetoothCharacteristic<T> map<T>(T Function(List<int> bytes) decode, {List<int> Function(T value)? encode}) =>
       MappedBluetoothCharacteristic._(this, decode, encode);
 }
 
@@ -146,8 +138,7 @@ class MappedBluetoothDescriptor<T> {
   }
 
   /// [BluetoothDescriptor.read], decoded to [T].
-  Future<T> read({Duration timeout = const Duration(seconds: 15)}) async =>
-      _decode(await raw.read(timeout: timeout));
+  Future<T> read({Duration timeout = const Duration(seconds: 15)}) async => _decode(await raw.read(timeout: timeout));
 
   /// [BluetoothDescriptor.write], encoding [value] first.
   /// Throws a [StateError] if this mapping has no encode function.
@@ -155,10 +146,7 @@ class MappedBluetoothDescriptor<T> {
       raw.write(_encodeOrThrow(value), timeout: timeout);
 
   /// A further-mapped view over the same underlying descriptor.
-  MappedBluetoothDescriptor<S> map<S>(
-    S Function(T value) decode, {
-    T Function(S value)? encode,
-  }) {
+  MappedBluetoothDescriptor<S> map<S>(S Function(T value) decode, {T Function(S value)? encode}) {
     final innerEncode = _encode;
     return MappedBluetoothDescriptor._(
       raw,
@@ -182,9 +170,6 @@ extension BluetoothDescriptorMapping on BluetoothDescriptor {
   /// A typed view over this descriptor. [decode] maps read bytes to [T];
   /// [encode] (required only if you [MappedBluetoothDescriptor.write]) maps
   /// [T] back to bytes.
-  MappedBluetoothDescriptor<T> map<T>(
-    T Function(List<int> bytes) decode, {
-    List<int> Function(T value)? encode,
-  }) =>
+  MappedBluetoothDescriptor<T> map<T>(T Function(List<int> bytes) decode, {List<int> Function(T value)? encode}) =>
       MappedBluetoothDescriptor._(this, decode, encode);
 }

@@ -12,20 +12,14 @@ class BluetoothOffScreen extends StatelessWidget {
   final BluetoothAdapterState? adapterState;
 
   Widget buildBluetoothOffIcon(BuildContext context) {
-    return const Icon(
-      Icons.bluetooth_disabled,
-      size: 200.0,
-      color: Colors.white54,
-    );
+    return const Icon(Icons.bluetooth_disabled, size: 200.0, color: Colors.white54);
   }
 
   Widget buildTitle(BuildContext context) {
     String? state = adapterState?.toString().split(".").last;
     return Text(
       'Bluetooth Adapter is ${state != null ? state : 'not available'}',
-      style: Theme.of(
-        context,
-      ).primaryTextTheme.titleSmall?.copyWith(color: Colors.white),
+      style: Theme.of(context).primaryTextTheme.titleSmall?.copyWith(color: Colors.white),
     );
   }
 
@@ -40,10 +34,7 @@ class BluetoothOffScreen extends StatelessWidget {
               await Bluebird.turnOn();
             }
           } catch (e) {
-            Snackbar.show(
-              prettyException("Error Turning On:", e),
-              success: false,
-            );
+            Snackbar.show(prettyException("Error Turning On:", e), success: false);
             print(e);
           }
         },

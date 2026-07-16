@@ -40,9 +40,7 @@ void main() {
   test('connectedDevices reflects per-device connection state', () async {
     final device = Bluebird.deviceForAddress('AA');
     expect(Bluebird.connectedDevices, isEmpty);
-    device.applyEvent(
-      OnConnectionStateChangedEvent(device, BluetoothConnectionState.connected, null),
-    );
+    device.applyEvent(OnConnectionStateChangedEvent(device, BluetoothConnectionState.connected, null));
     expect(Bluebird.connectedDevices, [device]);
   });
 

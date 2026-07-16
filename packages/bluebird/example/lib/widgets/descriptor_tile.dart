@@ -41,12 +41,7 @@ class _DescriptorTileState extends State<DescriptorTile> {
 
   List<int> _getRandomBytes() {
     final math = Random();
-    return [
-      math.nextInt(255),
-      math.nextInt(255),
-      math.nextInt(255),
-      math.nextInt(255),
-    ];
+    return [math.nextInt(255), math.nextInt(255), math.nextInt(255), math.nextInt(255)];
   }
 
   Future onReadPressed() async {
@@ -55,10 +50,7 @@ class _DescriptorTileState extends State<DescriptorTile> {
       if (mounted) setState(() => _value = value);
       Snackbar.show("Descriptor Read : Success", success: true);
     } catch (e) {
-      Snackbar.show(
-        prettyException("Descriptor Read Error:", e),
-        success: false,
-      );
+      Snackbar.show(prettyException("Descriptor Read Error:", e), success: false);
       print(e);
     }
   }
@@ -68,10 +60,7 @@ class _DescriptorTileState extends State<DescriptorTile> {
       await d.write(_getRandomBytes());
       Snackbar.show("Descriptor Write : Success", success: true);
     } catch (e) {
-      Snackbar.show(
-        prettyException("Descriptor Write Error:", e),
-        success: false,
-      );
+      Snackbar.show(prettyException("Descriptor Write Error:", e), success: false);
       print(e);
     }
   }
@@ -95,10 +84,7 @@ class _DescriptorTileState extends State<DescriptorTile> {
   }
 
   Widget buildButtonRow(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[buildReadButton(context), buildWriteButton(context)],
-    );
+    return Row(mainAxisSize: MainAxisSize.min, children: <Widget>[buildReadButton(context), buildWriteButton(context)]);
   }
 
   @override
@@ -107,11 +93,7 @@ class _DescriptorTileState extends State<DescriptorTile> {
       title: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(d.uuid.name ?? 'Descriptor'),
-          buildUuid(context),
-          buildValue(context),
-        ],
+        children: <Widget>[Text(d.uuid.name ?? 'Descriptor'), buildUuid(context), buildValue(context)],
       ),
       subtitle: buildButtonRow(context),
     );

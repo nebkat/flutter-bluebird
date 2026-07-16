@@ -25,17 +25,9 @@ class WebUnsupportedScreen extends StatelessWidget {
               children: [
                 Center(child: Image.asset('assets/bluebird.png', height: 140)),
                 const SizedBox(height: 24),
-                Icon(
-                  Icons.bluetooth_disabled,
-                  size: 56,
-                  color: theme.colorScheme.error,
-                ),
+                Icon(Icons.bluetooth_disabled, size: 56, color: theme.colorScheme.error),
                 const SizedBox(height: 16),
-                Text(
-                  "Web Bluetooth isn't available",
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.titleLarge,
-                ),
+                Text("Web Bluetooth isn't available", textAlign: TextAlign.center, style: theme.textTheme.titleLarge),
                 const SizedBox(height: 12),
                 Text(
                   'This demo requires the Web Bluetooth API, which is only supported '
@@ -48,9 +40,7 @@ class WebUnsupportedScreen extends StatelessWidget {
                 Text(
                   'Firefox and Safari are not supported.',
                   textAlign: TextAlign.center,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.hintColor,
-                  ),
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
                 ),
               ],
             ),

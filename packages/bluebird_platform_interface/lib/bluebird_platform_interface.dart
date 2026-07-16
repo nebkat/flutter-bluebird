@@ -99,15 +99,18 @@ abstract base class BluebirdPlatform {
 
   Future<bool> isSupported() => throw UnimplementedError('$runtimeType.isSupported');
 
-  Future<Uint8List> readCharacteristic(String address, BmCharacteristicRef characteristic) => throw UnimplementedError('$runtimeType.readCharacteristic');
+  Future<Uint8List> readCharacteristic(String address, BmCharacteristicRef characteristic) =>
+      throw UnimplementedError('$runtimeType.readCharacteristic');
 
-  Future<Uint8List> readDescriptor(String address, BmDescriptorRef descriptor) => throw UnimplementedError('$runtimeType.readDescriptor');
+  Future<Uint8List> readDescriptor(String address, BmDescriptorRef descriptor) =>
+      throw UnimplementedError('$runtimeType.readDescriptor');
 
   Future<int> readRssi(String address) => throw UnimplementedError('$runtimeType.readRssi');
 
   Future<bool> removeBond(String address) => throw UnimplementedError('$runtimeType.removeBond');
 
-  Future<void> requestConnectionPriority(String address, ConnectionPriority connectionPriority) => throw UnimplementedError('$runtimeType.requestConnectionPriority');
+  Future<void> requestConnectionPriority(String address, ConnectionPriority connectionPriority) =>
+      throw UnimplementedError('$runtimeType.requestConnectionPriority');
 
   Future<int> requestMtu(String address, int mtu) => throw UnimplementedError('$runtimeType.requestMtu');
 
@@ -117,11 +120,14 @@ abstract base class BluebirdPlatform {
     return Future.value();
   }
 
-  Future<bool> setNotifyValue(String address, BmCharacteristicRef characteristic, bool enable) => throw UnimplementedError('$runtimeType.setNotifyValue');
+  Future<bool> setNotifyValue(String address, BmCharacteristicRef characteristic, bool enable) =>
+      throw UnimplementedError('$runtimeType.setNotifyValue');
 
-  Future<void> setOptions(bool showPowerAlert, bool restoreState) => throw UnimplementedError('$runtimeType.setOptions');
+  Future<void> setOptions(bool showPowerAlert, bool restoreState) =>
+      throw UnimplementedError('$runtimeType.setOptions');
 
-  Future<void> setPreferredPhy(String address, int txPhy, int rxPhy, int phyOptions) => throw UnimplementedError('$runtimeType.setPreferredPhy');
+  Future<void> setPreferredPhy(String address, int txPhy, int rxPhy, int phyOptions) =>
+      throw UnimplementedError('$runtimeType.setPreferredPhy');
 
   Future<void> startScan(BmScanSettings settings) => throw UnimplementedError('$runtimeType.startScan');
 
@@ -139,5 +145,6 @@ abstract base class BluebirdPlatform {
     Uint8List value,
   ) => throw UnimplementedError('$runtimeType.writeCharacteristic');
 
-  Future<void> writeDescriptor(String address, BmDescriptorRef descriptor, Uint8List value) => throw UnimplementedError('$runtimeType.writeDescriptor');
+  Future<void> writeDescriptor(String address, BmDescriptorRef descriptor, Uint8List value) =>
+      throw UnimplementedError('$runtimeType.writeDescriptor');
 }

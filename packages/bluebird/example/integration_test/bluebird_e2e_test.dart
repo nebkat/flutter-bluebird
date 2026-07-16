@@ -53,24 +53,21 @@ void main() {
   late List<BluetoothService> services;
 
   BluetoothService serviceByUuid(Uuid uuid) => services.firstWhere(
-        (s) => s.uuid == uuid,
-        orElse: () => fail('service $uuid not found on fixture; discovered: ${services.map((s) => s.uuid).toList()}'),
-      );
+    (s) => s.uuid == uuid,
+    orElse: () => fail('service $uuid not found on fixture; discovered: ${services.map((s) => s.uuid).toList()}'),
+  );
 
-  BluetoothCharacteristic chr(Uuid service, Uuid characteristic) =>
-      serviceByUuid(service).characteristics.firstWhere(
-            (c) => c.uuid == characteristic,
-            orElse: () => fail('characteristic $characteristic not found in service $service'),
-          );
+  BluetoothCharacteristic chr(Uuid service, Uuid characteristic) => serviceByUuid(service).characteristics.firstWhere(
+    (c) => c.uuid == characteristic,
+    orElse: () => fail('characteristic $characteristic not found in service $service'),
+  );
 
-  int decodeCounter(List<int> value) =>
-      ByteData.sublistView(Uint8List.fromList(value)).getUint32(0, Endian.little);
+  int decodeCounter(List<int> value) => ByteData.sublistView(Uint8List.fromList(value)).getUint32(0, Endian.little);
 
   void expectStrictlyIncrementing(List<int> counters) {
     expect(counters.length, greaterThanOrEqualTo(3));
     for (int i = 1; i < counters.length; i++) {
-      expect(counters[i], greaterThan(counters[i - 1]),
-          reason: 'counter values must strictly increment: $counters');
+      expect(counters[i], greaterThan(counters[i - 1]), reason: 'counter values must strictly increment: $counters');
     }
   }
 
@@ -106,25 +103,28 @@ void main() {
     await Bluebird.adapterState
         .where((s) => s == BluetoothAdapterState.on)
         .first
-        .timeout(const Duration(seconds: 10),
-            onTimeout: () => fail('bluetooth adapter did not turn on within 10s'));
+        .timeout(const Duration(seconds: 10), onTimeout: () => fail('bluetooth adapter did not turn on within 10s'));
 
     final result = await scanForFixture();
 
     // scan-filter / advertisement assertions
     final adv = result.advertisementData;
-    expect(adv.manufacturerData, contains(mfgCompanyId),
-        reason: 'advertisement must carry manufacturer data for company 0x02E5');
+    expect(
+      adv.manufacturerData,
+      contains(mfgCompanyId),
+      reason: 'advertisement must carry manufacturer data for company 0x02E5',
+    );
     expect(adv.manufacturerData[mfgCompanyId], mfgPayload);
-    expect(adv.serviceData, contains(advServiceUuid),
-        reason: 'scan response must carry service data for 0x181A');
+    expect(adv.serviceData, contains(advServiceUuid), reason: 'scan response must carry service data for 0x181A');
     expect(adv.serviceData[advServiceUuid], advServiceData);
     expect(adv.serviceUuids, contains(advServiceUuid));
     expect(adv.connectable, isTrue);
 
     device = result.device;
     // ignore: avoid_print
-    print('FIXTURE result: address=${result.address} platformName=${result.platformName} adv=${result.advertisementData}');
+    print(
+      'FIXTURE result: address=${result.address} platformName=${result.platformName} adv=${result.advertisementData}',
+    );
     await device.connect(timeout: const Duration(seconds: 15));
     // ignore: avoid_print
     print('CONNECTED: remoteId=${device.remoteId} platformName=${device.platformName}');
@@ -136,7 +136,9 @@ void main() {
   tearDownAll(() async {
     try {
       if (device.isConnected) await device.disconnect();
-    } catch (_) {/* best effort */}
+    } catch (_) {
+      /* best effort */
+    }
   });
 
   test(
@@ -176,60 +178,44 @@ void main() {
     timeout: const Timeout(Duration(seconds: 10)),
   );
 
-  test(
-    'AttributeId: Service B duplicate-uuid characteristics are distinct instances '
-    'with different values',
-    () async {
-      final dups =
-          serviceByUuid(svcB).characteristics.where((c) => c.uuid == chrDuplicate).toList();
-      expect(dups, hasLength(2),
-          reason: 'Service B must expose TWO characteristics with uuid $chrDuplicate');
+  test('AttributeId: Service B duplicate-uuid characteristics are distinct instances '
+      'with different values', () async {
+    final dups = serviceByUuid(svcB).characteristics.where((c) => c.uuid == chrDuplicate).toList();
+    expect(dups, hasLength(2), reason: 'Service B must expose TWO characteristics with uuid $chrDuplicate');
 
-      // the two instances must be disambiguated by their attribute ids
-      expect(dups[0].id, isNot(equals(dups[1].id)),
-          reason: 'same-uuid characteristics must have distinct BluetoothAttributeIds');
+    // the two instances must be disambiguated by their attribute ids
+    expect(
+      dups[0].id,
+      isNot(equals(dups[1].id)),
+      reason: 'same-uuid characteristics must have distinct BluetoothAttributeIds',
+    );
 
-      final v1 = utf8.decode(await dups[0].read());
-      final v2 = utf8.decode(await dups[1].read());
-      expect(v1, isNot(equals(v2)),
-          reason: 'reads of the two instances must hit different attributes');
-      expect({v1, v2}, {'instance-one', 'instance-two'});
-    },
-    timeout: const Timeout(Duration(seconds: 15)),
-  );
+    final v1 = utf8.decode(await dups[0].read());
+    final v2 = utf8.decode(await dups[1].read());
+    expect(v1, isNot(equals(v2)), reason: 'reads of the two instances must hit different attributes');
+    expect({v1, v2}, {'instance-one', 'instance-two'});
+  }, timeout: const Timeout(Duration(seconds: 15)));
 
-  test(
-    'static read returns "bluebird"',
-    () async {
-      final value = await chr(svcA, chrStaticRead).read();
-      expect(utf8.decode(value), 'bluebird');
-    },
-    timeout: const Timeout(Duration(seconds: 10)),
-  );
+  test('static read returns "bluebird"', () async {
+    final value = await chr(svcA, chrStaticRead).read();
+    expect(utf8.decode(value), 'bluebird');
+  }, timeout: const Timeout(Duration(seconds: 10)));
 
-  test(
-    'write with response then read-back',
-    () async {
-      final c = chr(svcA, chrWriteEcho);
-      final payload = utf8.encode('hello-with-response');
-      await c.write(payload);
-      expect(await c.read(), payload);
-    },
-    timeout: const Timeout(Duration(seconds: 15)),
-  );
+  test('write with response then read-back', () async {
+    final c = chr(svcA, chrWriteEcho);
+    final payload = utf8.encode('hello-with-response');
+    await c.write(payload);
+    expect(await c.read(), payload);
+  }, timeout: const Timeout(Duration(seconds: 15)));
 
-  test(
-    'write without response then read-back',
-    () async {
-      final c = chr(svcA, chrWriteEcho);
-      final payload = utf8.encode('hello-no-response');
-      await c.write(payload, withoutResponse: true);
-      // withoutResponse gives no delivery guarantee; give the peripheral a moment
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-      expect(await c.read(), payload);
-    },
-    timeout: const Timeout(Duration(seconds: 15)),
-  );
+  test('write without response then read-back', () async {
+    final c = chr(svcA, chrWriteEcho);
+    final payload = utf8.encode('hello-no-response');
+    await c.write(payload, withoutResponse: true);
+    // withoutResponse gives no delivery guarantee; give the peripheral a moment
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    expect(await c.read(), payload);
+  }, timeout: const Timeout(Duration(seconds: 15)));
 
   test(
     'descriptors: 0x2901 user description read + custom descriptor write/read-back',
@@ -253,116 +239,87 @@ void main() {
     timeout: const Timeout(Duration(seconds: 20)),
   );
 
-  test(
-    'notify: collects >=3 strictly-incrementing counter values',
-    () async {
-      // fixture notifies a uint32 LE counter every 1 s while subscribed;
-      // the notifications stream subscribes on listen, unsubscribes on cancel
-      final values = await chr(svcA, chrNotify)
-          .notifications
-          .take(3)
-          .map(decodeCounter)
-          .toList()
-          .timeout(const Duration(seconds: 10));
-      expectStrictlyIncrementing(values);
-    },
-    timeout: const Timeout(Duration(seconds: 15)),
-  );
+  test('notify: collects >=3 strictly-incrementing counter values', () async {
+    // fixture notifies a uint32 LE counter every 1 s while subscribed;
+    // the notifications stream subscribes on listen, unsubscribes on cancel
+    final values = await chr(
+      svcA,
+      chrNotify,
+    ).notifications.take(3).map(decodeCounter).toList().timeout(const Duration(seconds: 10));
+    expectStrictlyIncrementing(values);
+  }, timeout: const Timeout(Duration(seconds: 15)));
 
-  test(
-    'indicate: collects >=3 strictly-incrementing counter values',
-    () async {
-      // fixture indicates every 2 s while subscribed
-      final values = await chr(svcA, chrIndicate)
-          .notifications
-          .take(3)
-          .map(decodeCounter)
-          .toList()
-          .timeout(const Duration(seconds: 15));
-      expectStrictlyIncrementing(values);
-    },
-    timeout: const Timeout(Duration(seconds: 20)),
-  );
+  test('indicate: collects >=3 strictly-incrementing counter values', () async {
+    // fixture indicates every 2 s while subscribed
+    final values = await chr(
+      svcA,
+      chrIndicate,
+    ).notifications.take(3).map(decodeCounter).toList().timeout(const Duration(seconds: 15));
+    expectStrictlyIncrementing(values);
+  }, timeout: const Timeout(Duration(seconds: 20)));
 
-  test(
-    'notify|indicate characteristic subscribes (uses notifications)',
-    () async {
-      final c = chr(svcA, chrNotifyInd);
-      final values = await c.notifications
-          .take(3)
-          .map(decodeCounter)
-          .toList()
-          .timeout(const Duration(seconds: 10));
+  test('notify|indicate characteristic subscribes (uses notifications)', () async {
+    final c = chr(svcA, chrNotifyInd);
+    final values = await c.notifications.take(3).map(decodeCounter).toList().timeout(const Duration(seconds: 10));
 
-      expectStrictlyIncrementing(values);
-    },
-    timeout: const Timeout(Duration(seconds: 20)),
-  );
+    expectStrictlyIncrementing(values);
+  }, timeout: const Timeout(Duration(seconds: 20)));
 
-  test(
-    '512-byte long write (allowLongWrite) + read-back equality',
-    () async {
-      final c = chr(svcA, chrLong);
+  test('512-byte long write (allowLongWrite) + read-back equality', () async {
+    final c = chr(svcA, chrLong);
 
-      // requestMtu is Android-only (macOS negotiates the MTU automatically)
-      if (System.isAndroid) {
-        await device.requestMtu(517);
-      }
+    // requestMtu is Android-only (macOS negotiates the MTU automatically)
+    if (System.isAndroid) {
+      await device.requestMtu(517);
+    }
 
-      final payload = List<int>.generate(512, (i) => (i * 7 + 3) & 0xff);
-      await c.write(payload, allowLongWrite: true, timeout: const Duration(seconds: 30));
-      final back = await c.read(timeout: const Duration(seconds: 30));
-      expect(back, hasLength(512));
-      expect(back, payload);
-    },
-    timeout: const Timeout(Duration(seconds: 45)),
-  );
+    final payload = List<int>.generate(512, (i) => (i * 7 + 3) & 0xff);
+    await c.write(payload, allowLongWrite: true, timeout: const Duration(seconds: 30));
+    final back = await c.read(timeout: const Duration(seconds: 30));
+    expect(back, hasLength(512));
+    expect(back, payload);
+  }, timeout: const Timeout(Duration(seconds: 45)));
 
-  test(
-    'control 0x01: services-changed indication fires onServicesReset, '
-    're-discovery succeeds',
-    () async {
-      final reset = device.onServicesReset.first;
-      await chr(svcA, chrControl).write([0x01]);
-      await reset.timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => fail('onServicesReset event not received within 10s'),
-      );
+  test('control 0x01: services-changed indication fires onServicesReset, '
+      're-discovery succeeds', () async {
+    final reset = device.onServicesReset.first;
+    await chr(svcA, chrControl).write([0x01]);
+    await reset.timeout(
+      const Duration(seconds: 10),
+      onTimeout: () => fail('onServicesReset event not received within 10s'),
+    );
 
-      services = await device.discoverServices();
-      expect(services.any((s) => s.uuid == svcA), isTrue);
-      expect(services.any((s) => s.uuid == svcB), isTrue);
-    },
-    timeout: const Timeout(Duration(seconds: 20)),
-  );
+    services = await device.discoverServices();
+    expect(services.any((s) => s.uuid == svcA), isTrue);
+    expect(services.any((s) => s.uuid == svcB), isTrue);
+  }, timeout: const Timeout(Duration(seconds: 20)));
 
-  test(
-    'control 0x02: peripheral-side disconnect emits disconnected state with a '
-    'reason, then reconnect succeeds',
-    () async {
-      final disconnected = device.connectionState
-          .where((s) => s == BluetoothConnectionState.disconnected)
-          .first;
+  test('control 0x02: peripheral-side disconnect emits disconnected state with a '
+      'reason, then reconnect succeeds', () async {
+    final disconnected = device.connectionState.where((s) => s == BluetoothConnectionState.disconnected).first;
 
-      // the write response may be lost in the race with the disconnect
-      try {
-        await chr(svcA, chrControl).write([0x02], timeout: const Duration(seconds: 5));
-      } catch (_) {/* expected on some platforms */}
+    // the write response may be lost in the race with the disconnect
+    try {
+      await chr(svcA, chrControl).write([0x02], timeout: const Duration(seconds: 5));
+    } catch (_) {
+      /* expected on some platforms */
+    }
 
-      await disconnected.timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => fail('disconnected connectionState event not received within 10s'),
-      );
-      expect(device.disconnectReason, isNotNull,
-          reason: 'peripheral-initiated disconnect must surface a DisconnectReason');
+    await disconnected.timeout(
+      const Duration(seconds: 10),
+      onTimeout: () => fail('disconnected connectionState event not received within 10s'),
+    );
+    expect(
+      device.disconnectReason,
+      isNotNull,
+      reason: 'peripheral-initiated disconnect must surface a DisconnectReason',
+    );
 
-      // fixture resumes advertising immediately; reconnect
-      await device.connect(timeout: const Duration(seconds: 15));
-      services = await device.discoverServices();
-      expect(services.any((s) => s.uuid == svcA), isTrue);
-    },
-    timeout: const Timeout(Duration(seconds: 40)),
-  );
+    // fixture resumes advertising immediately; reconnect
+    await device.connect(timeout: const Duration(seconds: 15));
+    services = await device.discoverServices();
+    expect(services.any((s) => s.uuid == svcA), isTrue);
+  }, timeout: const Timeout(Duration(seconds: 40)));
 
   // Reading an encryption-requiring characteristic forces pairing/bonding.
   // Android exposes bond-state management (query + remove) and Just-Works
@@ -371,30 +328,26 @@ void main() {
   group('bonding', () {
     final canManageBonds = !System.isDarwin;
 
-    test(
-      'encrypted read triggers bonding and returns "top-secret"',
-      () async {
-        // start from a clean bond so the encrypted read actually drives
-        // pairing; removeBond disconnects on Android, so reconnect + rediscover
-        // to run the read against live attribute handles
-        if (canManageBonds && await device.bondState.value != BluetoothBondState.none) {
-          await device.removeBond();
-          if (device.isDisconnected) {
-            await device.connect(timeout: const Duration(seconds: 15));
-            services = await device.discoverServices();
-          }
+    test('encrypted read triggers bonding and returns "top-secret"', () async {
+      // start from a clean bond so the encrypted read actually drives
+      // pairing; removeBond disconnects on Android, so reconnect + rediscover
+      // to run the read against live attribute handles
+      if (canManageBonds && await device.bondState.value != BluetoothBondState.none) {
+        await device.removeBond();
+        if (device.isDisconnected) {
+          await device.connect(timeout: const Duration(seconds: 15));
+          services = await device.discoverServices();
         }
+      }
 
-        // the read only succeeds once the link is encrypted, so a correct
-        // value is itself proof that bonding completed
-        final value = await chr(svcA, chrEncrypted).read(timeout: const Duration(seconds: 30));
-        expect(utf8.decode(value), 'top-secret');
+      // the read only succeeds once the link is encrypted, so a correct
+      // value is itself proof that bonding completed
+      final value = await chr(svcA, chrEncrypted).read(timeout: const Duration(seconds: 30));
+      expect(utf8.decode(value), 'top-secret');
 
-        if (canManageBonds) {
-          expect(await device.bondState.value, BluetoothBondState.bonded);
-        }
-      },
-      timeout: const Timeout(Duration(seconds: 45)),
-    );
+      if (canManageBonds) {
+        expect(await device.bondState.value, BluetoothBondState.bonded);
+      }
+    }, timeout: const Timeout(Duration(seconds: 45)));
   });
 }

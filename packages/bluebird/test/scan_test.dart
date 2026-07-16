@@ -54,8 +54,12 @@ void main() {
   test('scans with filters applied', () async {
     final sub = Bluebird.scan(
       withServices: [Uuid('180f')],
-      withMsd: [MsdFilter(0x02e5, data: [1], mask: [0xff])],
-      withServiceData: [ServiceDataFilter(Uuid('180a'), data: [2])],
+      withMsd: [
+        MsdFilter(0x02e5, data: [1], mask: [0xff]),
+      ],
+      withServiceData: [
+        ServiceDataFilter(Uuid('180a'), data: [2]),
+      ],
       withNames: ['dev'],
     ).listen((_) {});
     await pumpEventQueue();

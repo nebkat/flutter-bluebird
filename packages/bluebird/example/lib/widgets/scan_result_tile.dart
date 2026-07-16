@@ -7,8 +7,7 @@ import '../utils/appearance_values.dart';
 import '../utils/manufacturer_ids.dart';
 
 class ScanResultTile extends StatefulWidget {
-  const ScanResultTile({Key? key, required this.result, this.onTap})
-    : super(key: key);
+  const ScanResultTile({Key? key, required this.result, this.onTap}) : super(key: key);
 
   final ScanResult result;
   final VoidCallback? onTap;
@@ -18,16 +17,13 @@ class ScanResultTile extends StatefulWidget {
 }
 
 class _ScanResultTileState extends State<ScanResultTile> {
-  late StreamSubscription<BluetoothConnectionState>
-  _connectionStateSubscription;
+  late StreamSubscription<BluetoothConnectionState> _connectionStateSubscription;
 
   @override
   void initState() {
     super.initState();
 
-    _connectionStateSubscription = widget.result.device.connectionState.listen((
-      state,
-    ) {
+    _connectionStateSubscription = widget.result.device.connectionState.listen((state) {
       if (mounted) {
         setState(() {});
       }
@@ -41,12 +37,10 @@ class _ScanResultTileState extends State<ScanResultTile> {
   }
 
   String getNiceHexArray(List<int> bytes) {
-    return '[${bytes.map((i) => i.toRadixString(16).padLeft(2, '0')).join(' ')}]'
-        .toUpperCase();
+    return '[${bytes.map((i) => i.toRadixString(16).padLeft(2, '0')).join(' ')}]'.toUpperCase();
   }
 
-  String _hex16(int id) =>
-      '0x${id.toRadixString(16).padLeft(4, '0').toUpperCase()}';
+  String _hex16(int id) => '0x${id.toRadixString(16).padLeft(4, '0').toUpperCase()}';
 
   // manufacturerData maps a 16-bit company id to its payload; append the SIG
   // company name in brackets when the id is a known assigned number
@@ -61,10 +55,7 @@ class _ScanResultTileState extends State<ScanResultTile> {
   }
 
   String getNiceServiceData(Map<Uuid, List<int>> data) {
-    return data.entries
-        .map((v) => '${v.key} ${getNiceHexArray(v.value)}')
-        .join('\n')
-        .toUpperCase();
+    return data.entries.map((v) => '${v.key} ${getNiceHexArray(v.value)}').join('\n').toUpperCase();
   }
 
   String getNiceServiceUuids(List<Uuid> serviceUuids) {
@@ -143,12 +134,7 @@ class _ScanResultTileState extends State<ScanResultTile> {
               child: Text(
                 hasName ? advertisedName : 'Unknown',
                 overflow: TextOverflow.ellipsis,
-                style: hasName
-                    ? null
-                    : TextStyle(
-                        color: Theme.of(context).hintColor,
-                        fontStyle: FontStyle.italic,
-                      ),
+                style: hasName ? null : TextStyle(color: Theme.of(context).hintColor, fontStyle: FontStyle.italic),
               ),
             ),
             if (manufacturer != null) ...[
@@ -157,9 +143,7 @@ class _ScanResultTileState extends State<ScanResultTile> {
                 child: Text(
                   '· $manufacturer',
                   overflow: TextOverflow.ellipsis,
-                  style: bodySmall?.copyWith(
-                    color: Theme.of(context).hintColor,
-                  ),
+                  style: bodySmall?.copyWith(color: Theme.of(context).hintColor),
                 ),
               ),
             ],
@@ -171,9 +155,7 @@ class _ScanResultTileState extends State<ScanResultTile> {
   }
 
   Widget _buildConnectButton(BuildContext context) {
-    final onPressed = widget.result.advertisementData.connectable
-        ? widget.onTap
-        : null;
+    final onPressed = widget.result.advertisementData.connectable ? widget.onTap : null;
     // primary filled to connect; outlined (lighter) to open once connected
     return isConnected
         ? OutlinedButton(onPressed: onPressed, child: const Text('OPEN'))
@@ -187,18 +169,9 @@ class _ScanResultTileState extends State<ScanResultTile> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           // fixed-width label column so all values align
-          SizedBox(
-            width: 120.0,
-            child: Text(title, style: Theme.of(context).textTheme.bodySmall),
-          ),
+          SizedBox(width: 120.0, child: Text(title, style: Theme.of(context).textTheme.bodySmall)),
           const SizedBox(width: 12.0),
-          Expanded(
-            child: Text(
-              value,
-              style: Theme.of(context).textTheme.bodySmall,
-              softWrap: true,
-            ),
-          ),
+          Expanded(child: Text(value, style: Theme.of(context).textTheme.bodySmall, softWrap: true)),
         ],
       ),
     );
@@ -216,32 +189,12 @@ class _ScanResultTileState extends State<ScanResultTile> {
         _buildAdvRow(context, 'RSSI', '${widget.result.rssi} dBm'),
         _buildAdvRow(context, 'Connectable', adv.connectable ? 'Yes' : 'No'),
         if (adv.advName.isNotEmpty) _buildAdvRow(context, 'Name', adv.advName),
-        if (adv.txPowerLevel != null)
-          _buildAdvRow(context, 'Tx Power Level', '${adv.txPowerLevel} dBm'),
-        if ((adv.appearance ?? 0) > 0)
-          _buildAdvRow(
-            context,
-            'Appearance',
-            _appearanceLabel(adv.appearance!),
-          ),
+        if (adv.txPowerLevel != null) _buildAdvRow(context, 'Tx Power Level', '${adv.txPowerLevel} dBm'),
+        if ((adv.appearance ?? 0) > 0) _buildAdvRow(context, 'Appearance', _appearanceLabel(adv.appearance!)),
         if (adv.manufacturerData.isNotEmpty)
-          _buildAdvRow(
-            context,
-            'Manufacturer Data',
-            getNiceManufacturerData(adv.manufacturerData),
-          ),
-        if (adv.serviceUuids.isNotEmpty)
-          _buildAdvRow(
-            context,
-            'Service UUIDs',
-            getNiceServiceUuids(adv.serviceUuids),
-          ),
-        if (adv.serviceData.isNotEmpty)
-          _buildAdvRow(
-            context,
-            'Service Data',
-            getNiceServiceData(adv.serviceData),
-          ),
+          _buildAdvRow(context, 'Manufacturer Data', getNiceManufacturerData(adv.manufacturerData)),
+        if (adv.serviceUuids.isNotEmpty) _buildAdvRow(context, 'Service UUIDs', getNiceServiceUuids(adv.serviceUuids)),
+        if (adv.serviceData.isNotEmpty) _buildAdvRow(context, 'Service Data', getNiceServiceData(adv.serviceData)),
       ],
     );
   }

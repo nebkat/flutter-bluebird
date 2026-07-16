@@ -11,9 +11,7 @@ class StreamControllerReemit<T> {
   StreamControllerReemit({T? initialValue}) : _latestValue = initialValue;
 
   Stream<T> get stream {
-    return _latestValue != null
-        ? _controller.stream.newStreamWithInitialValue(_latestValue!)
-        : _controller.stream;
+    return _latestValue != null ? _controller.stream.newStreamWithInitialValue(_latestValue!) : _controller.stream;
   }
 
   T? get value => _latestValue;
@@ -36,8 +34,7 @@ extension _StreamNewStreamWithInitialValue<T> on Stream<T> {
 }
 
 // Helper for 'newStreamWithInitialValue' method for streams.
-class _NewStreamWithInitialValueTransformer<T>
-    extends StreamTransformerBase<T, T> {
+class _NewStreamWithInitialValueTransformer<T> extends StreamTransformerBase<T, T> {
   /// the initial value to push to the new stream
   final T initialValue;
 
@@ -133,17 +130,9 @@ class _NewStreamWithInitialValueTransformer<T>
 
     // create a new stream controller
     if (broadcast) {
-      controller = StreamController<T>.broadcast(
-        onListen: onListen,
-        onCancel: onCancel,
-      );
+      controller = StreamController<T>.broadcast(onListen: onListen, onCancel: onCancel);
     } else {
-      controller = StreamController<T>(
-        onListen: onListen,
-        onPause: onPause,
-        onResume: onResume,
-        onCancel: onCancel,
-      );
+      controller = StreamController<T>(onListen: onListen, onPause: onPause, onResume: onResume, onCancel: onCancel);
     }
 
     return controller.stream;

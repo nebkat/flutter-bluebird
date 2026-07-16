@@ -8,10 +8,7 @@ class Snackbar {
   static final messengerKey = GlobalKey<ScaffoldMessengerState>();
 
   static void show(String msg, {required bool success}) {
-    final snackBar = SnackBar(
-      content: Text(msg),
-      backgroundColor: success ? Colors.blue : Colors.red,
-    );
+    final snackBar = SnackBar(content: Text(msg), backgroundColor: success ? Colors.blue : Colors.red);
     messengerKey.currentState
       ?..removeCurrentSnackBar()
       ..showSnackBar(snackBar);

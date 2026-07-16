@@ -69,10 +69,7 @@ class _ScanScreenState extends State<ScanScreen> {
       var withServices = [Uuid("180f")]; // Battery Level Service
       _systemDevices = await Bluebird.systemDevices(withServices);
     } catch (e) {
-      Snackbar.show(
-        prettyException("System Devices Error:", e),
-        success: false,
-      );
+      Snackbar.show(prettyException("System Devices Error:", e), success: false);
       print(e);
     }
     try {
@@ -104,9 +101,7 @@ class _ScanScreenState extends State<ScanScreen> {
       return;
     }
     if (!mounted) return;
-    MaterialPageRoute route = MaterialPageRoute(
-      builder: (context) => DeviceScreen(device: device),
-    );
+    MaterialPageRoute route = MaterialPageRoute(builder: (context) => DeviceScreen(device: device));
     Navigator.of(context).push(route);
   }
 
@@ -144,9 +139,7 @@ class _ScanScreenState extends State<ScanScreen> {
         .map(
           (d) => SystemDeviceTile(
             device: d,
-            onOpen: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (context) => DeviceScreen(device: d)),
-            ),
+            onOpen: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => DeviceScreen(device: d))),
             onConnect: () => onConnectPressed(d),
           ),
         )
@@ -154,14 +147,7 @@ class _ScanScreenState extends State<ScanScreen> {
   }
 
   List<Widget> _buildScanResultTiles(BuildContext context) {
-    return _scanResults
-        .map(
-          (r) => ScanResultTile(
-            result: r,
-            onTap: () => onConnectPressed(r.device),
-          ),
-        )
-        .toList();
+    return _scanResults.map((r) => ScanResultTile(result: r, onTap: () => onConnectPressed(r.device))).toList();
   }
 
   @override
@@ -193,9 +179,7 @@ class _ScanScreenState extends State<ScanScreen> {
                 children: [
                   Padding(
                     padding: const EdgeInsets.only(top: 96, bottom: 16),
-                    child: Center(
-                      child: Image.asset('assets/bluebird.png', height: 180),
-                    ),
+                    child: Center(child: Image.asset('assets/bluebird.png', height: 180)),
                   ),
                   Center(
                     child: Text(
@@ -205,18 +189,10 @@ class _ScanScreenState extends State<ScanScreen> {
                   ),
                 ],
               )
-            : ListView(
-                children: <Widget>[
-                  ..._buildSystemDeviceTiles(context),
-                  ..._buildScanResultTiles(context),
-                ],
-              ),
+            : ListView(children: <Widget>[..._buildSystemDeviceTiles(context), ..._buildScanResultTiles(context)]),
       ),
       bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: buildScanButton(context),
-        ),
+        child: Padding(padding: const EdgeInsets.all(16.0), child: buildScanButton(context)),
       ),
     );
   }

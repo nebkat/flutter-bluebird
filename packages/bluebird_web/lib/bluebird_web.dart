@@ -317,11 +317,7 @@ final class BluebirdWeb extends BluebirdPlatform {
   }
 
   @override
-  Future<bool> setNotifyValue(
-    String address,
-    BmCharacteristicRef characteristic,
-    bool enable,
-  ) async {
+  Future<bool> setNotifyValue(String address, BmCharacteristicRef characteristic, bool enable) async {
     final jsChar = _resolveCharacteristic(address, characteristic);
     if (enable) {
       jsChar.addEventListener('characteristicvaluechanged', _characteristicValueChangedListener);

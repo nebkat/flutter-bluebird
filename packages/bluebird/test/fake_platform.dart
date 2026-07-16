@@ -70,7 +70,12 @@ final class FakePlatform extends BluebirdPlatform {
 
   @override
   Future<void> writeCharacteristic(
-      String address, BmCharacteristicRef c, BmWriteType writeType, bool allowLongWrite, Uint8List value) {
+    String address,
+    BmCharacteristicRef c,
+    BmWriteType writeType,
+    bool allowLongWrite,
+    Uint8List value,
+  ) {
     lastCharRef = c;
     lastWriteType = writeType;
     lastWriteValue = value;
@@ -78,7 +83,8 @@ final class FakePlatform extends BluebirdPlatform {
   }
 
   @override
-  Future<Uint8List> readDescriptor(String address, BmDescriptorRef d) => _run('readDescriptor', Uint8List.fromList([0xcd]));
+  Future<Uint8List> readDescriptor(String address, BmDescriptorRef d) =>
+      _run('readDescriptor', Uint8List.fromList([0xcd]));
 
   @override
   Future<void> writeDescriptor(String address, BmDescriptorRef d, Uint8List value) {
@@ -87,8 +93,7 @@ final class FakePlatform extends BluebirdPlatform {
   }
 
   @override
-  Future<bool> setNotifyValue(String address, BmCharacteristicRef c, bool enable) =>
-      _run('setNotifyValue', true);
+  Future<bool> setNotifyValue(String address, BmCharacteristicRef c, bool enable) => _run('setNotifyValue', true);
 
   @override
   Future<int> readRssi(String address) => _run('readRssi', -42);
@@ -96,7 +101,8 @@ final class FakePlatform extends BluebirdPlatform {
   List<BmBluetoothDevice> systemDevices = const [];
 
   @override
-  Future<List<BmBluetoothDevice>> getSystemDevices(List<String> withServices) => _run('getSystemDevices', systemDevices);
+  Future<List<BmBluetoothDevice>> getSystemDevices(List<String> withServices) =>
+      _run('getSystemDevices', systemDevices);
 
   @override
   Future<bool> turnOn() => _run('turnOn', true);

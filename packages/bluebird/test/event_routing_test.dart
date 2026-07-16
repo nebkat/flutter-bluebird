@@ -97,7 +97,9 @@ void main() {
             .having((e) => e.prevState, 'prevState', BluetoothBondState.bonding),
       ),
     );
-    fake.emit(BmBondStateEvent(address: 'AA', bondState: BluetoothBondState.bonded, prevState: BluetoothBondState.bonding));
+    fake.emit(
+      BmBondStateEvent(address: 'AA', bondState: BluetoothBondState.bonded, prevState: BluetoothBondState.bonding),
+    );
     await seen;
   });
 
@@ -134,12 +136,12 @@ void main() {
     );
 
     void emitValue(String charUuid, List<int> value) => fake.emit(
-          BmCharacteristicNotificationEvent(
-            address: 'AA',
-            characteristic: refFor(charUuid),
-            value: Uint8List.fromList(value),
-          ),
-        );
+      BmCharacteristicNotificationEvent(
+        address: 'AA',
+        characteristic: refFor(charUuid),
+        value: Uint8List.fromList(value),
+      ),
+    );
 
     test('resolved notification reaches notificationsPassive and is broadcast', () async {
       final c = await discoverNotifyChar();
@@ -148,9 +150,11 @@ void main() {
       final broadcast = expectLater(
         Bluebird.events.where((e) => e is OnCharacteristicNotifiedEvent),
         emits(
-          isA<OnCharacteristicNotifiedEvent>()
-              .having((e) => e.characteristic, 'characteristic', c)
-              .having((e) => e.value, 'value', [1, 2, 3]),
+          isA<OnCharacteristicNotifiedEvent>().having((e) => e.characteristic, 'characteristic', c).having(
+            (e) => e.value,
+            'value',
+            [1, 2, 3],
+          ),
         ),
       );
 
@@ -177,7 +181,7 @@ void main() {
       emitValue('b001', [9]);
       await pump();
       expect(received, [
-        [9]
+        [9],
       ]);
       await sub.cancel();
     });

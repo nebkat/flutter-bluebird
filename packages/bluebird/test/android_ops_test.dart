@@ -17,12 +17,13 @@ void main() {
 
   setUp(() async {
     System.current = System.android;
-    fake = FakePlatform()..services = [bmService('a000', characteristics: [bmChar('b001')])];
+    fake = FakePlatform()
+      ..services = [
+        bmService('a000', characteristics: [bmChar('b001')]),
+      ];
     FakePlatform.install(fake);
     device = Bluebird.deviceForAddress('AA:BB:CC:DD:EE:FF');
-    device.applyEvent(
-      OnConnectionStateChangedEvent(device, BluetoothConnectionState.connected, null),
-    );
+    device.applyEvent(OnConnectionStateChangedEvent(device, BluetoothConnectionState.connected, null));
   });
 
   tearDown(() => System.current = realSystem);

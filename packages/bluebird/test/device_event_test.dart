@@ -44,7 +44,10 @@ void main() {
   });
 
   test('services reset invalidates and clears discovered services', () async {
-    final fake = FakePlatform()..services = [bmService('a000', characteristics: [bmChar('b001')])];
+    final fake = FakePlatform()
+      ..services = [
+        bmService('a000', characteristics: [bmChar('b001')]),
+      ];
     FakePlatform.install(fake);
     device = Bluebird.deviceForAddress('AA:BB:CC:DD:EE:FF');
     device.applyEvent(connEvent(BluetoothConnectionState.connected));
@@ -86,7 +89,10 @@ void main() {
   });
 
   test('disconnect invalidates attributes and reports deviceDisconnected first', () async {
-    final fake = FakePlatform()..services = [bmService('a000', characteristics: [bmChar('b001')])];
+    final fake = FakePlatform()
+      ..services = [
+        bmService('a000', characteristics: [bmChar('b001')]),
+      ];
     FakePlatform.install(fake);
     device = Bluebird.deviceForAddress('AA:BB:CC:DD:EE:FF');
     device.applyEvent(connEvent(BluetoothConnectionState.connected));

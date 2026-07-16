@@ -35,18 +35,13 @@ void main() {
       final fake = FakePlatform()..services = services;
       FakePlatform.install(fake);
       device = Bluebird.deviceForAddress('AA:BB:CC:DD:EE:FF');
-      device.applyEvent(
-        OnConnectionStateChangedEvent(device, BluetoothConnectionState.connected, null),
-      );
+      device.applyEvent(OnConnectionStateChangedEvent(device, BluetoothConnectionState.connected, null));
       await device.discoverServices(subscribeToServicesChanged: false);
     }
 
     test('duplicate-uuid characteristics resolve to distinct instances', () async {
       await discover([
-        bmService('a000', characteristics: [
-          bmChar('b001', instance: 0),
-          bmChar('b001', instance: 1),
-        ]),
+        bmService('a000', characteristics: [bmChar('b001', instance: 0), bmChar('b001', instance: 1)]),
       ]);
 
       final service = device.services.single;
@@ -59,7 +54,9 @@ void main() {
     });
 
     test('unknown characteristic ref throws characteristicNotFound', () async {
-      await discover([bmService('a000', characteristics: [bmChar('b001')])]);
+      await discover([
+        bmService('a000', characteristics: [bmChar('b001')]),
+      ]);
       final ref = BmCharacteristicRef(service: device.services.single.bm, characteristic: attr('bfff'));
       expect(
         () => device.characteristicForRef(ref),
@@ -69,9 +66,12 @@ void main() {
 
     test('descriptor resolves within its characteristic', () async {
       await discover([
-        bmService('a000', characteristics: [
-          bmChar('b001', descriptors: ['2902', '2901']),
-        ]),
+        bmService(
+          'a000',
+          characteristics: [
+            bmChar('b001', descriptors: ['2902', '2901']),
+          ],
+        ),
       ]);
       final chrRef = BmCharacteristicRef(service: device.services.single.bm, characteristic: attr('b001'));
       final descRef = BmDescriptorRef(characteristic: chrRef, id: attr('2901'));
@@ -80,9 +80,11 @@ void main() {
 
     test('included secondary service is linked with a parent back-reference', () async {
       final secondary = bmService('a100', isPrimary: false, characteristics: [bmChar('c001')]);
-      final primary = bmService('a000', characteristics: [bmChar('b001')], includedServices: [
-        BmServiceRef(service: secondary.id),
-      ]);
+      final primary = bmService(
+        'a000',
+        characteristics: [bmChar('b001')],
+        includedServices: [BmServiceRef(service: secondary.id)],
+      );
       await discover([primary, secondary]);
 
       final primarySvc = device.services.firstWhere((s) => s.uuid == Uuid('a000'));
@@ -97,9 +99,13 @@ void main() {
     });
 
     test('an unresolvable included-service ref throws serviceNotFound', () async {
-      final primary = bmService('a000', characteristics: [bmChar('b001')], includedServices: [
-        BmServiceRef(service: attr('a999')), // references a service that was not discovered
-      ]);
+      final primary = bmService(
+        'a000',
+        characteristics: [bmChar('b001')],
+        includedServices: [
+          BmServiceRef(service: attr('a999')), // references a service that was not discovered
+        ],
+      );
       await expectLater(
         discover([primary]),
         throwsA(isA<BluebirdException>().having((e) => e.code, 'code', BluebirdErrorCode.serviceNotFound)),
@@ -107,7 +113,9 @@ void main() {
     });
 
     test('service toString includes its type label and fields', () async {
-      await discover([bmService('a000', characteristics: [bmChar('b001')])]);
+      await discover([
+        bmService('a000', characteristics: [bmChar('b001')]),
+      ]);
       final s = device.services.single.toString();
       expect(s, startsWith('BluetoothService{'));
       expect(s, contains('uuid: a000'));

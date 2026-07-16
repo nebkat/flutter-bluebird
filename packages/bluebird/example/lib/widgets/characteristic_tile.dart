@@ -25,11 +25,7 @@ class CharacteristicTile extends StatefulWidget {
   final BluetoothCharacteristic characteristic;
   final List<DescriptorTile> descriptorTiles;
 
-  const CharacteristicTile({
-    Key? key,
-    required this.characteristic,
-    required this.descriptorTiles,
-  }) : super(key: key);
+  const CharacteristicTile({Key? key, required this.characteristic, required this.descriptorTiles}) : super(key: key);
 
   @override
   State<CharacteristicTile> createState() => _CharacteristicTileState();
@@ -63,9 +59,7 @@ class _CharacteristicTileState extends State<CharacteristicTile> {
   /// Reads the Characteristic User Description (0x2901), if present, to show a
   /// friendly name in place of the bare UUID. Best-effort — ignored on failure.
   Future<void> _readName() async {
-    final descriptor = c.descriptors
-        .where((d) => d.uuid == Uuids.descriptor.characteristicUserDescription)
-        .firstOrNull;
+    final descriptor = c.descriptors.where((d) => d.uuid == Uuids.descriptor.characteristicUserDescription).firstOrNull;
     if (descriptor == null) return;
     try {
       final name = utf8.decode(await descriptor.read()).trim();
@@ -82,12 +76,7 @@ class _CharacteristicTileState extends State<CharacteristicTile> {
 
   List<int> _getRandomBytes() {
     final math = Random();
-    return [
-      math.nextInt(255),
-      math.nextInt(255),
-      math.nextInt(255),
-      math.nextInt(255),
-    ];
+    return [math.nextInt(255), math.nextInt(255), math.nextInt(255), math.nextInt(255)];
   }
 
   Future onReadPressed() async {
@@ -102,10 +91,7 @@ class _CharacteristicTileState extends State<CharacteristicTile> {
 
   Future onWritePressed() async {
     try {
-      await c.write(
-        _getRandomBytes(),
-        withoutResponse: c.properties.writeWithoutResponse,
-      );
+      await c.write(_getRandomBytes(), withoutResponse: c.properties.writeWithoutResponse);
       Snackbar.show("Write: Success", success: true);
       if (c.properties.read) {
         _setValue(await c.read());
@@ -128,10 +114,7 @@ class _CharacteristicTileState extends State<CharacteristicTile> {
         // the CCCD write) instead of letting it escape as an unhandled error.
         _notifySubscription = c.notifications.listen(
           _setValue,
-          onError: (e) => Snackbar.show(
-            prettyException("Subscribe Error:", e),
-            success: false,
-          ),
+          onError: (e) => Snackbar.show(prettyException("Subscribe Error:", e), success: false),
         );
         Snackbar.show("Subscribe: Success", success: true);
       }

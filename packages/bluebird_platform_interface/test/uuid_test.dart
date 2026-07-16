@@ -5,8 +5,7 @@ void main() {
   group('Uuid equality', () {
     test('is by value, not identity', () {
       expect(Uuid('180a'), equals(Uuid('180a')));
-      expect(Uuid('0000180a-0000-1000-8000-00805f9b34fb'),
-          equals(Uuid('0000180a-0000-1000-8000-00805f9b34fb')));
+      expect(Uuid('0000180a-0000-1000-8000-00805f9b34fb'), equals(Uuid('0000180a-0000-1000-8000-00805f9b34fb')));
     });
 
     test('short and long forms of the same uuid compare equal', () {

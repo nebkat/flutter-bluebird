@@ -60,10 +60,7 @@ class WebScanScreen extends StatefulWidget {
 
 class _WebScanScreenState extends State<WebScanScreen> {
   final List<Uuid> _serviceFilter = [];
-  final List<Uuid> _optionalServices = [
-    Uuids.service.deviceInformation,
-    Uuids.service.battery,
-  ];
+  final List<Uuid> _optionalServices = [Uuids.service.deviceInformation, Uuids.service.battery];
   final _nameFilter = TextEditingController();
 
   bool _connecting = false;
@@ -93,9 +90,7 @@ class _WebScanScreenState extends State<WebScanScreen> {
       await device.connectAndUpdateStream();
 
       if (!mounted) return;
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (context) => DeviceScreen(device: device)),
-      );
+      Navigator.of(context).push(MaterialPageRoute(builder: (context) => DeviceScreen(device: device)));
     } catch (e) {
       Snackbar.show(prettyException("Connect Error:", e), success: false);
     } finally {
@@ -117,10 +112,7 @@ class _WebScanScreenState extends State<WebScanScreen> {
               children: [
                 Center(child: Image.asset('assets/bluebird.png', height: 140)),
                 const SizedBox(height: 24),
-                Text(
-                  'Connect a device',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
+                Text('Connect a device', style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 4),
                 Text(
                   'The browser will show a device chooser. On web you can only access '
@@ -138,11 +130,7 @@ class _WebScanScreenState extends State<WebScanScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                _ServiceSelector(
-                  label: 'Filter by service',
-                  values: _serviceFilter,
-                  onChanged: () => setState(() {}),
-                ),
+                _ServiceSelector(label: 'Filter by service', values: _serviceFilter, onChanged: () => setState(() {})),
                 const SizedBox(height: 12),
                 _ServiceSelector(
                   label: 'Optional services',
@@ -152,11 +140,7 @@ class _WebScanScreenState extends State<WebScanScreen> {
                 const SizedBox(height: 20),
                 FilledButton.icon(
                   icon: _connecting
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.bluetooth),
                   label: Text(_connecting ? 'Connecting…' : 'Connect a device'),
                   onPressed: _connecting ? null : onConnectPressed,
@@ -174,11 +158,7 @@ class _WebScanScreenState extends State<WebScanScreen> {
 /// press enter to add it. Selections are shown as compact list tiles (UUID with
 /// the known name as subtitle). [values] is mutated in place.
 class _ServiceSelector extends StatefulWidget {
-  const _ServiceSelector({
-    required this.label,
-    required this.values,
-    required this.onChanged,
-  });
+  const _ServiceSelector({required this.label, required this.values, required this.onChanged});
 
   final String label;
   final List<Uuid> values;
@@ -211,11 +191,7 @@ class _ServiceSelectorState extends State<_ServiceSelector> {
             final q = value.text.trim().toLowerCase();
             if (q.isEmpty) return const Iterable<String>.empty();
             return _knownServices.entries
-                .where(
-                  (e) =>
-                      e.key.toLowerCase().contains(q) ||
-                      e.value.string128.toLowerCase().contains(q),
-                )
+                .where((e) => e.key.toLowerCase().contains(q) || e.value.string128.toLowerCase().contains(q))
                 .map((e) => e.key);
           },
           fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
@@ -233,10 +209,7 @@ class _ServiceSelectorState extends State<_ServiceSelector> {
               onSubmitted: (text) {
                 final uuid = _resolve(text);
                 if (uuid == null) {
-                  Snackbar.show(
-                    'Not a known service or valid UUID: $text',
-                    success: false,
-                  );
+                  Snackbar.show('Not a known service or valid UUID: $text', success: false);
                 } else {
                   _add(uuid);
                 }
@@ -251,10 +224,7 @@ class _ServiceSelectorState extends State<_ServiceSelector> {
               child: Material(
                 elevation: 4,
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxHeight: 260,
-                    maxWidth: 472,
-                  ),
+                  constraints: const BoxConstraints(maxHeight: 260, maxWidth: 472),
                   child: ListView(
                     padding: EdgeInsets.zero,
                     shrinkWrap: true,
@@ -279,9 +249,7 @@ class _ServiceSelectorState extends State<_ServiceSelector> {
             dense: true,
             contentPadding: const EdgeInsets.only(left: 12),
             title: Text(uuid.string),
-            subtitle: _serviceName(uuid) != null
-                ? Text(_serviceName(uuid)!)
-                : null,
+            subtitle: _serviceName(uuid) != null ? Text(_serviceName(uuid)!) : null,
             trailing: IconButton(
               icon: const Icon(Icons.close),
               onPressed: () {

@@ -26,8 +26,7 @@ import 'package:bluebird/bluebird.dart';
 class BluebirdMockable {
   LogLevel get logLevel => Bluebird.logLevel;
 
-  Future<void> setLogLevel(LogLevel level, {bool color = true}) =>
-      Bluebird.setLogLevel(level, color: color);
+  Future<void> setLogLevel(LogLevel level, {bool color = true}) => Bluebird.setLogLevel(level, color: color);
 
   Future<bool> get isSupported => Bluebird.isSupported;
 
@@ -35,8 +34,7 @@ class BluebirdMockable {
 
   AsyncValueStream<BluetoothAdapterState> get adapterState => Bluebird.adapterState;
 
-  Future<void> turnOn({Duration timeout = const Duration(seconds: 60)}) =>
-      Bluebird.turnOn(timeout: timeout);
+  Future<void> turnOn({Duration timeout = const Duration(seconds: 60)}) => Bluebird.turnOn(timeout: timeout);
 
   Future<void> setOptions({bool showPowerAlert = true, bool restoreState = false}) =>
       Bluebird.setOptions(showPowerAlert: showPowerAlert, restoreState: restoreState);
@@ -58,26 +56,24 @@ class BluebirdMockable {
     AndroidScanMode androidScanMode = AndroidScanMode.lowLatency,
     bool androidUsesFineLocation = false,
     List<Uuid> webOptionalServices = const [],
-  }) =>
-      Bluebird.scan(
-        withServices: withServices,
-        withRemoteIds: withRemoteIds,
-        withNames: withNames,
-        withKeywords: withKeywords,
-        withMsd: withMsd,
-        withServiceData: withServiceData,
-        continuousUpdates: continuousUpdates,
-        continuousDivisor: continuousDivisor,
-        androidLegacy: androidLegacy,
-        androidScanMode: androidScanMode,
-        androidUsesFineLocation: androidUsesFineLocation,
-        webOptionalServices: webOptionalServices,
-      );
+  }) => Bluebird.scan(
+    withServices: withServices,
+    withRemoteIds: withRemoteIds,
+    withNames: withNames,
+    withKeywords: withKeywords,
+    withMsd: withMsd,
+    withServiceData: withServiceData,
+    continuousUpdates: continuousUpdates,
+    continuousDivisor: continuousDivisor,
+    androidLegacy: androidLegacy,
+    androidScanMode: androidScanMode,
+    androidUsesFineLocation: androidUsesFineLocation,
+    webOptionalServices: webOptionalServices,
+  );
 
   List<BluetoothDevice> get connectedDevices => Bluebird.connectedDevices;
 
-  Future<List<BluetoothDevice>> systemDevices(List<Uuid> withServices) =>
-      Bluebird.systemDevices(withServices);
+  Future<List<BluetoothDevice>> systemDevices(List<Uuid> withServices) => Bluebird.systemDevices(withServices);
 
   Future<List<BluetoothDevice>> get bondedDevices => Bluebird.bondedDevices;
 

@@ -15,51 +15,20 @@ import 'package:pigeon/pigeon.dart';
     dartPackageName: 'bluebird',
   ),
 )
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Enums
 // ─────────────────────────────────────────────────────────────────────────────
+enum BluetoothAdapterState { unknown, unavailable, unauthorized, turningOn, on, turningOff, off }
 
-enum BluetoothAdapterState {
-  unknown,
-  unavailable,
-  unauthorized,
-  turningOn,
-  on,
-  turningOff,
-  off,
-}
+enum BluetoothConnectionState { disconnected, connected }
 
-enum BluetoothConnectionState {
-  disconnected,
-  connected,
-}
+enum BmWriteType { withResponse, withoutResponse }
 
-enum BmWriteType {
-  withResponse,
-  withoutResponse,
-}
+enum ConnectionPriority { balanced, high, lowPower }
 
-enum ConnectionPriority {
-  balanced,
-  high,
-  lowPower,
-}
+enum BluetoothBondState { none, bonding, bonded }
 
-enum BluetoothBondState {
-  none,
-  bonding,
-  bonded,
-}
-
-enum LogLevel {
-  none,
-  error,
-  warning,
-  info,
-  debug,
-  verbose,
-}
+enum LogLevel { none, error, warning, info, debug, verbose }
 
 /// Single source of truth for error codes, shared by every platform.
 ///
