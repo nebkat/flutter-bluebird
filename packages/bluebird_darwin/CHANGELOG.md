@@ -1,4 +1,4 @@
-## Unreleased
+## 0.2.0
 
 - Platform method-channel tracing now goes to `BluebirdPlatform.logger` (at `Level.FINEST`); `setLogLevel` no longer takes a `color` argument.
 - Surface a peer's ATT Error Response (`CBATTErrorDomain`) as `attError` (with the raw ATT code), distinct from other CoreBluetooth failures (`darwinError`).

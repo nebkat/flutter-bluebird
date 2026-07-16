@@ -1,4 +1,4 @@
-## Unreleased
+## 0.2.0
 
 - **Breaking:** logging now flows through a single [`package:logging`](https://pub.dev/packages/logging) `Logger`, exposed as `Bluebird.logger` (with `Level`, `Logger`, and `LogRecord` re-exported). Nothing is printed by default — attach an `onRecord` listener, or call `Bluebird.configureLoggerPrinting()` for a console one-liner. The previous string log stream and default `print` output have been removed.
 - **Breaking:** renamed `Bluebird.setLogLevel` to `setPlatformLogLevel` (and `logLevel` to `platformLogLevel`) and removed its `color` argument. It now sets only the native logcat / os_log verbosity; Dart-side output is filtered with `Bluebird.logger.level`. Records are path-scoped (`[remoteId][service][characteristic] …`), with platform-channel call tracing at `Level.FINEST`.

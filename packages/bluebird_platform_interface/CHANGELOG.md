@@ -1,4 +1,4 @@
-## Unreleased
+## 0.2.0
 
 - **Breaking:** replaced the `BluebirdPlatform.log(String)` / `logs` string sink with a [`package:logging`](https://pub.dev/packages/logging) `Logger` at `BluebirdPlatform.logger`; added a `logging` dependency.
 - **Breaking:** `BluebirdPlatform.setLogLevel` no longer takes a `color` argument.
