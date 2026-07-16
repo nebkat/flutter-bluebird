@@ -1,0 +1,48 @@
+# Builds the example as a Flutter web app and deploys it to GitHub Pages as a
+# live demo. Runs on a release tag (`vX.Y.Z`) and on manual dispatch.
+#
+# One-time setup: repo Settings -> Pages -> Source: "GitHub Actions".
+#
+# Note: Web Bluetooth requires HTTPS (Pages serves HTTPS) and only works in
+# Chromium browsers (Chrome/Edge), not Firefox or Safari.
+
+name: pages
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# one deploy at a time; newer runs supersede in-progress ones
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Build web
+        working-directory: packages/bluebird/example
+        run: |
+          flutter pub get
+          # project Pages serve under /<repo>/, so the base href must match
+          flutter build web --release --base-href "/flutter-bluebird/"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: packages/bluebird/example/build/web
+      - id: deployment
+        uses: actions/deploy-pages@v4
