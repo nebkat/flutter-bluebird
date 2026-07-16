@@ -32,7 +32,12 @@ final class FakePlatform extends BluebirdPlatform {
   Future<T> _run<T>(String name, T fallback) async {
     calls.add(name);
     final stub = stubs[name];
-    if (stub != null) return stub() as T;
+    if (stub != null) {
+      // a stub may return the value directly or a Future of it (e.g. to keep a
+      // call in-flight until the test completes it)
+      final result = stub();
+      return result is Future ? await result as T : result as T;
+    }
     return fallback;
   }
 

@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:bluebird/bluebird.dart';
 import 'package:bluebird_platform_interface/bluebird_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -45,6 +48,26 @@ void main() {
       () => device.discoverServices(),
       throwsA(isA<BluebirdException>().having((e) => e.code, 'code', BluebirdErrorCode.deviceDisconnected)),
     );
+  });
+
+  test('an operation fails fast if the adapter leaves the on state mid-flight', () async {
+    await connectAndDiscover();
+    // hold the read in-flight at the platform, so only the adapter guard can
+    // end it (gate is released at the end to free the platform mutex)
+    final gate = Completer<Uint8List>();
+    fake.stubs['readCharacteristic'] = () => gate.future;
+    final read = chr().read();
+    await pumpEventQueue(); // let the guard attach and consume the current 'on'
+
+    // a non-off terminal state (permission revoked) must still trip the guard,
+    // not just off/turningOff
+    fake.emit(BmAdapterStateEvent(adapterState: BluetoothAdapterState.unauthorized));
+
+    await expectLater(
+      read,
+      throwsA(isA<BluebirdException>().having((e) => e.code, 'code', BluebirdErrorCode.adapterOff)),
+    );
+    gate.complete(Uint8List(0));
   });
 
   test('characteristic read reaches values but not notifications', () async {

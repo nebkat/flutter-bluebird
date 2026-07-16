@@ -22,10 +22,10 @@ extension FutureGuards<T> on Future<T> {
 
   /// Completes with [error] as soon as [fatal] emits an event matching
   /// [isFatal], unless this future completes first.
-  Future<T> failOn<S>(Stream<S> fatal, bool Function(S event) isFatal, BluebirdException Function() error) {
+  Future<T> failOn<S>(Stream<S> fatal, bool Function(S event) isFatal, BluebirdException Function(S event) error) {
     final completer = Completer<T>();
     final subscription = fatal.listen((event) {
-      if (isFatal(event) && !completer.isCompleted) completer.completeError(error());
+      if (isFatal(event) && !completer.isCompleted) completer.completeError(error(event));
     });
     then(
       (value) {
@@ -38,18 +38,21 @@ extension FutureGuards<T> on Future<T> {
     return completer.future;
   }
 
-  /// Fails with [BluebirdErrorCode.adapterOff] if the adapter turns off mid-flight.
+  /// Fails with [BluebirdErrorCode.adapterOff] if the adapter leaves the `on`
+  /// state mid-flight — off/turningOff, but also unavailable/unauthorized/
+  /// unknown. Anything other than `on` means the operation can't complete, so
+  /// fail fast rather than hang until the timeout.
   Future<T> bluebirdEnsureAdapterIsOn(String function) => failOn(
     Bluebird.adapterState,
-    (s) => s == BluetoothAdapterState.off || s == BluetoothAdapterState.turningOff,
-    () => BluebirdException(function, BluebirdErrorCode.adapterOff, "Bluetooth adapter is off"),
+    (s) => s != BluetoothAdapterState.on,
+    (s) => BluebirdException(function, BluebirdErrorCode.adapterOff, "Bluetooth adapter is not on (${s.name})"),
   );
 
   /// Fails with [BluebirdErrorCode.deviceDisconnected] if [device] disconnects mid-flight.
   Future<T> bluebirdEnsureDeviceIsConnected(BluetoothDevice device, String function) => failOn(
     device.connectionState,
     (s) => s == BluetoothConnectionState.disconnected,
-    () => BluebirdException(function, BluebirdErrorCode.deviceDisconnected, "Device is disconnected"),
+    (s) => BluebirdException(function, BluebirdErrorCode.deviceDisconnected, "Device is disconnected"),
   );
 }
 
