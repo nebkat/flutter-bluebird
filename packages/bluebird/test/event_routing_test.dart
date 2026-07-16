@@ -208,12 +208,15 @@ void main() {
       await expectLater(subscription.unsubscribe(), throwsA(isA<BluebirdException>()));
     });
 
-    test('cancelling notifications surfaces a failed disable', () async {
+    test('cancelling notifications swallows a failed disable', () async {
       final c = await discoverNotifyChar();
       final sub = c.notifications.listen((_) {});
       await pump(); // enable completes
       fake.stubs['setNotifyValue'] = () => throw PlatformException(code: 'cb_error', message: 'disable rejected');
-      await expectLater(sub.cancel(), throwsA(isA<BluebirdException>()));
+      // a stream cancel() must not throw — the failed disable is swallowed
+      // (logged) rather than leaking as an uncatchable error. Explicit
+      // unsubscribe() still surfaces it (see the test above).
+      await expectLater(sub.cancel(), completes);
     });
 
     test('notification for an unknown characteristic is dropped', () async {

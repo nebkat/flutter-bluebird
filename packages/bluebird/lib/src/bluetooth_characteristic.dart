@@ -23,7 +23,9 @@ class BluetoothCharacteristic extends BluetoothAttribute {
   BluetoothCharacteristic.fromProto(BmBluetoothCharacteristic p, this.service)
     : properties = p.properties,
       super(device: service.device, id: BluetoothAttributeId.fromBm(p.id)) {
-    descriptors = p.descriptors.map((d) => BluetoothDescriptor.fromProto(d, this)).toList();
+    descriptors = p.descriptors
+        .map((d) => BluetoothDescriptor.fromProto(d, this))
+        .toList();
   }
 
   @override
@@ -31,7 +33,8 @@ class BluetoothCharacteristic extends BluetoothAttribute {
   String get typeLabel => 'BluetoothCharacteristic';
 
   @internal
-  BmCharacteristicRef get bm => BmCharacteristicRef(service: service.bm, characteristic: id.bm);
+  BmCharacteristicRef get bm =>
+      BmCharacteristicRef(service: service.bm, characteristic: id.bm);
 
   /// Whether [read] is supported.
   bool get canRead => properties.read;
@@ -54,7 +57,9 @@ class BluetoothCharacteristic extends BluetoothAttribute {
   /// observe passively (e.g. when notify is kept on separately via [subscribe]).
   /// Broadcast. See [notifications] to enable notify while listening.
   Stream<List<int>> get notificationsPassive =>
-      Bluebird.extractEventStream<OnCharacteristicNotifiedEvent>((e) => e.characteristic == this).map((e) => e.value);
+      Bluebird.extractEventStream<OnCharacteristicNotifiedEvent>(
+        (e) => e.characteristic == this,
+      ).map((e) => e.value);
 
   /// [notificationsPassive] with notify enabled for the duration of the
   /// subscription.
@@ -68,7 +73,9 @@ class BluetoothCharacteristic extends BluetoothAttribute {
   /// All values observed for this characteristic — [read] results *and*
   /// notify/indicate values — *without* enabling notify. Broadcast.
   Stream<List<int>> get valuesPassive =>
-      Bluebird.extractEventStream<OnCharacteristicValueEvent>((e) => e.characteristic == this).map((e) => e.value);
+      Bluebird.extractEventStream<OnCharacteristicValueEvent>(
+        (e) => e.characteristic == this,
+      ).map((e) => e.value);
 
   /// [valuesPassive] with notify enabled while listened to (same ref-count /
   /// error semantics as [notifications]).
@@ -81,7 +88,19 @@ class BluetoothCharacteristic extends BluetoothAttribute {
     try {
       yield* source;
     } finally {
-      await _releaseNotify();
+      // A stream cancel() must not throw — a disable failure here would leak as
+      // an uncatchable, duplicated error. A failed *disable* on teardown is
+      // harmless anyway (notify resets on disconnect), so log and move on.
+      // Callers who need to observe it should use subscribe()/unsubscribe().
+      try {
+        await _releaseNotify();
+      } catch (e) {
+        if (Bluebird.logLevel.index >= LogLevel.warning.index) {
+          BluebirdPlatform.log(
+            "[Bluebird] notify disable failed on unsubscribe: $e",
+          );
+        }
+      }
     }
   }
 
@@ -92,7 +111,9 @@ class BluetoothCharacteristic extends BluetoothAttribute {
   ///   - participates in the same ref-count as [notifications]; pair with
   ///     [notificationsPassive] / [valuesPassive] to receive values
   ///     decoupled from this handle's lifetime.
-  Future<CharacteristicSubscription> subscribe({Duration timeout = const Duration(seconds: 15)}) async {
+  Future<CharacteristicSubscription> subscribe({
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
     await _acquireNotify(timeout: timeout);
     return CharacteristicSubscription._(this);
   }
@@ -100,7 +121,9 @@ class BluetoothCharacteristic extends BluetoothAttribute {
   /// Claims a notify ref, enabling notify on the first one. Concurrent callers
   /// share one enable and fail together; a failed enable releases the ref and
   /// rethrows so callers can surface it.
-  Future<void> _acquireNotify({Duration timeout = const Duration(seconds: 15)}) async {
+  Future<void> _acquireNotify({
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
     requireValid("setNotifyValue");
     _notifyRefs++;
     final enable = _notifyEnable ??= _setNotifyValue(true, timeout: timeout);
@@ -114,9 +137,10 @@ class BluetoothCharacteristic extends BluetoothAttribute {
   }
 
   /// Releases a notify ref, disabling notify once the last one is gone.
-  /// The disable is awaited and its error is *not* swallowed, so a failing
-  /// `unsubscribe()`/`cancel()` surfaces it (unless already disconnected, when
-  /// there is nothing to disable).
+  /// The disable is awaited and its error propagates to the caller, so an
+  /// explicit `unsubscribe()` surfaces it (unless already disconnected, when
+  /// there is nothing to disable). The stream-cancel path in [_subscribed]
+  /// deliberately swallows it — a cancel() must not throw.
   Future<void> _releaseNotify() async {
     if (--_notifyRefs > 0) return;
     _notifyEnable = null;
@@ -125,11 +149,16 @@ class BluetoothCharacteristic extends BluetoothAttribute {
   }
 
   /// convenience accessor
-  BluetoothDescriptor? get cccd =>
-      descriptors.where((d) => d.uuid == Uuids.descriptor.clientCharacteristicConfiguration).firstOrNull;
+  BluetoothDescriptor? get cccd => descriptors
+      .where(
+        (d) => d.uuid == Uuids.descriptor.clientCharacteristicConfiguration,
+      )
+      .firstOrNull;
 
   /// read a characteristic
-  Future<List<int>> read({Duration timeout = const Duration(seconds: 15)}) async {
+  Future<List<int>> read({
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
     requireValid("readCharacteristic");
     final value = await device.invoke(
       "readCharacteristic",
@@ -162,13 +191,23 @@ class BluetoothCharacteristic extends BluetoothAttribute {
   }) async {
     requireValid("writeCharacteristic");
     if (withoutResponse && allowLongWrite) {
-      throw ArgumentError("cannot longWrite withoutResponse, not allowed on iOS or Android");
+      throw ArgumentError(
+        "cannot longWrite withoutResponse, not allowed on iOS or Android",
+      );
     }
 
-    final writeType = withoutResponse ? BmWriteType.withoutResponse : BmWriteType.withResponse;
+    final writeType = withoutResponse
+        ? BmWriteType.withoutResponse
+        : BmWriteType.withResponse;
     await device.invoke(
       "writeCharacteristic",
-      (p) => p.writeCharacteristic(device.remoteId, bm, writeType, allowLongWrite, Uint8List.fromList(value)),
+      (p) => p.writeCharacteristic(
+        device.remoteId,
+        bm,
+        writeType,
+        allowLongWrite,
+        Uint8List.fromList(value),
+      ),
       timeout: timeout,
     );
   }
@@ -177,8 +216,14 @@ class BluetoothCharacteristic extends BluetoothAttribute {
   /// driven by the ref-count in [_acquireNotify]/[_releaseNotify].
   ///   - If a characteristic supports both notify and indicate, we use notify
   ///     (a CoreBluetooth limitation on iOS).
-  Future<bool> _setNotifyValue(bool notify, {Duration timeout = const Duration(seconds: 15)}) =>
-      device.invoke("setNotifyValue", (p) => p.setNotifyValue(device.remoteId, bm, notify), timeout: timeout);
+  Future<bool> _setNotifyValue(
+    bool notify, {
+    Duration timeout = const Duration(seconds: 15),
+  }) => device.invoke(
+    "setNotifyValue",
+    (p) => p.setNotifyValue(device.remoteId, bm, notify),
+    timeout: timeout,
+  );
 
   @override
   String toString() =>
