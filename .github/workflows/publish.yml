@@ -2,6 +2,13 @@
 # `vX.Y.Z` tag. Lockstep: one version for the whole repo, one tag, all packages
 # published together in dependency order.
 #
+# Auth model (mirrors dart-lang/setup-dart/.github/workflows/publish.yml):
+# `dart-lang/setup-dart` provisions the short-lived OIDC token that pub uses to
+# authenticate to pub.dev. Without that step, `pub publish` has no credential
+# and falls back to an interactive OAuth prompt that hangs forever in CI. The
+# Flutter SDK is set up afterwards so `dart` can resolve/publish the Flutter
+# packages; its `dart` shadows setup-dart's, but the provisioned token persists.
+#
 # One-time pub.dev setup, PER package:
 #   Admin -> Automated publishing -> Enable publishing from GitHub Actions
 #     repository:  nebkat/flutter-bluebird
@@ -20,21 +27,28 @@ on:
 jobs:
   publish:
     permissions:
-      id-token: write # required for OIDC auth to pub.dev
+      id-token: write # required for OIDC: setup-dart mints the JWT with this
     environment: pub.dev
     runs-on: ubuntu-latest
+    timeout-minutes: 15 # backstop: never let a stuck auth prompt burn the job
     steps:
       - uses: actions/checkout@v5
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
+      # Provisions the OIDC token pub uses to authenticate to pub.dev. Must come
+      # before the Flutter setup and before any `pub publish`.
+      - uses: dart-lang/setup-dart@v1
+      # Flutter SDK so `dart pub` can handle the Flutter packages too.
+      - uses: flutter-actions/setup-flutter@v4.3
+      # Single resolve at the workspace root — members use `resolution: workspace`
+      # and cannot be resolved individually.
       - name: Install dependencies
-        run: flutter pub get
+        run: dart pub get
       - name: Publish all packages in dependency order
         run: |
           set -e
           for pkg in bluebird_platform_interface bluebird_android bluebird_darwin bluebird_web bluebird; do
             echo "::group::publish ${pkg}"
-            (cd "packages/${pkg}" && flutter pub publish --force)
+            # timeout is a hang-guard: if auth ever regresses to the interactive
+            # OAuth prompt, fail fast instead of burning the whole job budget.
+            (cd "packages/${pkg}" && timeout 120 dart pub publish --force)
             echo "::endgroup::"
           done
