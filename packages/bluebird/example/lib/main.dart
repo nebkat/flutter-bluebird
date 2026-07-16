@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'screens/bluetooth_off_screen.dart';
 import 'screens/scan_screen.dart';
 import 'screens/web_scan_screen.dart';
+import 'screens/web_unsupported_screen.dart';
 import 'utils/snackbar.dart';
 
 void main() {
@@ -30,9 +31,17 @@ class BluebirdApp extends StatelessWidget {
       initialData: BluetoothAdapterState.unknown,
       builder: (context, snapshot) {
         final adapterState = snapshot.data ?? BluetoothAdapterState.unknown;
-        final Widget screen = adapterState == BluetoothAdapterState.on
-            ? (kIsWeb ? const WebScanScreen() : const ScanScreen())
-            : BluetoothOffScreen(adapterState: adapterState);
+        final Widget screen;
+        if (adapterState == BluetoothAdapterState.on) {
+          screen = kIsWeb ? const WebScanScreen() : const ScanScreen();
+        } else if (kIsWeb &&
+            adapterState == BluetoothAdapterState.unavailable) {
+          // on web `unavailable` means the browser can't do Web Bluetooth, not
+          // that an adapter is switched off — send them to the right message
+          screen = const WebUnsupportedScreen();
+        } else {
+          screen = BluetoothOffScreen(adapterState: adapterState);
+        }
 
         return MaterialApp(
           color: Colors.lightBlue,
