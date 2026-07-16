@@ -17,10 +17,6 @@ export 'package:bluebird_platform_interface/bluebird_platform_interface.dart'
         BluetoothBondState,
         ConnectionPriority;
 
-// Re-exported so consumers can configure [Bluebird.logger] without taking a
-// direct dependency on package:logging.
-export 'package:logging/logging.dart' show Level, Logger, LogRecord;
-
 export 'src/bluetooth_attribute.dart' hide BluebirdScopedLogger;
 export 'src/bluetooth_characteristic.dart';
 export 'src/bluetooth_descriptor.dart';

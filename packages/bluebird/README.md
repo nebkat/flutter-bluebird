@@ -252,7 +252,7 @@ All Bluebird logs flow through a single [`package:logging`](https://pub.dev/pack
 Bluebird.configureLoggerPrinting(); // prints INFO and above; pass level: to change it
 ```
 
-For anything else, routing and filtering are entirely yours — listen to `onRecord` and set the level (`Level`, `Logger`, and `LogRecord` are re-exported by `package:bluebird`, so you don't need to depend on `package:logging`):
+For anything else, routing and filtering are entirely yours — add [`package:logging`](https://pub.dev/packages/logging) to your `pubspec.yaml`, then listen to `onRecord` and set the level:
 
 ```dart
 Bluebird.logger.onRecord.listen((r) => myLogger.log(r)); // e.g. a file, Crashlytics, …

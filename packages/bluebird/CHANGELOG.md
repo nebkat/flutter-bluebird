@@ -1,3 +1,7 @@
+## 0.2.1
+
+- Stopped re-exporting `Level` / `Logger` / `LogRecord` from `package:logging`, which collided with a consumer's own `package:logging` import (`unnecessary_import`). If you configure `Bluebird.logger` directly, add `package:logging` to your `pubspec.yaml`.
+
 ## 0.2.0
 
 - **Breaking:** logging now flows through a single [`package:logging`](https://pub.dev/packages/logging) `Logger`, exposed as `Bluebird.logger` (with `Level`, `Logger`, and `LogRecord` re-exported). Nothing is printed by default — attach an `onRecord` listener, or call `Bluebird.configureLoggerPrinting()` for a console one-liner. The previous string log stream and default `print` output have been removed.
