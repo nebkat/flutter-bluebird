@@ -5,6 +5,11 @@ homepage: https://github.com/nebkat/flutter-bluebird
 repository: https://github.com/nebkat/flutter-bluebird
 issue_tracker: https://github.com/nebkat/flutter-bluebird/issues
 
+topics:
+  - bluetooth
+  - ble
+  - bluetooth-low-energy
+
 environment:
   sdk: ^3.12.0
   flutter: ">=3.44.0"
