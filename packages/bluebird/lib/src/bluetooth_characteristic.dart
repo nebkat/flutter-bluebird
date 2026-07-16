@@ -173,7 +173,7 @@ class BluetoothCharacteristic extends BluetoothAttribute {
   }) async {
     requireValid("writeCharacteristic");
     if (withoutResponse && allowLongWrite) {
-      throw ArgumentError("cannot longWrite withoutResponse, not allowed on iOS or Android");
+      throw ArgumentError("cannot longWrite withoutResponse: a long write requires responses");
     }
 
     final writeType = withoutResponse ? BmWriteType.withoutResponse : BmWriteType.withResponse;
