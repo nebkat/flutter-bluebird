@@ -3,12 +3,14 @@
 </p>
 
 [![pub package](https://img.shields.io/pub/v/bluebird.svg)](https://pub.dev/packages/bluebird)
-[![License](https://img.shields.io/badge/license-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
-[![Platform](https://img.shields.io/badge/platform-Android%20%7C%20iOS%20%7C%20macOS%20%7C%20Web-lightgrey)](https://github.com/nebkat/flutter-bluebird)
-[![GitHub stars](https://img.shields.io/github/stars/nebkat/flutter-bluebird?style=social)](https://github.com/nebkat/flutter-bluebird)
 [![pub points](https://img.shields.io/pub/points/bluebird?color=2E7D32)](https://pub.dev/packages/bluebird/score)
+[![Coverage Status](https://coveralls.io/repos/github/nebkat/flutter-bluebird/badge.svg?branch=main)](https://coveralls.io/github/nebkat/flutter-bluebird?branch=main)
+[![GitHub stars](https://img.shields.io/github/stars/nebkat/flutter-bluebird?style=social)](https://github.com/nebkat/flutter-bluebird)
+
+[![Platform](https://img.shields.io/badge/platform-Android%20%7C%20iOS%20%7C%20macOS%20%7C%20Web-lightgrey)](https://github.com/nebkat/flutter-bluebird)
 [![Flutter](https://img.shields.io/badge/Flutter-%3E%3D3.44.0-blue.svg?logo=flutter)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-%3E%3D3.12.0-blue.svg?logo=dart)](https://dart.dev)
+[![License](https://img.shields.io/badge/license-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
 
 A Bluetooth Low Energy (BLE) plugin for Flutter.
