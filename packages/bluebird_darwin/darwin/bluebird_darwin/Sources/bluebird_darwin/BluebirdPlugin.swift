@@ -250,6 +250,31 @@ public class BluebirdPlugin: NSObject, FlutterPlugin {
     }
   }
 
+  /// Suspends until CoreBluetooth can accept another write-without-response,
+  /// resumed by `peripheralIsReady(toSendWriteWithoutResponse:)`. Returns
+  /// immediately when the peripheral is already ready — the common case.
+  ///
+  /// Unacknowledged writes carry no ATT response, so this readiness signal is
+  /// the only backpressure CoreBluetooth exposes; awaiting it gives the Dart
+  /// `write(withoutResponse: true)` future the same "resolves once the stack
+  /// accepted the bytes" meaning it already has on Android and Web. The Dart
+  /// layer serializes writes, so at most one is ever parked; a second arrival
+  /// throws operation_in_progress, mirroring the GATT slot.
+  @MainActor
+  func awaitWriteReady(_ state: PeripheralState) async throws {
+    // No suspension point between this check and installing the continuation,
+    // so on the single-threaded main actor readiness cannot flip in between.
+    if state.peripheral.canSendWriteWithoutResponse { return }
+    try await withCheckedThrowingContinuation {
+      (continuation: CheckedContinuation<Void, Error>) in
+      guard state.pendingWriteReady == nil else {
+        continuation.resume(throwing: operationInProgressError())
+        return
+      }
+      state.pendingWriteReady = continuation
+    }
+  }
+
   /// Completes the device's pending GATT operation from a delegate callback,
   /// but only if `matching` accepts its kind: failure with the wrapped
   /// CoreBluetooth error, or success with `success()`.

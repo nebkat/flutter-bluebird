@@ -252,5 +252,7 @@ extension BluebirdPlugin: CBPeripheralDelegate {
 
   public func peripheralIsReady(toSendWriteWithoutResponse peripheral: CBPeripheral) {
     log(.verbose, "peripheralIsReadyToSendWriteWithoutResponse")
+    // Resume a write-without-response that was waiting on flow control.
+    peripherals[peripheral.identifier.uuidString]?.takeWriteReady()?.resume()
   }
 }

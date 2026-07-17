@@ -60,6 +60,13 @@ final class PeripheralState {
   var pendingDisconnect: CheckedContinuation<Void, Error>?
   var pendingGatt: PendingGatt?
 
+  /// A write-without-response blocked on CoreBluetooth's flow control
+  /// (`canSendWriteWithoutResponse` is false), waiting to be resumed by
+  /// `peripheralIsReady(toSendWriteWithoutResponse:)`. Unacknowledged writes
+  /// don't occupy the GATT slot, so this is separate; the Dart layer
+  /// serializes writes, so at most one is ever parked here.
+  var pendingWriteReady: CheckedContinuation<Void, Error>?
+
   init(_ peripheral: CBPeripheral) { self.peripheral = peripheral }
 
   func clearDiscoveryState() {
@@ -88,12 +95,19 @@ final class PeripheralState {
     return pendingDisconnect
   }
 
+  /// Removes and returns the write-ready continuation, if any.
+  func takeWriteReady() -> CheckedContinuation<Void, Error>? {
+    defer { pendingWriteReady = nil }
+    return pendingWriteReady
+  }
+
   /// Fails every pending operation on this device (device disconnected or
   /// adapter turned off).
   func failAllPending(_ error: Error) {
     takeGatt()?.continuation.resume(throwing: error)
     takeConnect()?.resume(throwing: error)
     takeDisconnect()?.resume(throwing: error)
+    takeWriteReady()?.resume(throwing: error)
   }
 
   /// Hot restart / engine detach: resumes every slot with CancellationError

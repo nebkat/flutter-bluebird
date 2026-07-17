@@ -322,13 +322,6 @@ extension BluebirdPlugin: BluebirdHostApi {
           "data longer than allowed. dataLen: \(dataLen) > max: \(maxLen) (\(t)\(b))")
       }
 
-      // device not ready?
-      if cbWriteType == .withoutResponse && !peripheral.canSendWriteWithoutResponse {
-        // canSendWriteWithoutResponse is the current readiness of the
-        // peripheral to accept more write requests
-        throw unsupportedError("canSendWriteWithoutResponse is false. you must slow down")
-      }
-
       let chr = try locateCharacteristic(characteristic, in: peripheral)
 
       // check writeable
@@ -351,7 +344,11 @@ extension BluebirdPlugin: BluebirdHostApi {
           peripheral.writeValue(value.data, for: chr, type: .withResponse)
         }
       } else {
-        // writes without response are not acknowledged; complete immediately
+        // Writes without response are unacknowledged. CoreBluetooth throttles
+        // them via canSendWriteWithoutResponse; wait until the peripheral can
+        // accept another (backpressure) rather than dropping the write, then
+        // enqueue and complete immediately — there is no response to await.
+        try await awaitWriteReady(state)
         peripheral.writeValue(value.data, for: chr, type: .withoutResponse)
       }
     }
