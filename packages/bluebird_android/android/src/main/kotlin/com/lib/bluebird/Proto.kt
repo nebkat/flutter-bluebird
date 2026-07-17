@@ -30,10 +30,10 @@ object Proto {
     // typed ref building
 
     fun attributeId(service: BluetoothGattService): BmAttributeId =
-        BmAttributeId(Uuid(service.uuid), service.instanceId.toLong())
+        BmAttributeId(Uuid(service.uuid).str, service.instanceId.toLong())
 
     fun attributeId(characteristic: BluetoothGattCharacteristic): BmAttributeId =
-        BmAttributeId(Uuid(characteristic.uuid), characteristic.instanceId.toLong())
+        BmAttributeId(Uuid(characteristic.uuid).str, characteristic.instanceId.toLong())
 
     /**
      * Builds the ref for [service], setting parentService when it is a
@@ -84,7 +84,7 @@ object Proto {
     fun resolveDescriptor(gatt: BluetoothGatt, ref: BmDescriptorRef): BluetoothGattDescriptor? {
         val characteristic = resolveCharacteristic(gatt, ref.characteristic) ?: return null
         // descriptors are uuid-unique within a characteristic (instance is always 0)
-        return characteristic.descriptors.firstOrNull { Uuid(it.uuid) == ref.id.uuid }
+        return characteristic.descriptors.firstOrNull { Uuid(it.uuid) == Uuid.parse(ref.id.uuid) }
     }
 
     //////////////////////////////////////////
@@ -116,7 +116,7 @@ object Proto {
     fun bmBluetoothCharacteristic(characteristic: BluetoothGattCharacteristic): BmBluetoothCharacteristic =
         BmBluetoothCharacteristic(
             id = attributeId(characteristic),
-            descriptors = characteristic.descriptors.map { BmBluetoothDescriptor(BmAttributeId(Uuid(it.uuid), 0L)) },
+            descriptors = characteristic.descriptors.map { BmBluetoothDescriptor(BmAttributeId(Uuid(it.uuid).str, 0L)) },
             properties = bmCharacteristicProperties(characteristic.properties),
         )
 

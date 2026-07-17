@@ -25,7 +25,7 @@ internal fun operationInProgress() = FlutterError(
 data class AttributeId(val uuid: Uuid, val instance: Int) {
     constructor(s: BluetoothGattService) : this(Uuid(s.uuid), s.instanceId)
     constructor(c: BluetoothGattCharacteristic) : this(Uuid(c.uuid), c.instanceId)
-    constructor(id: BmAttributeId) : this(id.uuid, id.instance.toInt())
+    constructor(id: BmAttributeId) : this(Uuid.parse(id.uuid), id.instance.toInt())
 }
 
 /**

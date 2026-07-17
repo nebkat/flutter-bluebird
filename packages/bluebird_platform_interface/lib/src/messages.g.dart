@@ -9,8 +9,6 @@ import 'dart:typed_data' show Float64List, Int32List, Int64List;
 import 'package:flutter/services.dart';
 import 'package:meta/meta.dart' show immutable, protected, visibleForTesting;
 
-import 'uuid.dart';
-
 Object? _extractReplyValueOrThrow(List<Object?>? replyList, String channelName, {required bool isNullValid}) {
   if (replyList == null) {
     throw PlatformException(
@@ -148,13 +146,13 @@ enum BluebirdErrorCode {
 class BmAttributeId {
   BmAttributeId({required this.uuid, required this.instance});
 
-  Uuid uuid;
+  String uuid;
 
   /// Platform-opaque token disambiguating duplicate uuids.
   int instance;
 
   List<Object?> _toList() {
-    return <Object?>[uuid.string, instance];
+    return <Object?>[uuid, instance];
   }
 
   Object encode() {
@@ -163,7 +161,7 @@ class BmAttributeId {
 
   static BmAttributeId decode(Object result) {
     result as List<Object?>;
-    return BmAttributeId(uuid: Uuid(result[0]! as String), instance: result[1]! as int);
+    return BmAttributeId(uuid: result[0]! as String, instance: result[1]! as int);
   }
 
   @override

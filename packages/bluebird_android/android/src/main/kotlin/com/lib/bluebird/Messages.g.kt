@@ -332,21 +332,21 @@ enum class BluebirdErrorCode(val raw: Int) {
  * Generated class from Pigeon that represents data sent in messages.
  */
 data class BmAttributeId (
-  val uuid: Uuid,
+  val uuid: String,
   /** Platform-opaque token disambiguating duplicate uuids. */
   val instance: Long
 )
  {
   companion object {
     fun fromList(pigeonVar_list: List<Any?>): BmAttributeId {
-      val uuid = Uuid.parse(pigeonVar_list[0] as String)
+      val uuid = pigeonVar_list[0] as String
       val instance = pigeonVar_list[1] as Long
       return BmAttributeId(uuid, instance)
     }
   }
   fun toList(): List<Any?> {
     return listOf(
-      uuid.str,
+      uuid,
       instance,
     )
   }

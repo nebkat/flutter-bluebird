@@ -79,10 +79,11 @@ class BluetoothAttributeId {
   const BluetoothAttributeId(this.uuid, [this.index]);
 
   @internal
-  BluetoothAttributeId.fromBm(BmAttributeId id) : this(id.uuid, id.instance);
+  BluetoothAttributeId.fromBm(BmAttributeId id)
+    : this(Uuid(id.uuid), id.instance);
 
   @internal
-  BmAttributeId get bm => BmAttributeId(uuid: uuid, instance: index ?? 0);
+  BmAttributeId get bm => BmAttributeId(uuid: uuid.string, instance: index ?? 0);
 
   @override
   operator ==(Object other) =>

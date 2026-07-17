@@ -4,87 +4,13 @@
 #   - bluebird_android  Messages.g.kt    (Kotlin)
 #   - bluebird_darwin   Messages.g.swift (Swift)
 # Generated files are committed; rerun after editing pigeons/messages.dart.
+#
+# Pigeon types the attribute UUID as a plain String (the wire format). Each
+# platform converts to/from its own Uuid type at the hand-written boundary
+# (Dart: BluetoothAttributeId; Kotlin: Proto/DeviceConnection; Swift: the
+# CBUUID helpers) — the generated code is used verbatim, no post-processing.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 dart run pigeon --input pigeons/messages.dart
-
-# Post-generation patch: BmAttributeId.uuid and BmDescriptorRef.uuid are typed
-# as String by pigeon (the wire format stays a plain string), but the Dart and
-# Kotlin sides expose them as a real Uuid. Each replacement is exact-match and
-# asserted so the script fails loudly if pigeon's output ever shifts.
-# NOTE: Swift is intentionally NOT patched — Messages.g.swift keeps String, so
-# the Swift plugin compiles and interoperates unchanged. When bluebird_darwin
-# gains its own Uuid type, apply the same treatment there.
-python3 - <<'EOF'
-def patch(path, replacements):
-    with open(path) as f:
-        src = f.read()
-    for old, new in replacements:
-        count = src.count(old)
-        assert count == 1, (
-            f"expected exactly 1 occurrence of {old!r} in {path}, found {count}; "
-            "pigeon output changed — update tool/generate.sh"
-        )
-        src = src.replace(old, new)
-    with open(path, 'w') as f:
-        f.write(src)
-    print(f"patched {path}")
-
-# --- Dart: lib/src/messages.g.dart ---------------------------------------
-patch('lib/src/messages.g.dart', [
-    # Uuid import (uuid.dart lives alongside messages.g.dart).
-    (
-        "import 'package:meta/meta.dart' show immutable, protected, visibleForTesting;\n",
-        "import 'package:meta/meta.dart' show immutable, protected, visibleForTesting;\n\n"
-        "import 'uuid.dart';\n",
-    ),
-    # BmAttributeId: field, _toList, decode.
-    (
-        "class BmAttributeId {\n"
-        "  BmAttributeId({\n"
-        "    required this.uuid,\n"
-        "    required this.instance,\n"
-        "  });\n"
-        "\n"
-        "  String uuid;",
-        "class BmAttributeId {\n"
-        "  BmAttributeId({\n"
-        "    required this.uuid,\n"
-        "    required this.instance,\n"
-        "  });\n"
-        "\n"
-        "  Uuid uuid;",
-    ),
-    (
-        "    return <Object?>[\n      uuid,\n      instance,\n    ];",
-        "    return <Object?>[\n      uuid.string,\n      instance,\n    ];",
-    ),
-    (
-        "    return BmAttributeId(\n      uuid: result[0]! as String,",
-        "    return BmAttributeId(\n      uuid: Uuid(result[0]! as String),",
-    ),
-])
-
-# --- Kotlin: bluebird_android Messages.g.kt (Uuid is in the same package) --
-patch('../bluebird_android/android/src/main/kotlin/com/lib/bluebird/Messages.g.kt', [
-    # BmAttributeId: constructor param, fromList, toList.
-    (
-        "data class BmAttributeId (\n  val uuid: String,",
-        "data class BmAttributeId (\n  val uuid: Uuid,",
-    ),
-    (
-        "      val uuid = pigeonVar_list[0] as String\n"
-        "      val instance = pigeonVar_list[1] as Long\n"
-        "      return BmAttributeId(uuid, instance)",
-        "      val uuid = Uuid.parse(pigeonVar_list[0] as String)\n"
-        "      val instance = pigeonVar_list[1] as Long\n"
-        "      return BmAttributeId(uuid, instance)",
-    ),
-    (
-        "    return listOf(\n      uuid,\n      instance,\n    )",
-        "    return listOf(\n      uuid.str,\n      instance,\n    )",
-    ),
-])
-EOF
 
 dart format lib/src/messages.g.dart

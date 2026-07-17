@@ -210,7 +210,7 @@ final class BluebirdWeb extends BluebirdPlatform {
       cache.services.add(cachedService);
 
       final serviceRef = BmServiceRef(
-        service: BmAttributeId(uuid: serviceUuid, instance: serviceInstance),
+        service: BmAttributeId(uuid: serviceUuid.string, instance: serviceInstance),
       );
 
       final characteristics = <BmBluetoothCharacteristic>[];
@@ -229,7 +229,7 @@ final class BluebirdWeb extends BluebirdPlatform {
 
         final charRef = BmCharacteristicRef(
           service: serviceRef,
-          characteristic: BmAttributeId(uuid: charUuid, instance: charInstance),
+          characteristic: BmAttributeId(uuid: charUuid.string, instance: charInstance),
         );
         _charRefs[jsChar] = charRef;
 
@@ -237,7 +237,7 @@ final class BluebirdWeb extends BluebirdPlatform {
         try {
           final jsDescs = (await jsChar.getDescriptors().toDart).toDart;
           for (final jsDesc in jsDescs) {
-            descriptors.add(BmBluetoothDescriptor(id: BmAttributeId(uuid: Uuid(jsDesc.uuid), instance: 0)));
+            descriptors.add(BmBluetoothDescriptor(id: BmAttributeId(uuid: Uuid(jsDesc.uuid).string, instance: 0)));
           }
         } catch (e) {
           // getDescriptors throws if there are none / access is disallowed.
@@ -246,7 +246,7 @@ final class BluebirdWeb extends BluebirdPlatform {
         final props = jsChar.properties;
         characteristics.add(
           BmBluetoothCharacteristic(
-            id: BmAttributeId(uuid: charUuid, instance: charInstance),
+            id: BmAttributeId(uuid: charUuid.string, instance: charInstance),
             descriptors: descriptors,
             properties: BmCharacteristicProperties(
               broadcast: props.broadcast,
@@ -266,7 +266,7 @@ final class BluebirdWeb extends BluebirdPlatform {
 
       services.add(
         BmBluetoothService(
-          id: BmAttributeId(uuid: serviceUuid, instance: serviceInstance),
+          id: BmAttributeId(uuid: serviceUuid.string, instance: serviceInstance),
           isPrimary: jsService.isPrimary,
           characteristics: characteristics,
           // Web Bluetooth exposes included services via getIncludedServices(),
@@ -336,13 +336,13 @@ final class BluebirdWeb extends BluebirdPlatform {
 
     final serviceId = ref.service.service;
     final cachedService = cache.services.firstWhere(
-      (s) => s.uuid == serviceId.uuid && s.instance == serviceId.instance,
+      (s) => s.uuid == Uuid(serviceId.uuid) && s.instance == serviceId.instance,
       orElse: () => throw StateError('Service ${serviceId.uuid}#${serviceId.instance} not found for "$address".'),
     );
 
     final charId = ref.characteristic;
     final cachedChar = cachedService.characteristics.firstWhere(
-      (c) => c.uuid == charId.uuid && c.instance == charId.instance,
+      (c) => c.uuid == Uuid(charId.uuid) && c.instance == charId.instance,
       orElse: () => throw StateError('Characteristic ${charId.uuid}#${charId.instance} not found for "$address".'),
     );
 
@@ -351,7 +351,7 @@ final class BluebirdWeb extends BluebirdPlatform {
 
   Future<BluetoothRemoteGATTDescriptor> _resolveDescriptor(String address, BmDescriptorRef ref) async {
     final jsChar = _resolveCharacteristic(address, ref.characteristic);
-    return await jsChar.getDescriptor(ref.id.uuid.string128.toJS).toDart;
+    return await jsChar.getDescriptor(Uuid(ref.id.uuid).string128.toJS).toDart;
   }
 
   // --- event handlers -------------------------------------------------------

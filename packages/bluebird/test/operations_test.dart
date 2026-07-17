@@ -87,7 +87,7 @@ void main() {
 
     final value = await c.read();
     expect(value, [0xab]);
-    expect(fake.lastCharRef?.characteristic.uuid, Uuid('b001'));
+    expect(fake.lastCharRef?.characteristic.uuid, Uuid('b001').string);
 
     await onValues;
     await pumpEventQueue();

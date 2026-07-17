@@ -93,7 +93,7 @@ void main() {
       // the secondary's ref carries its parent, so a characteristic ref through
       // it round-trips to the same characteristic
       final secSvc = primarySvc.includedServices.single;
-      expect(secSvc.bm.parentService?.uuid, Uuid('a000'));
+      expect(secSvc.bm.parentService?.uuid, Uuid('a000').string);
       final ref = BmCharacteristicRef(service: secSvc.bm, characteristic: attr('c001'));
       expect(device.characteristicForRef(ref).uuid, Uuid('c001'));
     });
