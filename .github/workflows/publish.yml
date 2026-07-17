@@ -1,7 +1,12 @@
-# Publishes packages to pub.dev via OIDC (no long-lived token) on a `vX.Y.Z`
-# tag, in dependency order. Each package is published at the version in its
-# pubspec; versions already on pub.dev are skipped, so a tag that bumps only
-# some packages (a patch) publishes just those, not the whole repo.
+# Publishes packages to pub.dev via OIDC (no long-lived token), in dependency
+# order. Each package is published at the version in its pubspec; versions
+# already on pub.dev are skipped, so a run that bumps only some packages (a
+# patch, or an ad-hoc platform-package release) publishes just those.
+#
+# Triggers: a `vX.Y.Z` tag push (normal release), or a manual `workflow_dispatch`
+# (re-run a publish, or ship a platform package on its own without a repo-wide
+# tag). Both are enabled on pub.dev per package; the `pub.dev` GitHub environment
+# gates the manual path.
 #
 # Auth model: `flutter-actions/setup-pubdev-credentials` requests the short-lived
 # OIDC token (audience pub.dev) and runs `dart pub token add`, so `dart pub
@@ -13,10 +18,12 @@
 # One-time pub.dev setup, PER package:
 #   Admin -> Automated publishing -> Enable publishing from GitHub Actions
 #     repository:  nebkat/flutter-bluebird
-#     tag pattern: v{{version}}          (the same pattern for every package)
+#     tag pattern: v{{version}}
+#     enable both `push` and `workflow_dispatch` events; require environment pub.dev
 # and create a GitHub environment named `pub.dev` (Settings -> Environments).
 #
-# Release: bump every package to the new version, commit, then push tag `vX.Y.Z`.
+# Release: bump the changed package(s), commit, then push tag `vX.Y.Z` — or run
+# this workflow manually (Actions -> publish -> Run workflow).
 
 name: publish
 
@@ -24,6 +31,7 @@ on:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
 
 jobs:
   publish:
