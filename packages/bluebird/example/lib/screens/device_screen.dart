@@ -5,7 +5,6 @@ import 'package:bluebird/bluebird.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../utils/extra.dart';
 import '../utils/snackbar.dart';
 import '../widgets/characteristic_tile.dart';
 import '../widgets/descriptor_tile.dart';
@@ -26,12 +25,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
   BluetoothConnectionState _connectionState = BluetoothConnectionState.disconnected;
   List<BluetoothService> get _services => widget.device.services;
   bool _isDiscoveringServices = false;
-  bool _isConnecting = false;
-  bool _isDisconnecting = false;
 
   late StreamSubscription<BluetoothConnectionState> _connectionStateSubscription;
-  late StreamSubscription<bool> _isConnectingSubscription;
-  late StreamSubscription<bool> _isDisconnectingSubscription;
   late StreamSubscription<int> _mtuSubscription;
   late StreamSubscription<BluetoothAdapterState> _adapterStateSubscription;
 
@@ -57,20 +52,6 @@ class _DeviceScreenState extends State<DeviceScreen> {
       }
     });
 
-    _isConnectingSubscription = widget.device.isConnecting.listen((value) {
-      _isConnecting = value;
-      if (mounted) {
-        setState(() {});
-      }
-    });
-
-    _isDisconnectingSubscription = widget.device.isDisconnecting.listen((value) {
-      _isDisconnecting = value;
-      if (mounted) {
-        setState(() {});
-      }
-    });
-
     // this screen requires Bluetooth; dismiss it if the adapter is turned off
     _adapterStateSubscription = Bluebird.adapterState.listen((state) {
       if (state != BluetoothAdapterState.on && mounted) {
@@ -83,19 +64,30 @@ class _DeviceScreenState extends State<DeviceScreen> {
   void dispose() {
     _connectionStateSubscription.cancel();
     _mtuSubscription.cancel();
-    _isConnectingSubscription.cancel();
-    _isDisconnectingSubscription.cancel();
     _adapterStateSubscription.cancel();
     super.dispose();
   }
 
-  bool get isConnected {
-    return _connectionState == BluetoothConnectionState.connected;
-  }
+  bool get isConnected => _connectionState == BluetoothConnectionState.connected;
+  bool get _isConnecting => _connectionState == BluetoothConnectionState.connecting;
+  bool get _isDisconnecting => _connectionState == BluetoothConnectionState.disconnecting;
+
+  String get _connectionLabel => switch (_connectionState) {
+    BluetoothConnectionState.connected => 'Connected',
+    BluetoothConnectionState.connecting => 'Connecting…',
+    BluetoothConnectionState.disconnecting => 'Disconnecting…',
+    BluetoothConnectionState.disconnected => 'Disconnected',
+  };
+
+  Color get _connectionColor => switch (_connectionState) {
+    BluetoothConnectionState.connected => Colors.green,
+    BluetoothConnectionState.connecting || BluetoothConnectionState.disconnecting => Colors.orange,
+    BluetoothConnectionState.disconnected => Colors.grey,
+  };
 
   Future onConnectPressed() async {
     try {
-      await widget.device.connectAndUpdateStream();
+      await widget.device.connect(mtu: null);
       Snackbar.show("Connect: Success", success: true);
     } catch (e) {
       if (e is BluebirdException && e.code == BluebirdErrorCode.userCanceled.index) {
@@ -109,7 +101,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
   Future onCancelPressed() async {
     try {
-      await widget.device.disconnectAndUpdateStream(queue: false);
+      await widget.device.disconnect(queue: false);
       Snackbar.show("Cancel: Success", success: true);
     } catch (e) {
       Snackbar.show(prettyException("Cancel Error:", e), success: false);
@@ -119,7 +111,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
   Future onDisconnectPressed() async {
     try {
-      await widget.device.disconnectAndUpdateStream();
+      await widget.device.disconnect();
       Snackbar.show("Disconnect: Success", success: true);
     } catch (e) {
       Snackbar.show(prettyException("Disconnect Error:", e), success: false);
@@ -241,8 +233,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
                 Text(widget.device.remoteId, style: Theme.of(context).textTheme.bodySmall),
                 const SizedBox(height: 2),
                 Text(
-                  isConnected ? 'Connected' : 'Disconnected',
-                  style: TextStyle(color: isConnected ? Colors.green : Colors.grey, fontWeight: FontWeight.w500),
+                  _connectionLabel,
+                  style: TextStyle(color: _connectionColor, fontWeight: FontWeight.w500),
                 ),
               ],
             ),

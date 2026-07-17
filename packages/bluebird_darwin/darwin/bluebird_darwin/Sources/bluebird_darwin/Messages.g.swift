@@ -197,6 +197,8 @@ enum BluetoothAdapterState: Int, CaseIterable {
 enum BluetoothConnectionState: Int, CaseIterable {
   case disconnected = 0
   case connected = 1
+  case connecting = 2
+  case disconnecting = 3
 }
 
 enum BmWriteType: Int, CaseIterable {

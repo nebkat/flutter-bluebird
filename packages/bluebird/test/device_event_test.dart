@@ -1,4 +1,6 @@
 import 'package:bluebird/bluebird.dart';
+import 'package:bluebird_platform_interface/bluebird_platform_interface.dart' show BmConnectionStateEvent;
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_platform.dart';
@@ -8,12 +10,17 @@ import 'protos.dart';
 /// the device's own state. The `Bm…Event` → `On…Event` translation is
 /// Bluebird's responsibility and is covered in event_routing_test.dart.
 void main() {
+  late FakePlatform fake;
   late BluetoothDevice device;
 
   setUp(() {
-    FakePlatform.install(FakePlatform());
+    fake = FakePlatform();
+    FakePlatform.install(fake);
     device = Bluebird.deviceForAddress('AA:BB:CC:DD:EE:FF');
   });
+
+  BmConnectionStateEvent bmConn(BluetoothConnectionState state) =>
+      BmConnectionStateEvent(address: device.remoteId, connectionState: state);
 
   OnConnectionStateChangedEvent connEvent(BluetoothConnectionState state, [DisconnectReason? reason]) =>
       OnConnectionStateChangedEvent(device, state, reason);
@@ -31,10 +38,69 @@ void main() {
       expect(device.mtu.value, 515);
 
       device.applyEvent(connEvent(BluetoothConnectionState.disconnected, DisconnectReason(19, 'peer')));
-      expect(device.isDisconnected, isTrue);
+      expect(device.isConnected, isFalse);
+      expect(device.connectionState.value, BluetoothConnectionState.disconnected);
       expect(device.mtu.value, 23); // reset to default
       expect(device.disconnectReason?.code, 19);
       expect(device.disconnectReason?.description, 'peer');
+    });
+
+    test('connect() synthesizes connecting, then reaches connected', () async {
+      final states = <BluetoothConnectionState>[];
+      final sub = device.connectionState.changes.listen(states.add);
+      await pumpEventQueue();
+
+      await device.connect(mtu: null);
+      await pumpEventQueue();
+
+      // the natives never report connecting — Dart synthesizes it; the success
+      // sets .value to connected immediately (the stream reaches connected via
+      // the native event, exercised next).
+      expect(states, [BluetoothConnectionState.connecting]);
+      expect(device.isConnected, isTrue);
+      expect(device.connectionState.value, BluetoothConnectionState.connected);
+
+      fake.emit(bmConn(BluetoothConnectionState.connected));
+      await pumpEventQueue();
+      expect(states, [BluetoothConnectionState.connecting, BluetoothConnectionState.connected]);
+
+      await sub.cancel();
+    });
+
+    test('disconnect() synthesizes disconnecting, then the native disconnected lands', () async {
+      await device.connect(mtu: null);
+      fake.emit(bmConn(BluetoothConnectionState.connected));
+      await pumpEventQueue();
+
+      final states = <BluetoothConnectionState>[];
+      final sub = device.connectionState.changes.listen(states.add);
+      await pumpEventQueue();
+
+      await device.disconnect();
+      await pumpEventQueue();
+      expect(states, [BluetoothConnectionState.disconnecting]); // synthesized
+
+      fake.emit(bmConn(BluetoothConnectionState.disconnected));
+      await pumpEventQueue();
+      expect(states, [BluetoothConnectionState.disconnecting, BluetoothConnectionState.disconnected]);
+
+      await sub.cancel();
+    });
+
+    test('a failed connect reverts connecting to disconnected', () async {
+      fake.stubs['connect'] = () => throw PlatformException(code: 'cb_error', message: 'rejected');
+      final states = <BluetoothConnectionState>[];
+      final sub = device.connectionState.changes.listen(states.add);
+      await pumpEventQueue();
+
+      // web emits no native event on a failed connect, so Dart reverts the
+      // synthesized `connecting` itself.
+      await expectLater(device.connect(mtu: null), throwsA(isA<BluebirdException>()));
+      await pumpEventQueue();
+      expect(states, [BluetoothConnectionState.connecting, BluetoothConnectionState.disconnected]);
+      expect(device.isConnected, isFalse);
+
+      await sub.cancel();
     });
   });
 
@@ -44,7 +110,7 @@ void main() {
   });
 
   test('services reset invalidates and clears discovered services', () async {
-    final fake = FakePlatform()
+    fake = FakePlatform()
       ..services = [
         bmService('a000', characteristics: [bmChar('b001')]),
       ];
@@ -89,7 +155,7 @@ void main() {
   });
 
   test('disconnect invalidates attributes and reports deviceDisconnected first', () async {
-    final fake = FakePlatform()
+    fake = FakePlatform()
       ..services = [
         bmService('a000', characteristics: [bmChar('b001')]),
       ];

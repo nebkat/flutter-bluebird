@@ -156,7 +156,7 @@ class BluetoothCharacteristic extends BluetoothAttribute {
   Future<void> _releaseNotify() async {
     if (--_notifyRefs > 0) return;
     _notifyEnable = null;
-    if (device.isDisconnected) return;
+    if (!device.isConnected) return; // nothing to disable unless still connected
     await _setNotifyValue(false);
   }
 

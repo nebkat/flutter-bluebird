@@ -20,7 +20,11 @@ import 'package:pigeon/pigeon.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 enum BluetoothAdapterState { unknown, unavailable, unauthorized, turningOn, on, turningOff, off }
 
-enum BluetoothConnectionState { disconnected, connected }
+// `connecting` and `disconnecting` are synthesized on the Dart side (around
+// device.connect()/disconnect()); the natives only ever emit `connected` /
+// `disconnected`. Appended (not reordered) so the existing wire indices for
+// `disconnected` (0) and `connected` (1) are preserved.
+enum BluetoothConnectionState { disconnected, connected, connecting, disconnecting }
 
 enum BmWriteType { withResponse, withoutResponse }
 

@@ -210,7 +210,9 @@ enum class BluetoothAdapterState(val raw: Int) {
 
 enum class BluetoothConnectionState(val raw: Int) {
   DISCONNECTED(0),
-  CONNECTED(1);
+  CONNECTED(1),
+  CONNECTING(2),
+  DISCONNECTING(3);
 
   companion object {
     fun ofRaw(raw: Int): BluetoothConnectionState? {

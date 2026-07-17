@@ -90,7 +90,7 @@ int _deepHash(Object? value) {
 
 enum BluetoothAdapterState { unknown, unavailable, unauthorized, turningOn, on, turningOff, off }
 
-enum BluetoothConnectionState { disconnected, connected }
+enum BluetoothConnectionState { disconnected, connected, connecting, disconnecting }
 
 enum BmWriteType { withResponse, withoutResponse }
 

@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:bluebird/bluebird.dart';
 
 import 'device_screen.dart';
-import '../utils/extra.dart';
 import '../utils/snackbar.dart';
 
 // Well-known service names offered as autocomplete suggestions. Values come
@@ -87,7 +86,7 @@ class _WebScanScreenState extends State<WebScanScreen> {
       ).first;
       final device = result.device;
 
-      await device.connectAndUpdateStream();
+      await device.connect(mtu: null);
 
       if (!mounted) return;
       Navigator.of(context).push(MaterialPageRoute(builder: (context) => DeviceScreen(device: device)));

@@ -125,11 +125,14 @@ class BluetoothDevice implements BluebirdLoggable {
     }
   }
 
-  /// Returns true if this device is currently connected to your app
+  /// Returns true if this device is currently connected to your app.
   bool get isConnected => _connectionState == BluetoothConnectionState.connected;
 
-  /// Returns true if this device is currently disconnected from your app
-  bool get isDisconnected => !isConnected;
+  void _emitConnectionState(BluetoothConnectionState state) {
+    final event = OnConnectionStateChangedEvent(this, state, _disconnectReason);
+    applyEvent(event);
+    Bluebird.emitEvent(event);
+  }
 
   /// Establishes a connection to the Bluetooth Device.
   ///   [timeout] if timeout occurs, cancel the connection request and throw exception
@@ -139,36 +142,49 @@ class BluetoothDevice implements BluebirdLoggable {
     await Mutex.disconnect.take();
     bool disconnectReturned = false;
 
-    await Mutex.global.protect(() async {
-      // record connection time
-      if (System.isAndroid) _connectTimestamp = DateTime.now();
+    // enter the `connecting` state up front (the platforms don't report it)
+    _emitConnectionState(BluetoothConnectionState.connecting);
 
-      try {
-        final future = Bluebird.invoke(
-          "connect",
-          (p) => p.connect(remoteId),
-          ensureAdapterIsOn: true,
-          timeout: timeout,
-        );
+    try {
+      await Mutex.global.protect(() async {
+        // record connection time
+        if (System.isAndroid) _connectTimestamp = DateTime.now();
 
-        // we return the disconnect mutex now so that this
-        // connection attempt can be canceled by calling disconnect
-        Mutex.disconnect.give();
-        disconnectReturned = true;
+        try {
+          final future = Bluebird.invoke(
+            "connect",
+            (p) => p.connect(remoteId),
+            ensureAdapterIsOn: true,
+            timeout: timeout,
+          );
 
-        await future;
+          // we return the disconnect mutex now so that this
+          // connection attempt can be canceled by calling disconnect
+          Mutex.disconnect.give();
+          disconnectReturned = true;
 
-        // the connect future completing means we are connected; update state
-        // here rather than waiting for the BmConnectionStateEvent, which
-        // travels on a separate channel and may be processed after we return
-        _connectionState = BluetoothConnectionState.connected;
-      } on BluebirdException catch (e) {
-        if (e.code == BluebirdErrorCode.timeout) {
-          await Bluebird.invoke("disconnect", (p) => p.disconnect(remoteId));
+          await future;
+
+          // the connect future completing means we are connected; update state
+          // here rather than waiting for the BmConnectionStateEvent, which
+          // travels on a separate channel and may be processed after we return
+          _connectionState = BluetoothConnectionState.connected;
+        } on BluebirdException catch (e) {
+          if (e.code == BluebirdErrorCode.timeout) {
+            await Bluebird.invoke("disconnect", (p) => p.disconnect(remoteId));
+          }
+          rethrow;
         }
-        rethrow;
+      });
+    } catch (_) {
+      // connect failed: the synthesized `connecting` never resolves on its own.
+      // Android/darwin also emit a native disconnected event, but web does not —
+      // so revert here (skipped if a native event already moved us on).
+      if (_connectionState == BluetoothConnectionState.connecting) {
+        _emitConnectionState(BluetoothConnectionState.disconnected);
       }
-    });
+      rethrow;
+    }
 
     if (!disconnectReturned) Mutex.disconnect.give();
 
@@ -196,6 +212,12 @@ class BluetoothDevice implements BluebirdLoggable {
     // Only allow a single disconnect operation at a time
     await Mutex.disconnect.protect(() {
       Future<void> action() async {
+        // enter the `disconnecting` state (the platforms don't report it); the
+        // native `disconnected` event follows and moves us to disconnected
+        if (_connectionState != BluetoothConnectionState.disconnected) {
+          _emitConnectionState(BluetoothConnectionState.disconnecting);
+        }
+
         // Workaround Android race condition
         await _ensureAndroidDisconnectionDelay(androidDelay);
 
@@ -408,9 +430,7 @@ class BluetoothDevice implements BluebirdLoggable {
     Duration elapsed = DateTime.now().difference(_connectTimestamp!);
     if (elapsed.compareTo(minGap) < 0) {
       Duration timeLeft = minGap - elapsed;
-      logger.fine(
-        "Enforcing disconnect gap: min=${minGap.inMilliseconds}ms delay=${timeLeft.inMilliseconds}ms",
-      );
+      logger.fine("Enforcing disconnect gap: min=${minGap.inMilliseconds}ms delay=${timeLeft.inMilliseconds}ms");
       await Future<void>.delayed(timeLeft);
     }
   }

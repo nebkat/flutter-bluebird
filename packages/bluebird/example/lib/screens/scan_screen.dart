@@ -7,7 +7,6 @@ import 'device_screen.dart';
 import '../utils/snackbar.dart';
 import '../widgets/system_device_tile.dart';
 import '../widgets/scan_result_tile.dart';
-import '../utils/extra.dart';
 
 class ScanScreen extends StatefulWidget {
   const ScanScreen({Key? key}) : super(key: key);
@@ -92,7 +91,7 @@ class _ScanScreenState extends State<ScanScreen> {
 
   Future onConnectPressed(BluetoothDevice device) async {
     try {
-      await device.connectAndUpdateStream();
+      await device.connect(mtu: null);
     } catch (e) {
       // connection failed — surface the error and stay on the scan page
       Snackbar.show(prettyException("Connect Error:", e), success: false);

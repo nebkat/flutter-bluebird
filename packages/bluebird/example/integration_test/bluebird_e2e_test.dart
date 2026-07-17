@@ -334,7 +334,7 @@ void main() {
       // to run the read against live attribute handles
       if (canManageBonds && await device.bondState.value != BluetoothBondState.none) {
         await device.removeBond();
-        if (device.isDisconnected) {
+        if (!device.isConnected) {
           await device.connect(timeout: const Duration(seconds: 15));
           services = await device.discoverServices();
         }
