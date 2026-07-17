@@ -23,7 +23,6 @@ class _ScanScreenState extends State<ScanScreen> {
 
   /// The active scan; cancelling it stops scanning.
   StreamSubscription<List<ScanResult>>? _scanSubscription;
-  Timer? _scanTimeout;
   late StreamSubscription<bool> _isScanningSubscription;
 
   @override
@@ -40,17 +39,18 @@ class _ScanScreenState extends State<ScanScreen> {
 
   @override
   void dispose() {
-    _scanTimeout?.cancel();
     _scanSubscription?.cancel();
     _isScanningSubscription.cancel();
     super.dispose();
   }
 
   /// Starts a scan for [timeout], accumulating results into [_scanResults].
+  /// The scan stops itself when [timeout] elapses (or when the subscription is
+  /// cancelled by [onStopPressed] / [dispose]).
   void _startScan({Duration timeout = const Duration(seconds: 15)}) {
     _scanSubscription?.cancel();
     _scanResults = [];
-    _scanSubscription = Bluebird.scan().accumulate().listen(
+    _scanSubscription = Bluebird.scan(timeout: timeout).accumulate().listen(
       (results) {
         _scanResults = results;
         if (mounted) setState(() {});
@@ -59,8 +59,6 @@ class _ScanScreenState extends State<ScanScreen> {
         Snackbar.show(prettyException("Scan Error:", e), success: false);
       },
     );
-    _scanTimeout?.cancel();
-    _scanTimeout = Timer(timeout, () => _scanSubscription?.cancel());
   }
 
   Future onScanPressed() async {

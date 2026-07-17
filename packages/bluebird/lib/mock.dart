@@ -56,6 +56,7 @@ class BluebirdMockable {
     AndroidScanMode androidScanMode = AndroidScanMode.lowLatency,
     bool androidUsesFineLocation = false,
     List<Uuid> webOptionalServices = const [],
+    Duration? timeout,
   }) => Bluebird.scan(
     withServices: withServices,
     withRemoteIds: withRemoteIds,
@@ -69,6 +70,7 @@ class BluebirdMockable {
     androidScanMode: androidScanMode,
     androidUsesFineLocation: androidUsesFineLocation,
     webOptionalServices: webOptionalServices,
+    timeout: timeout,
   );
 
   List<BluetoothDevice> get connectedDevices => Bluebird.connectedDevices;

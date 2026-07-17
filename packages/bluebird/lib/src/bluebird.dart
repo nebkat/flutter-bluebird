@@ -179,10 +179,12 @@ class Bluebird {
   /// Scan for Bluetooth Low Energy devices, as a stream of advertisements.
   ///
   /// The native scan starts when the returned stream is first listened to, and
-  /// stops when the subscription is cancelled — so a `timeout` is just cancel
-  /// after a duration, and there is no separate `stopScan`. Only one scan may
-  /// run at a time (the radio is a single resource); listening while a scan is
-  /// already running throws [BluebirdErrorCode.operationInProgress].
+  /// stops when the subscription is cancelled or after [timeout] elapses (if
+  /// set) — there is no separate `stopScan`. On [timeout] the stream *completes
+  /// normally* (it does not error), so `scan(timeout: …).accumulate().last`
+  /// yields the final device list. Only one scan may run at a time (the radio is
+  /// a single resource); listening while a scan is already running throws
+  /// [BluebirdErrorCode.operationInProgress].
   ///
   /// Each advertisement is emitted one at a time. To collect them into a
   /// growing, de-duplicated device list, use [ScanResultAccumulate.accumulate].
@@ -207,6 +209,8 @@ class Bluebird {
   ///        dependent on the your Bluetooth stack implementation.
   ///   - [androidScanMode] choose the android scan mode to use when scanning
   ///   - [androidUsesFineLocation] request `ACCESS_FINE_LOCATION` permission at runtime
+  ///   - [timeout] if set, stop scanning and complete the stream (normally, not
+  ///        with an error) after this duration; otherwise scan until cancelled
   static Stream<ScanResult> scan({
     List<Uuid> withServices = const [],
     List<String> withRemoteIds = const [],
@@ -220,6 +224,7 @@ class Bluebird {
     AndroidScanMode androidScanMode = AndroidScanMode.lowLatency,
     bool androidUsesFineLocation = false,
     List<Uuid> webOptionalServices = const [],
+    Duration? timeout,
   }) async* {
     assert(continuousDivisor >= 1, "divisor must be >= 1");
 
@@ -260,9 +265,18 @@ class Bluebird {
     // Buffer advertisements from *before* the native scan starts, so none are
     // missed while startScan is in flight.
     final controller = StreamController<ScanResult>();
+    // Guard against add-after-close: the controller can be closed (by a timeout
+    // or endScan()) before this subscription is cancelled in the finally.
     final advertisements = extractEventStream<OnScanAdvertisementEvent>()
         .map((e) => e.advertisement)
-        .listen(controller.add, onError: controller.addError);
+        .listen(
+          (a) {
+            if (!controller.isClosed) controller.add(a);
+          },
+          onError: (Object e, StackTrace st) {
+            if (!controller.isClosed) controller.addError(e, st);
+          },
+        );
 
     // Ways the scan ends without us telling the platform to stop, because the
     // native scan is already dead: it reported a failure, the adapter turned
@@ -283,12 +297,22 @@ class Bluebird {
         .listen((_) => endScan());
     final detached = extractEventStream<OnDetachedFromEngineEvent>().listen((_) => endScan());
 
+    Timer? timeoutTimer;
     var started = false;
     try {
       await invoke("startScan", (p) => p.startScan(settings));
       started = true;
+      // Stop the scan and complete the stream normally after [timeout]. Closing
+      // the controller (rather than endScan()) leaves nativeScanDead false, so
+      // the finally still tells the platform to stopScan.
+      if (timeout != null) {
+        timeoutTimer = Timer(timeout, () {
+          if (!controller.isClosed) controller.close();
+        });
+      }
       yield* controller.stream;
     } finally {
+      timeoutTimer?.cancel();
       await advertisements.cancel();
       await failures.cancel();
       await adapterOff.cancel();

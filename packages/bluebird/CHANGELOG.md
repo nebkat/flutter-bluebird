@@ -1,3 +1,7 @@
+## Unreleased
+
+- Added an optional `timeout` to `Bluebird.scan(...)`: the scan stops and the stream *completes normally* (not with an error) after the duration, so `Bluebird.scan(timeout: …).accumulate().last` yields the final device list. Also hardened the advertisement feed against add-after-close.
+
 ## 0.2.1
 
 - Stopped re-exporting `Level` / `Logger` / `LogRecord` from `package:logging`, which collided with a consumer's own `package:logging` import (`unnecessary_import`). If you configure `Bluebird.logger` directly, add `package:logging` to your `pubspec.yaml`.

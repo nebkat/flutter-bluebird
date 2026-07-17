@@ -78,6 +78,41 @@ void main() {
     expect(fake.calls, contains('stopScan'));
   });
 
+  test('scan(timeout:) stops the scan and completes the stream normally', () async {
+    final seen = <String>[];
+    var done = false;
+    final sub = Bluebird.scan(
+      timeout: const Duration(milliseconds: 50),
+    ).listen((r) => seen.add(r.address), onDone: () => done = true);
+    await pumpEventQueue();
+    expect(Bluebird.isScanning.value, isTrue);
+
+    fake.emit(BmScanAdvertisementEvent(advertisement: bmAdv('AA')));
+    await pumpEventQueue();
+    expect(seen, ['AA']);
+
+    // let the timeout fire
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    await pumpEventQueue();
+
+    expect(done, isTrue); // completed normally (onDone), not an error
+    expect(Bluebird.isScanning.value, isFalse); // guard released
+    expect(fake.calls, contains('stopScan')); // platform told to stop (scan was alive)
+    await sub.cancel();
+  });
+
+  test('scan(timeout:).accumulate().last yields the final device list', () async {
+    final future = Bluebird.scan(timeout: const Duration(milliseconds: 50)).accumulate().last;
+    await pumpEventQueue();
+
+    fake.emit(BmScanAdvertisementEvent(advertisement: bmAdv('AA')));
+    fake.emit(BmScanAdvertisementEvent(advertisement: bmAdv('BB')));
+
+    final list = await future; // resolves when the timeout completes the stream
+    expect(list.map((r) => r.address), unorderedEquals(['AA', 'BB']));
+    expect(Bluebird.isScanning.value, isFalse);
+  });
+
   test('a second concurrent scan throws operationInProgress', () async {
     final sub = Bluebird.scan().listen((_) {});
     await pumpEventQueue();
