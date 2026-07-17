@@ -99,16 +99,6 @@ class _DeviceScreenState extends State<DeviceScreen> {
     }
   }
 
-  Future onCancelPressed() async {
-    try {
-      await widget.device.disconnect(queue: false);
-      Snackbar.show("Cancel: Success", success: true);
-    } catch (e) {
-      Snackbar.show(prettyException("Cancel Error:", e), success: false);
-      print(e);
-    }
-  }
-
   Future onDisconnectPressed() async {
     try {
       await widget.device.disconnect();
@@ -254,7 +244,12 @@ class _DeviceScreenState extends State<DeviceScreen> {
           Expanded(
             child: FilledButton.icon(
               icon: busy ? spinner() : Icon(isConnected ? Icons.link_off : Icons.link),
-              label: Text(_isConnecting ? 'Cancel' : (isConnected ? 'Disconnect' : 'Connect')),
+              label: Text(switch (_connectionState) {
+                BluetoothConnectionState.connecting => 'Connecting…',
+                BluetoothConnectionState.disconnecting => 'Disconnecting…',
+                BluetoothConnectionState.connected => 'Disconnect',
+                BluetoothConnectionState.disconnected => 'Connect',
+              }),
               // destructive: error colors keep the label readable in light/dark
               style: isConnected
                   ? FilledButton.styleFrom(
@@ -262,7 +257,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
                       foregroundColor: Theme.of(context).colorScheme.onError,
                     )
                   : null,
-              onPressed: _isConnecting ? onCancelPressed : (isConnected ? onDisconnectPressed : onConnectPressed),
+              // disabled while a connect/disconnect is in flight
+              onPressed: busy ? null : (isConnected ? onDisconnectPressed : onConnectPressed),
             ),
           ),
           const SizedBox(width: 12),
