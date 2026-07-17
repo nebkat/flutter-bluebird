@@ -1,3 +1,7 @@
+## 0.3.0
+
+- Regenerated for the `BluetoothConnectionState` `connecting` / `disconnecting` additions. Native behaviour is unchanged — Android still reports only connected / disconnected.
+
 ## 0.2.0
 
 - Platform method-channel tracing now goes to `BluebirdPlatform.logger` (at `Level.FINEST`); `setLogLevel` no longer takes a `color` argument.

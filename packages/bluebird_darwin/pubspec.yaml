@@ -1,6 +1,6 @@
 name: bluebird_darwin
 description: The iOS and macOS implementation of bluebird, the Bluetooth Low Energy (BLE) plugin for Flutter.
-version: 0.2.1
+version: 0.3.0
 homepage: https://github.com/nebkat/flutter-bluebird
 repository: https://github.com/nebkat/flutter-bluebird
 issue_tracker: https://github.com/nebkat/flutter-bluebird/issues
@@ -18,7 +18,7 @@ resolution: workspace
 dependencies:
   flutter:
     sdk: flutter
-  bluebird_platform_interface: ^0.2.0
+  bluebird_platform_interface: ^0.3.0
 
 dev_dependencies:
   flutter_lints: ^6.0.0

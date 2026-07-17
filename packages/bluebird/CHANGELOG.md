@@ -1,4 +1,4 @@
-## Unreleased
+## 0.3.0
 
 - **Breaking:** `BluetoothConnectionState` now has `connecting` and `disconnecting` in addition to `connected` / `disconnected`. They are synthesized on the Dart side around `device.connect()` / `disconnect()` (the platforms only report the terminal states), so `device.connectionState` drives a connecting/disconnecting spinner directly. `device.isDisconnected` is **removed** — it was ambiguous with the new transient states; use `!device.isConnected`, or `connectionState.value == BluetoothConnectionState.disconnected` for a fully-disconnected device.
 - Added an optional `timeout` to `Bluebird.scan(...)`: the scan stops and the stream *completes normally* (not with an error) after the duration, so `Bluebird.scan(timeout: …).accumulate().last` yields the final device list. Also hardened the advertisement feed against add-after-close.

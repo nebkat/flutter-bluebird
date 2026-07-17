@@ -1,3 +1,7 @@
+## 0.3.0
+
+- Regenerated for the `BluetoothConnectionState` `connecting` / `disconnecting` additions. Native behaviour is unchanged — CoreBluetooth still reports only connected / disconnected.
+
 ## 0.2.1
 
 - Writes without response now wait for CoreBluetooth's flow control (`canSendWriteWithoutResponse`) to open before enqueuing, instead of failing with a "you must slow down" error. `write(withoutResponse: true)` applies backpressure and resolves once the stack accepts the bytes, matching the Android and web behaviour.

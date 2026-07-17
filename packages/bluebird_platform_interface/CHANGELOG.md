@@ -1,3 +1,7 @@
+## 0.3.0
+
+- `BluetoothConnectionState` gains `connecting` and `disconnecting`, appended so the existing wire indices for `disconnected` / `connected` are preserved. The transient states are synthesized in `package:bluebird`; the natives still emit only the terminal states.
+
 ## 0.2.0
 
 - **Breaking:** replaced the `BluebirdPlatform.log(String)` / `logs` string sink with a [`package:logging`](https://pub.dev/packages/logging) `Logger` at `BluebirdPlatform.logger`; added a `logging` dependency.
