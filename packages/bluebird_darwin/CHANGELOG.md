@@ -1,3 +1,7 @@
+## 0.2.1
+
+- Writes without response now wait for CoreBluetooth's flow control (`canSendWriteWithoutResponse`) to open before enqueuing, instead of failing with a "you must slow down" error. `write(withoutResponse: true)` applies backpressure and resolves once the stack accepts the bytes, matching the Android and web behaviour.
+
 ## 0.2.0
 
 - Platform method-channel tracing now goes to `BluebirdPlatform.logger` (at `Level.FINEST`); `setLogLevel` no longer takes a `color` argument.
