@@ -650,7 +650,7 @@ extension ScanResultAccumulate on Stream<ScanResult> {
 }
 
 class AdvertisementData {
-  final String advName;
+  final String? advName;
   final int? txPowerLevel;
   final int? appearance; // not supported on iOS / macOS
   final bool connectable;
@@ -669,7 +669,7 @@ class AdvertisementData {
   });
 
   AdvertisementData.fromProto(BmScanAdvertisement p)
-    : advName = p.advName ?? "",
+    : advName = p.advName,
       txPowerLevel = p.txPowerLevel,
       appearance = p.appearance,
       connectable = p.connectable,
@@ -677,14 +677,8 @@ class AdvertisementData {
       serviceData = p.serviceData.map((uuid, data) => MapEntry(Uuid(uuid), data)),
       serviceUuids = p.serviceUuids.map(Uuid.new).toList();
 
-  /// Returns this data updated with [newer], carrying forward any field that
-  /// [newer] does not carry (its advertising and scan-response PDUs each carry
-  /// only part of the picture). For each field, [newer]'s value wins when it is
-  /// present — a non-empty string/list/map, or a non-null number — otherwise the
-  /// prior value is kept. [connectable] is a per-packet header flag with no
-  /// "absent" state, so [newer]'s value is always taken.
   AdvertisementData mergedWith(AdvertisementData newer) => AdvertisementData(
-    advName: newer.advName.isNotEmpty ? newer.advName : advName,
+    advName: newer.advName ?? advName,
     txPowerLevel: newer.txPowerLevel ?? txPowerLevel,
     appearance: newer.appearance ?? appearance,
     connectable: newer.connectable,

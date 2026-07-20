@@ -119,7 +119,7 @@ class _ScanResultTileState extends State<ScanResultTile> {
     // devices advertise no name at all, so show a muted "Unknown" placeholder
     final advertisedName = widget.result.device.platformName.isNotEmpty
         ? widget.result.device.platformName
-        : widget.result.advertisementData.advName;
+        : widget.result.advertisementData.advName ?? '';
     final hasName = advertisedName.isNotEmpty;
     final manufacturer = _manufacturer();
     final bodySmall = Theme.of(context).textTheme.bodySmall;
@@ -188,7 +188,7 @@ class _ScanResultTileState extends State<ScanResultTile> {
         _buildAdvRow(context, 'Remote ID', widget.result.device.remoteId),
         _buildAdvRow(context, 'RSSI', '${widget.result.rssi} dBm'),
         _buildAdvRow(context, 'Connectable', adv.connectable ? 'Yes' : 'No'),
-        if (adv.advName.isNotEmpty) _buildAdvRow(context, 'Name', adv.advName),
+        if (adv.advName?.isNotEmpty ?? false) _buildAdvRow(context, 'Name', adv.advName!),
         if (adv.txPowerLevel != null) _buildAdvRow(context, 'Tx Power Level', '${adv.txPowerLevel} dBm'),
         if ((adv.appearance ?? 0) > 0) _buildAdvRow(context, 'Appearance', _appearanceLabel(adv.appearance!)),
         if (adv.manufacturerData.isNotEmpty)

@@ -1,3 +1,7 @@
+## Unreleased
+
+- **Breaking:** `AdvertisementData.advName` is now `String?`. It is `null` when the advertisement carries no name, rather than being coerced to an empty string. `mergedWith` carries the prior name forward whenever `newer.advName` is `null`.
+
 ## 0.3.0
 
 - **Breaking:** `BluetoothConnectionState` now has `connecting` and `disconnecting` in addition to `connected` / `disconnected`. They are synthesized on the Dart side around `device.connect()` / `disconnect()` (the platforms only report the terminal states), so `device.connectionState` drives a connecting/disconnecting spinner directly. `device.isDisconnected` is **removed** — it was ambiguous with the new transient states; use `!device.isConnected`, or `connectionState.value == BluetoothConnectionState.disconnected` for a fully-disconnected device.
