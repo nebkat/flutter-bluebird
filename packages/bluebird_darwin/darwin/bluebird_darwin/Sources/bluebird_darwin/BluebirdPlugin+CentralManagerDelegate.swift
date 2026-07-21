@@ -42,6 +42,11 @@ extension BluebirdPlugin: CBCentralManagerDelegate {
             disconnectReasonCode: Self.adapterOffDisconnectCode,
             disconnectReasonString: "Bluetooth turned off"))
       }
+      // close any open L2CAP channels, notifying the app
+      for address in peripherals.keys {
+        closeL2capForDevice(address)
+      }
+
       let states = Array(peripherals.values)
       peripherals.removeAll()
       stopMtuPollingIfIdle()
@@ -186,6 +191,9 @@ extension BluebirdPlugin: CBCentralManagerDelegate {
 
     let state = peripherals.removeValue(forKey: address)
     stopMtuPollingIfIdle()
+
+    // close any L2CAP channels this device had open
+    closeL2capForDevice(address)
 
     // unregister self as delegate for peripheral
     peripheral.delegate = nil

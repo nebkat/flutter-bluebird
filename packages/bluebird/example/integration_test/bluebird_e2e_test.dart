@@ -280,6 +280,50 @@ void main() {
     expect(back, payload);
   }, timeout: const Timeout(Duration(seconds: 45)));
 
+  test('l2cap: echo channel round-trips written bytes', () async {
+    // PSM 0x0080 — the fixture's L2CAP CoC echo server (see
+    // tools/esp32_peripheral/main/l2cap_svr.c). `secure: false` avoids
+    // requiring an encrypted link (Android); ignored on iOS/macOS.
+    final channel = await device.openL2capChannel(0x0080, secure: false, timeout: const Duration(seconds: 15));
+    addTearDown(() async {
+      if (!channel.isClosed) await channel.close();
+    });
+
+    // L2CAP is a byte stream, so an echoed payload may arrive split across
+    // events — accumulate until we have the expected number of bytes back.
+    final inbound = <int>[];
+    Completer<void>? pending;
+    int expectedLen = 0;
+    final sub = channel.input.listen((chunk) {
+      inbound.addAll(chunk);
+      if (pending != null && !pending!.isCompleted && inbound.length >= expectedLen) pending!.complete();
+    });
+    addTearDown(sub.cancel);
+
+    Future<List<int>> echo(List<int> payload) async {
+      inbound.clear();
+      expectedLen = payload.length;
+      pending = Completer<void>();
+      await channel.write(Uint8List.fromList(payload));
+      await pending!.future.timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => fail('l2cap echo did not return $expectedLen bytes (got ${inbound.length})'),
+      );
+      return List<int>.of(inbound.take(expectedLen));
+    }
+
+    // round-trip a small payload, then a second write on the same channel
+    expect(await echo(utf8.encode('bluebird-l2cap')), utf8.encode('bluebird-l2cap'));
+    expect(await echo(const [1, 2, 3, 4, 5]), const [1, 2, 3, 4, 5]);
+
+    // a full 512-byte SDU (the fixture's max) exercises multi-chunk + backpressure
+    final big = List<int>.generate(512, (i) => (i * 31 + 7) & 0xff);
+    expect(await echo(big), big);
+
+    await channel.close();
+    expect(channel.isClosed, isTrue);
+  }, timeout: const Timeout(Duration(seconds: 45)));
+
   test('control 0x01: services-changed indication fires onServicesReset, '
       're-discovery succeeds', () async {
     final reset = device.onServicesReset.first;

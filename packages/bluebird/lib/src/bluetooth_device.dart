@@ -14,6 +14,7 @@ import 'bluetooth_attribute.dart';
 import 'bluetooth_characteristic.dart';
 import 'bluetooth_descriptor.dart';
 import 'bluetooth_events.dart';
+import 'bluetooth_l2cap.dart';
 import 'bluetooth_service.dart';
 import 'bluetooth_utils.dart';
 import 'utils.dart';
@@ -301,6 +302,37 @@ class BluetoothDevice implements BluebirdLoggable {
   /// Read the RSSI of connected remote device
   Future<int> readRssi({Duration timeout = const Duration(seconds: 15)}) =>
       invoke("readRssi", (p) => p.readRssi(remoteId), timeout: timeout);
+
+  /// Open an L2CAP connection-oriented channel to [psm] — a bidirectional byte
+  /// stream to the peer, independent of GATT (Android & iOS/macOS only; not
+  /// supported on Web).
+  ///   - the device must be connected; the PSM is typically learned out-of-band
+  ///     or from a GATT characteristic the peripheral exposes.
+  ///   - [secure] (Android only) requires an authenticated + encrypted (bonded)
+  ///     link for the channel — Android's `createL2capChannel` vs
+  ///     `createInsecureL2capChannel`. Defaults to `false`: like iOS/macOS
+  ///     (where this flag is ignored and channel security follows the PSM), the
+  ///     channel then uses whatever security the link already has rather than
+  ///     demanding encryption. Set `true` only if the peer's PSM requires it —
+  ///     a mismatch surfaces as a "Client security clearance failed" connect
+  ///     error. Requires Android 10 (API 29).
+  ///   - the returned [BluetoothL2CapChannel] carries data on a dedicated transport that
+  ///     bypasses the global operation queue (see [BluetoothL2CapChannel]).
+  Future<BluetoothL2CapChannel> openL2capChannel(
+    int psm, {
+    bool secure = false,
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
+    ensurePlatform(System.isAndroid || System.isDarwin, "openL2capChannel");
+    final channelId = await invoke(
+      "openL2capChannel",
+      (p) => p.openL2capChannel(remoteId, psm, secure),
+      timeout: timeout,
+    );
+    final channel = BluetoothL2CapChannel(device: this, psm: psm, channelId: channelId);
+    Bluebird.registerL2cap(channel);
+    return channel;
+  }
 
   /// Request to change MTU (Android Only)
   ///  - returns new MTU

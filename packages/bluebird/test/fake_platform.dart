@@ -148,6 +148,40 @@ final class FakePlatform extends BluebirdPlatform {
   @override
   Future<BmPhySupport> getPhySupport() => _run('getPhySupport', BmPhySupport(le2M: true, leCoded: false));
 
+  // L2CAP surface
+  int l2capNextId = 1;
+  int? lastL2capPsm;
+  bool? lastL2capSecure;
+  final l2capInboundControllers = <int, StreamController<Uint8List>>{};
+  final l2capWrites = <int, List<Uint8List>>{};
+  final l2capDetached = <int>[];
+
+  @override
+  Future<int> openL2capChannel(String address, int psm, bool secure) {
+    lastL2capPsm = psm;
+    lastL2capSecure = secure;
+    return _run('openL2capChannel', l2capNextId++);
+  }
+
+  @override
+  Future<void> closeL2capChannel(int channelId) => _run('closeL2capChannel', null);
+
+  @override
+  Stream<Uint8List> l2capInput(int channelId) =>
+      (l2capInboundControllers[channelId] ??= StreamController<Uint8List>()).stream;
+
+  @override
+  Future<void> l2capWrite(int channelId, Uint8List data) {
+    (l2capWrites[channelId] ??= []).add(data);
+    return _run('l2capWrite', null);
+  }
+
+  @override
+  void l2capDetach(int channelId) {
+    l2capDetached.add(channelId);
+    l2capInboundControllers.remove(channelId)?.close();
+  }
+
   static void install(FakePlatform platform) {
     BluebirdPlatform.instance = platform;
     Bluebird.resetForTest();

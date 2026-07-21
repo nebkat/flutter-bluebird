@@ -14,6 +14,7 @@ import 'package:logging/logging.dart';
 import 'bluetooth_attribute.dart';
 import 'bluetooth_device.dart';
 import 'bluetooth_events.dart';
+import 'bluetooth_l2cap.dart';
 import 'bluetooth_utils.dart';
 import 'utils.dart';
 
@@ -440,8 +441,24 @@ class Bluebird {
 
       case BmDetachedFromEngineEvent():
         _eventStream.add(OnDetachedFromEngineEvent());
+
+      case BmL2capChannelClosedEvent():
+        // Unsolicited close (peer close, disconnect, or I/O error): tear down
+        // the matching channel so its `input` stream completes. A channel the
+        // app closed itself is already unregistered, so this is a no-op then.
+        _l2capChannels.remove(event.channelId)?.onRemoteClosed();
     }
   }
+
+  /// Open L2CAP channels, keyed by their native channel id, so an unsolicited
+  /// [BmL2capChannelClosedEvent] can be routed to the right [BluetoothL2CapChannel].
+  static final Map<int, BluetoothL2CapChannel> _l2capChannels = {};
+
+  @internal
+  static void registerL2cap(BluetoothL2CapChannel channel) => _l2capChannels[channel.channelId] = channel;
+
+  @internal
+  static void unregisterL2cap(int channelId) => _l2capChannels.remove(channelId);
 
   /// Applies a device event to its device (a synchronous state update) and then
   /// broadcasts it. The `Bm…Event` → `On…Event` translation happens in

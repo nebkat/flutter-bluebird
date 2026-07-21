@@ -22,6 +22,7 @@ export 'src/bluetooth_characteristic.dart';
 export 'src/bluetooth_descriptor.dart';
 export 'src/bluetooth_device.dart';
 export 'src/bluetooth_events.dart';
+export 'src/bluetooth_l2cap.dart';
 export 'src/mapped.dart';
 export 'src/bluetooth_service.dart';
 export 'src/bluetooth_utils.dart';

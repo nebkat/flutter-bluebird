@@ -1461,6 +1461,69 @@ data class BmDetachedFromEngineEvent (
     return "BmDetachedFromEngineEvent(unused=$unused)"
   }
 }
+
+/**
+ * An L2CAP connection-oriented channel closed *unsolicited* — the peer closed
+ * it, the device disconnected, or a read/write failed. A successful open is
+ * reported by [BluebirdHostApi.openL2capChannel]'s return value, and a
+ * [closeL2capChannel] the app requested itself is confirmed by that call
+ * completing, so neither emits this event. Channel *data* never crosses here:
+ * it flows on the dedicated `bluebird/l2cap` binary channel (see
+ * [BluebirdHostApi.openL2capChannel]).
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+data class BmL2capChannelClosedEvent (
+  val channelId: Long,
+  val address: String,
+  /**
+   * Wire error code (snake_case of a [BluebirdErrorCode]) when the close was
+   * caused by a failure; null for a clean peer/EOF close.
+   */
+  val errorCode: String? = null,
+  val errorString: String? = null
+) : BmEvent()
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): BmL2capChannelClosedEvent {
+      val channelId = pigeonVar_list[0] as Long
+      val address = pigeonVar_list[1] as String
+      val errorCode = pigeonVar_list[2] as String?
+      val errorString = pigeonVar_list[3] as String?
+      return BmL2capChannelClosedEvent(channelId, address, errorCode, errorString)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      channelId,
+      address,
+      errorCode,
+      errorString,
+    )
+  }
+  override fun equals(other: Any?): Boolean {
+    if (other == null || other.javaClass != javaClass) {
+      return false
+    }
+    if (this === other) {
+      return true
+    }
+    val other = other as BmL2capChannelClosedEvent
+    return MessagesPigeonUtils.deepEquals(this.channelId, other.channelId) && MessagesPigeonUtils.deepEquals(this.address, other.address) && MessagesPigeonUtils.deepEquals(this.errorCode, other.errorCode) && MessagesPigeonUtils.deepEquals(this.errorString, other.errorString)
+  }
+
+  override fun hashCode(): Int {
+    var result = javaClass.hashCode()
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.channelId)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.address)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.errorCode)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.errorString)
+    return result
+  }
+  override fun toString(): String {
+    return "BmL2capChannelClosedEvent(channelId=$channelId, address=$address, errorCode=$errorCode, errorString=$errorString)"
+  }
+}
 private open class MessagesPigeonCodec : StandardMessageCodec() {
   override fun readValueOfType(type: Byte, buffer: ByteBuffer): Any? {
     return when (type) {
@@ -1619,6 +1682,11 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
           BmDetachedFromEngineEvent.fromList(it)
         }
       }
+      160.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          BmL2capChannelClosedEvent.fromList(it)
+        }
+      }
       else -> super.readValueOfType(type, buffer)
     }
   }
@@ -1748,6 +1816,10 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
         stream.write(159)
         writeValue(stream, value.toList())
       }
+      is BmL2capChannelClosedEvent -> {
+        stream.write(160)
+        writeValue(stream, value.toList())
+      }
       else -> super.writeValue(stream, value)
     }
   }
@@ -1849,6 +1921,8 @@ interface BluebirdHostApi {
   fun createBond(address: String, pin: ByteArray?, callback: (Result<Boolean>) -> Unit)
   fun removeBond(address: String, callback: (Result<Boolean>) -> Unit)
   fun clearGattCache(address: String, callback: (Result<Unit>) -> Unit)
+  fun openL2capChannel(address: String, psm: Long, secure: Boolean, callback: (Result<Long>) -> Unit)
+  fun closeL2capChannel(channelId: Long, callback: (Result<Unit>) -> Unit)
 
   companion object {
     /** The codec used by BluebirdHostApi. */
@@ -2411,6 +2485,47 @@ interface BluebirdHostApi {
             val args = message as List<Any?>
             val addressArg = args[0] as String
             api.clearGattCache(addressArg) { result: Result<Unit> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(MessagesPigeonUtils.wrapError(error))
+              } else {
+                reply.reply(MessagesPigeonUtils.wrapResult(null))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.bluebird.BluebirdHostApi.openL2capChannel$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val addressArg = args[0] as String
+            val psmArg = args[1] as Long
+            val secureArg = args[2] as Boolean
+            api.openL2capChannel(addressArg, psmArg, secureArg) { result: Result<Long> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(MessagesPigeonUtils.wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(MessagesPigeonUtils.wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.bluebird.BluebirdHostApi.closeL2capChannel$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val channelIdArg = args[0] as Long
+            api.closeL2capChannel(channelIdArg) { result: Result<Unit> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(MessagesPigeonUtils.wrapError(error))

@@ -67,6 +67,10 @@ final class PeripheralState {
   /// serializes writes, so at most one is ever parked here.
   var pendingWriteReady: CheckedContinuation<Void, Error>?
 
+  /// An in-flight `openL2capChannel`, resumed by `peripheral(_:didOpen:error:)`.
+  /// The Dart layer serializes operations, so at most one is ever parked here.
+  var pendingL2capOpen: CheckedContinuation<CBL2CAPChannel, Error>?
+
   init(_ peripheral: CBPeripheral) { self.peripheral = peripheral }
 
   func clearDiscoveryState() {
@@ -101,6 +105,12 @@ final class PeripheralState {
     return pendingWriteReady
   }
 
+  /// Removes and returns the L2CAP-open continuation, if any.
+  func takeL2capOpen() -> CheckedContinuation<CBL2CAPChannel, Error>? {
+    defer { pendingL2capOpen = nil }
+    return pendingL2capOpen
+  }
+
   /// Fails every pending operation on this device (device disconnected or
   /// adapter turned off).
   func failAllPending(_ error: Error) {
@@ -108,6 +118,7 @@ final class PeripheralState {
     takeConnect()?.resume(throwing: error)
     takeDisconnect()?.resume(throwing: error)
     takeWriteReady()?.resume(throwing: error)
+    takeL2capOpen()?.resume(throwing: error)
   }
 
   /// Hot restart / engine detach: resumes every slot with CancellationError

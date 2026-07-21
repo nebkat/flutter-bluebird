@@ -1403,6 +1403,66 @@ struct BmDetachedFromEngineEvent: BmEvent {
   }
 }
 
+/// An L2CAP connection-oriented channel closed *unsolicited* — the peer closed
+/// it, the device disconnected, or a read/write failed. A successful open is
+/// reported by [BluebirdHostApi.openL2capChannel]'s return value, and a
+/// [closeL2capChannel] the app requested itself is confirmed by that call
+/// completing, so neither emits this event. Channel *data* never crosses here:
+/// it flows on the dedicated `bluebird/l2cap` binary channel (see
+/// [BluebirdHostApi.openL2capChannel]).
+///
+/// Generated class from Pigeon that represents data sent in messages.
+struct BmL2capChannelClosedEvent: BmEvent {
+  var channelId: Int64
+  var address: String
+  /// Wire error code (snake_case of a [BluebirdErrorCode]) when the close was
+  /// caused by a failure; null for a clean peer/EOF close.
+  var errorCode: String? = nil
+  var errorString: String? = nil
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> BmL2capChannelClosedEvent? {
+    let channelId = pigeonVar_list[0] as! Int64
+    let address = pigeonVar_list[1] as! String
+    let errorCode: String? = nilOrValue(pigeonVar_list[2])
+    let errorString: String? = nilOrValue(pigeonVar_list[3])
+
+    return BmL2capChannelClosedEvent(
+      channelId: channelId,
+      address: address,
+      errorCode: errorCode,
+      errorString: errorString
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      channelId,
+      address,
+      errorCode,
+      errorString,
+    ]
+  }
+  static func == (lhs: BmL2capChannelClosedEvent, rhs: BmL2capChannelClosedEvent) -> Bool {
+    if Swift.type(of: lhs) != Swift.type(of: rhs) {
+      return false
+    }
+    return MessagesPigeonInternal.deepEquals(lhs.channelId, rhs.channelId) && MessagesPigeonInternal.deepEquals(lhs.address, rhs.address) && MessagesPigeonInternal.deepEquals(lhs.errorCode, rhs.errorCode) && MessagesPigeonInternal.deepEquals(lhs.errorString, rhs.errorString)
+  }
+
+  func hash(into hasher: inout Hasher) {
+    hasher.combine("BmL2capChannelClosedEvent")
+    MessagesPigeonInternal.deepHash(value: channelId, hasher: &hasher)
+    MessagesPigeonInternal.deepHash(value: address, hasher: &hasher)
+    MessagesPigeonInternal.deepHash(value: errorCode, hasher: &hasher)
+    MessagesPigeonInternal.deepHash(value: errorString, hasher: &hasher)
+  }
+
+  public var description: String {
+    return "BmL2capChannelClosedEvent(channelId: \(String(describing: channelId)), address: \(String(describing: address)), errorCode: \(String(describing: errorCode)), errorString: \(String(describing: errorString)))"
+  }
+}
+
 private class MessagesPigeonCodecReader: FlutterStandardReader {
   override func readValue(ofType type: UInt8) -> Any? {
     switch type {
@@ -1496,6 +1556,8 @@ private class MessagesPigeonCodecReader: FlutterStandardReader {
       return BmMtuChangedEvent.fromList(self.readValue() as! [Any?])
     case 159:
       return BmDetachedFromEngineEvent.fromList(self.readValue() as! [Any?])
+    case 160:
+      return BmL2capChannelClosedEvent.fromList(self.readValue() as! [Any?])
     default:
       return super.readValue(ofType: type)
     }
@@ -1596,6 +1658,9 @@ private class MessagesPigeonCodecWriter: FlutterStandardWriter {
       super.writeValue(value.toList())
     } else if let value = value as? BmDetachedFromEngineEvent {
       super.writeByte(159)
+      super.writeValue(value.toList())
+    } else if let value = value as? BmL2capChannelClosedEvent {
+      super.writeByte(160)
       super.writeValue(value.toList())
     } else {
       super.writeValue(value)
@@ -1721,6 +1786,8 @@ protocol BluebirdHostApi {
   func createBond(address: String, pin: FlutterStandardTypedData?, completion: @escaping (Result<Bool, Error>) -> Void)
   func removeBond(address: String, completion: @escaping (Result<Bool, Error>) -> Void)
   func clearGattCache(address: String, completion: @escaping (Result<Void, Error>) -> Void)
+  func openL2capChannel(address: String, psm: Int64, secure: Bool, completion: @escaping (Result<Int64, Error>) -> Void)
+  func closeL2capChannel(channelId: Int64, completion: @escaping (Result<Void, Error>) -> Void)
 }
 
 /// Generated setup class from Pigeon to handle messages through the `binaryMessenger`.
@@ -2220,6 +2287,42 @@ class BluebirdHostApiSetup {
       }
     } else {
       clearGattCacheChannel.setMessageHandler(nil)
+    }
+    let openL2capChannelChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.bluebird.BluebirdHostApi.openL2capChannel\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      openL2capChannelChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let addressArg = args[0] as! String
+        let psmArg = args[1] as! Int64
+        let secureArg = args[2] as! Bool
+        api.openL2capChannel(address: addressArg, psm: psmArg, secure: secureArg) { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      openL2capChannelChannel.setMessageHandler(nil)
+    }
+    let closeL2capChannelChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.bluebird.BluebirdHostApi.closeL2capChannel\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      closeL2capChannelChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let channelIdArg = args[0] as! Int64
+        api.closeL2capChannel(channelId: channelIdArg) { result in
+          switch result {
+          case .success:
+            reply(wrapResult(nil))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      closeL2capChannelChannel.setMessageHandler(nil)
     }
   }
 }

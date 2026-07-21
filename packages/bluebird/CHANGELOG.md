@@ -1,5 +1,6 @@
 ## Unreleased
 
+- Added L2CAP connection-oriented channel support. `device.openL2capChannel(psm, secure: …)` returns a `BluetoothL2CapChannel` — a bidirectional byte stream to the peer (`input` / `write(...)` / `close()`), independent of GATT, on Android (API 29+) and iOS/macOS (unsupported on Web; `secure` is Android-only). Data flows over a dedicated binary channel with backpressure in both directions and does not pass through the global GATT operation queue, so its throughput neither gates nor is gated by characteristic I/O. The channel closes on its own when the peer closes it or the device disconnects.
 - **Breaking:** `AdvertisementData.advName` is now `String?`. It is `null` when the advertisement carries no name, rather than being coerced to an empty string. `mergedWith` carries the prior name forward whenever `newer.advName` is `null`.
 
 ## 0.3.0

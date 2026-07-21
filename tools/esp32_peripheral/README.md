@@ -6,13 +6,13 @@ Based on the upstream `examples/bluetooth/nimble/bleprph` example.
 
 ## Build & flash
 
-```sh
-# One-time toolchain setup (if not already installed):
-#   git clone --depth 1 --branch v6.0.2 https://github.com/espressif/esp-idf \
-#       ~/esp/esp-idf-v6.0.2 --recursive
-#   ~/esp/esp-idf-v6.0.2/install.sh esp32s3
+Requires ESP-IDF v6.0.x. Source whichever install you have (the standard
+location is `/opt/espressif/esp-idf-v6.0`); install per the
+[ESP-IDF get-started guide](https://docs.espressif.com/projects/esp-idf/en/v6.0/esp32s3/get-started/)
+if you don't have it.
 
-. ~/esp/esp-idf-v6.0.2/export.sh
+```sh
+. /opt/espressif/esp-idf-v6.0/export.sh   # adjust to your ESP-IDF install path
 cd tools/esp32_peripheral
 idf.py set-target esp32s3
 idf.py build
@@ -63,6 +63,25 @@ below). Preferred ATT MTU is **517** (`ble_att_set_preferred_mtu`), so
 |------------|-----------|------------|-----------|---------------------|
 | `B001` (instance 1) | Characteristic | READ | Static value `"instance-one"` | Instance-ID disambiguation of duplicate characteristic UUIDs |
 | `B001` (instance 2) | Characteristic | READ | Static value `"instance-two"` | Same — the two reads must return different values |
+
+## L2CAP channel (CoC)
+
+An L2CAP connection-oriented channel **echo server** listens on **PSM `0x0080`**
+(LE dynamic PSM range). Every SDU it receives is echoed straight back, so
+`device.openL2capChannel(0x80)` → `write(...)` → `input` round-trips can be
+verified. Max SDU is **512 bytes**; flow control is credit-based (one SDU
+outstanding at a time, so a slow reader backpressures the peer).
+
+| Property | Value | bluebird API tested |
+|----------|-------|---------------------|
+| PSM      | `0x0080` | `BluetoothDevice.openL2capChannel(psm)` |
+| Behaviour | echoes every received SDU back unchanged | `BluetoothL2CapChannel.write` / `.input` |
+| Max SDU  | 512 bytes | throughput / backpressure |
+| On disconnect | channel closes; `onL2capChannelClosed` fires client-side | unsolicited close handling |
+
+Enabled by `CONFIG_BT_NIMBLE_L2CAP_COC_MAX_NUM=1` (`sdkconfig.defaults`). If you
+have an existing `sdkconfig`, run `idf.py reconfigure` (or delete `sdkconfig`)
+so the new option is applied.
 
 ## Other behaviour
 

@@ -24,6 +24,7 @@ extension BluebirdPlugin: BluebirdHostApi {
     }
 
     // all dart state is reset after a hot restart, so reset native state too
+    closeAllL2cap()
     peripherals.values.forEach { $0.cancelAllPending() }
     peripherals.values.forEach { $0.clearDiscoveryState() }
     scanSettings = nil
@@ -505,6 +506,42 @@ extension BluebirdPlugin: BluebirdHostApi {
   func clearGattCache(address: String, completion: @escaping (Result<Void, Error>) -> Void) {
     launch(completion) {
       throw unsupportedError("android only")
+    }
+  }
+
+  func openL2capChannel(
+    address: String, psm: Int64, secure: Bool,
+    completion: @escaping (Result<Int64, Error>) -> Void
+  ) {
+    launch(completion) { [self] in
+      ensureCentralManager()
+
+      let state = try requireConnectedState(address)
+
+      guard psm > 0, psm <= 0xFFFF else {
+        throw PigeonError(
+          code: BluebirdErrorCode.invalidArgument.wire, message: "psm out of range: \(psm)",
+          details: nil)
+      }
+
+      // `secure` is Android-only; CoreBluetooth derives channel security from
+      // the PSM, so it is intentionally ignored here.
+      let cbChannel = try await awaitL2capOpen(state) {
+        state.peripheral.openL2CAPChannel(CBL2CAPPSM(psm))
+      }
+
+      // a disconnect during the open would have failed the slot; still, guard
+      guard peripherals[address]?.connection == .connected else {
+        throw deviceDisconnectedError()
+      }
+
+      return registerL2capChannel(address, cbChannel)
+    }
+  }
+
+  func closeL2capChannel(channelId: Int64, completion: @escaping (Result<Void, Error>) -> Void) {
+    launch(completion) { [self] in
+      closeL2capSolicited(channelId)
     }
   }
 }

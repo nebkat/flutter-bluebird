@@ -41,6 +41,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 
 class BluebirdPlugin :
     FlutterPlugin,
@@ -77,6 +78,9 @@ class BluebirdPlugin :
     private val registry = ConnectionRegistry()
 
     private val scanner = Scanner(::log, ::emitEvent)
+
+    /** Owns the L2CAP data channel + open channels; created on engine attach. */
+    private var l2capManager: L2capManager? = null
 
     // In-flight ops that cannot live on a DeviceConnection slot:
     //  - pendingTurnOn: the single system "enable Bluetooth" dialog;
@@ -353,6 +357,7 @@ class BluebirdPlugin :
 
         BluebirdHostApi.setUp(binding.binaryMessenger, this)
         NativeEventsStreamHandler.register(binding.binaryMessenger, streamHandler)
+        l2capManager = L2capManager(binding.binaryMessenger, mainHandler, ::log, ::emitEvent).also { it.start() }
 
         context?.registerReceiver(adapterStateReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
         context?.registerReceiver(pairRequestReceiver, IntentFilter(BluetoothDevice.ACTION_PAIRING_REQUEST))
@@ -366,6 +371,10 @@ class BluebirdPlugin :
         sink?.success(BmDetachedFromEngineEvent())
         sink?.endOfStream()
         sink = null
+
+        // drop every L2CAP channel silently (dart side is gone)
+        l2capManager?.detach()
+        l2capManager = null
 
         // drop in-flight operations WITHOUT invoking their callbacks:
         // cancelAllPending resumes nothing; scope.cancel then kills the
@@ -458,6 +467,7 @@ class BluebirdPlugin :
 
         // all dart state is reset after flutter restart
         // (i.e. Hot Restart) so also reset native state
+        l2capManager?.closeAll()
         registry.withLock {
             disconnectAllDevices("flutterRestart")
         }
@@ -1004,6 +1014,52 @@ class BluebirdPlugin :
         }
     }
 
+    override fun openL2capChannel(
+        address: String,
+        psm: Long,
+        secure: Boolean,
+        callback: (Result<Long>) -> Unit,
+    ) = launch("openL2capChannel", callback) {
+        val conn = registry.requireConnected(address)
+
+        // createL2capChannel / createInsecureL2capChannel landed in API 29. The
+        // early throw guards the calls below for both runtime and lint.
+        if (Build.VERSION.SDK_INT < 29) { // Android 10 (September 2019)
+            throw FlutterError(BluebirdErrorCode.UNSUPPORTED.wire,
+                "L2CAP channels require Android 10 (API 29)", null)
+        }
+        val manager = l2capManager
+            ?: throw FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire, "plugin is detached", null)
+
+        val device = conn.gatt.device
+        val socket = try {
+            if (secure) device.createL2capChannel(psm.toInt()) else device.createInsecureL2capChannel(psm.toInt())
+        } catch (e: Throwable) {
+            throw FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire, "createL2capChannel failed: $e", null)
+        }
+
+        // connect() blocks until the channel opens; keep it off the main thread
+        try {
+            withContext(Dispatchers.IO) { socket.connect() }
+        } catch (e: Throwable) {
+            try { socket.close() } catch (_: Throwable) {}
+            throw FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire, "l2cap connect failed: $e", null)
+        }
+
+        // still connected after the (awaited) connect? otherwise clean up
+        if (registry[address]?.isConnected != true) {
+            try { socket.close() } catch (_: Throwable) {}
+            throw FlutterError(BluebirdErrorCode.DEVICE_DISCONNECTED.wire, "device is disconnected", null)
+        }
+
+        manager.register(address, socket)
+    }
+
+    override fun closeL2capChannel(channelId: Long, callback: (Result<Unit>) -> Unit) =
+        launch("closeL2capChannel", callback) {
+            l2capManager?.closeSolicited(channelId)
+        }
+
     /////////////////////////////////////////////////////////////////////////////
     // adapter state receiver
 
@@ -1195,6 +1251,9 @@ class BluebirdPlugin :
                     // it is important to close after disconnection, otherwise we will
                     // quickly run out of bluetooth resources, preventing new connections
                     gatt.close()
+
+                    // close any L2CAP channels this device had open
+                    l2capManager?.closeForDevice(remoteId)
 
                     // complete in-flight ops for this device
                     if (conn != null) {

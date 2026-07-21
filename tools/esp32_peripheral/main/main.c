@@ -21,6 +21,7 @@
 #include "services/gap/ble_svc_gap.h"
 
 #include "gatt_svr.h"
+#include "l2cap_svr.h"
 
 static const char *TAG = "bluebird_main";
 
@@ -310,6 +311,9 @@ app_main(void)
     ble_hs_cfg.sm_their_key_dist |= BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
 
     rc = gatt_svr_init();
+    assert(rc == 0);
+
+    rc = l2cap_svr_init();
     assert(rc == 0);
 
     rc = ble_svc_gap_device_name_set(DEVICE_NAME);

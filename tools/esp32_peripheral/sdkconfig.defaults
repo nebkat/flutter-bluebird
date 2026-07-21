@@ -16,3 +16,8 @@ CONFIG_BT_NIMBLE_SM_SC=y
 
 # Preferred / maximum ATT MTU
 CONFIG_BT_NIMBLE_ATT_PREFERRED_MTU=517
+
+# L2CAP connection-oriented channels (CoC) — enables the echo server on PSM
+# 0x0080 (see main/l2cap_svr.c). MAX_NUM is the number of simultaneous CoC
+# channels the host supports.
+CONFIG_BT_NIMBLE_L2CAP_COC_MAX_NUM=1

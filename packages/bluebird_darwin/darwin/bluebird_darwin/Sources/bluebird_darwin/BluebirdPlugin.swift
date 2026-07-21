@@ -36,6 +36,11 @@ public class BluebirdPlugin: NSObject, FlutterPlugin {
   var scanSettings: BmScanSettings?
   var scanCounts: [String: Int] = [:]
 
+  // L2CAP connection-oriented channels (data plane on kL2capDataChannelName)
+  var l2capDataChannel: FlutterBasicMessageChannel?
+  var l2capChannels: [Int64: L2capChannel] = [:]
+  var nextL2capId: Int64 = 1
+
   private var mtuPollTimer: Timer?
 
   var logLevel: LogLevel = .debug
@@ -59,12 +64,16 @@ public class BluebirdPlugin: NSObject, FlutterPlugin {
     BluebirdHostApiSetup.setUp(binaryMessenger: messenger, api: instance)
     NativeEventsStreamHandler.register(
       with: messenger, streamHandler: BluebirdStreamHandler(plugin: instance))
+    instance.setUpL2capDataChannel(messenger)
   }
 
   #if os(iOS)
     public func detachFromEngine(for registrar: FlutterPluginRegistrar) {
       log(.debug, "detachFromEngine")
       peripherals.values.forEach { $0.cancelAllPending() }
+      // drop every L2CAP channel silently (dart side is gone)
+      l2capDataChannel?.setMessageHandler(nil)
+      closeAllL2cap()
       sink?.success(BmDetachedFromEngineEvent())
       sink?.endOfStream()
       sink = nil
@@ -272,6 +281,22 @@ public class BluebirdPlugin: NSObject, FlutterPlugin {
         return
       }
       state.pendingWriteReady = continuation
+    }
+  }
+
+  /// Occupies the device's L2CAP-open slot, runs `start` (which kicks off
+  /// `openL2CAPChannel`), then suspends until `peripheral(_:didOpen:error:)`
+  /// resumes it. Same contract as `awaitGatt`.
+  @MainActor
+  func awaitL2capOpen(_ state: PeripheralState, start: () -> Void) async throws -> CBL2CAPChannel {
+    try await withCheckedThrowingContinuation {
+      (continuation: CheckedContinuation<CBL2CAPChannel, Error>) in
+      guard state.pendingL2capOpen == nil else {
+        continuation.resume(throwing: operationInProgressError())
+        return
+      }
+      state.pendingL2capOpen = continuation
+      start()
     }
   }
 

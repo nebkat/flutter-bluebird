@@ -1412,6 +1412,69 @@ class BmDetachedFromEngineEvent extends BmEvent {
   }
 }
 
+/// An L2CAP connection-oriented channel closed *unsolicited* — the peer closed
+/// it, the device disconnected, or a read/write failed. A successful open is
+/// reported by [BluebirdHostApi.openL2capChannel]'s return value, and a
+/// [closeL2capChannel] the app requested itself is confirmed by that call
+/// completing, so neither emits this event. Channel *data* never crosses here:
+/// it flows on the dedicated `bluebird/l2cap` binary channel (see
+/// [BluebirdHostApi.openL2capChannel]).
+class BmL2capChannelClosedEvent extends BmEvent {
+  BmL2capChannelClosedEvent({required this.channelId, required this.address, this.errorCode, this.errorString});
+
+  int channelId;
+
+  String address;
+
+  /// Wire error code (snake_case of a [BluebirdErrorCode]) when the close was
+  /// caused by a failure; null for a clean peer/EOF close.
+  String? errorCode;
+
+  String? errorString;
+
+  List<Object?> _toList() {
+    return <Object?>[channelId, address, errorCode, errorString];
+  }
+
+  Object encode() {
+    return _toList();
+  }
+
+  static BmL2capChannelClosedEvent decode(Object result) {
+    result as List<Object?>;
+    return BmL2capChannelClosedEvent(
+      channelId: result[0]! as int,
+      address: result[1]! as String,
+      errorCode: result[2] as String?,
+      errorString: result[3] as String?,
+    );
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  bool operator ==(Object other) {
+    if (other is! BmL2capChannelClosedEvent || other.runtimeType != runtimeType) {
+      return false;
+    }
+    if (identical(this, other)) {
+      return true;
+    }
+    return _deepEquals(channelId, other.channelId) &&
+        _deepEquals(address, other.address) &&
+        _deepEquals(errorCode, other.errorCode) &&
+        _deepEquals(errorString, other.errorString);
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  int get hashCode => _deepHash(<Object?>[runtimeType, ..._toList()]);
+
+  @override
+  String toString() {
+    return 'BmL2capChannelClosedEvent(channelId: $channelId, address: $address, errorCode: $errorCode, errorString: $errorString)';
+  }
+}
+
 class _PigeonCodec extends StandardMessageCodec {
   const _PigeonCodec();
   @override
@@ -1512,6 +1575,9 @@ class _PigeonCodec extends StandardMessageCodec {
     } else if (value is BmDetachedFromEngineEvent) {
       buffer.putUint8(159);
       writeValue(buffer, value.encode());
+    } else if (value is BmL2capChannelClosedEvent) {
+      buffer.putUint8(160);
+      writeValue(buffer, value.encode());
     } else {
       super.writeValue(buffer, value);
     }
@@ -1589,6 +1655,8 @@ class _PigeonCodec extends StandardMessageCodec {
         return BmMtuChangedEvent.decode(readValue(buffer)!);
       case 159:
         return BmDetachedFromEngineEvent.decode(readValue(buffer)!);
+      case 160:
+        return BmL2capChannelClosedEvent.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
     }
@@ -2151,6 +2219,39 @@ class BluebirdHostApi {
       binaryMessenger: pigeonVar_binaryMessenger,
     );
     final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[address]);
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    _extractReplyValueOrThrow(pigeonVar_replyList, pigeonVar_channelName, isNullValid: true);
+  }
+
+  Future<int> openL2capChannel(String address, int psm, bool secure) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluebird.BluebirdHostApi.openL2capChannel$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[address, psm, secure]);
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
+    return pigeonVar_replyValue! as int;
+  }
+
+  Future<void> closeL2capChannel(int channelId) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluebird.BluebirdHostApi.closeL2capChannel$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[channelId]);
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(pigeonVar_replyList, pigeonVar_channelName, isNullValid: true);

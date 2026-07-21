@@ -250,6 +250,26 @@ extension BluebirdPlugin: CBPeripheralDelegate {
     sink?.success(BmServicesResetEvent(address: peripheral.identifier.uuidString))
   }
 
+  public func peripheral(
+    _ peripheral: CBPeripheral, didOpen channel: CBL2CAPChannel?, error: Error?
+  ) {
+    logResult("didOpenL2CAPChannel", error, channel.map { "psm \($0.psm)" } ?? "")
+
+    let address = peripheral.identifier.uuidString
+    guard let cont = peripherals[address]?.takeL2capOpen() else { return }
+
+    if let error = error {
+      cont.resume(throwing: cbError(error))
+    } else if let channel = channel {
+      cont.resume(returning: channel)
+    } else {
+      cont.resume(
+        throwing: PigeonError(
+          code: BluebirdErrorCode.darwinError.wire, message: "openL2CAPChannel returned no channel",
+          details: nil))
+    }
+  }
+
   public func peripheralIsReady(toSendWriteWithoutResponse peripheral: CBPeripheral) {
     log(.verbose, "peripheralIsReadyToSendWriteWithoutResponse")
     // Resume a write-without-response that was waiting on flow control.

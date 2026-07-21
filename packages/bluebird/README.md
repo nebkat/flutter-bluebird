@@ -118,6 +118,18 @@ List<int> value = await d.read();
 await d.write([0x12, 0x34])
 ```
 
+### L2CAP channels
+
+Open a connection-oriented L2CAP channel — a bidirectional byte stream to the
+peer, independent of GATT (Android & iOS/macOS; not supported on Web):
+
+```dart
+final channel = await device.openL2capChannel(0x80); // the peer's PSM
+channel.input.listen((bytes) { /* data from the peer */ });
+await channel.write(Uint8List.fromList([0x12, 0x34]));
+await channel.close();
+```
+
 ## Example
 
 Bluebird ships with an example app that is useful for debugging issues.

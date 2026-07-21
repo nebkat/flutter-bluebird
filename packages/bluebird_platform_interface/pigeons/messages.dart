@@ -270,6 +270,23 @@ class BmDetachedFromEngineEvent extends BmEvent {
   bool? unused;
 }
 
+/// An L2CAP connection-oriented channel closed *unsolicited* — the peer closed
+/// it, the device disconnected, or a read/write failed. A successful open is
+/// reported by [BluebirdHostApi.openL2capChannel]'s return value, and a
+/// [closeL2capChannel] the app requested itself is confirmed by that call
+/// completing, so neither emits this event. Channel *data* never crosses here:
+/// it flows on the dedicated `bluebird/l2cap` binary channel (see
+/// [BluebirdHostApi.openL2capChannel]).
+class BmL2capChannelClosedEvent extends BmEvent {
+  late int channelId;
+  late String address;
+
+  /// Wire error code (snake_case of a [BluebirdErrorCode]) when the close was
+  /// caused by a failure; null for a clean peer/EOF close.
+  String? errorCode;
+  String? errorString;
+}
+
 @EventChannelApi()
 abstract class BluebirdEventChannelApi {
   BmEvent nativeEvents();
@@ -365,4 +382,28 @@ abstract class BluebirdHostApi {
   bool removeBond(String address);
   @async
   void clearGattCache(String address);
+
+  // L2CAP connection-oriented channels
+  //
+  // Control plane only. `openL2capChannel` completes once the channel is open
+  // and returns a native-assigned channelId; `closeL2capChannel` tears it down.
+  // Channel *data* does NOT cross the pigeon channels — it flows both ways on a
+  // dedicated binary `BasicMessageChannel` named "bluebird/l2cap", framed as
+  // `[channelId: int64 big-endian][type: uint8][payload]` with:
+  //   type 0 = data     (either direction; reply gates flow control)
+  //   type 1 = ready    (Dart→native: the app has wired its handler for
+  //                      channelId, so the native side may start forwarding
+  //                      inbound bytes — avoids racing this call's return)
+  // Each message's reply is the backpressure signal: native replies to an
+  // outbound-data frame once the bytes were accepted by the socket, and Dart
+  // replies to an inbound-data frame once it has taken them, which flow-controls
+  // the peer. Unsolicited closes arrive as [BmL2capChannelClosedEvent].
+  //
+  // [secure] selects Android's secure vs. insecure channel; ignored on darwin
+  // (CoreBluetooth derives channel security from the PSM). Android requires
+  // API 29+.
+  @async
+  int openL2capChannel(String address, int psm, bool secure);
+  @async
+  void closeL2capChannel(int channelId);
 }

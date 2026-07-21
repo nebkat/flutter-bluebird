@@ -119,6 +119,14 @@ final class BluebirdAndroid extends BluebirdPlatform {
   Future<void> writeDescriptor(String address, BmDescriptorRef descriptor, Uint8List value) =>
       _call('writeDescriptor', () => _api.writeDescriptor(address, descriptor, value));
 
+  @override
+  Future<int> openL2capChannel(String address, int psm, bool secure) =>
+      _call('openL2capChannel', () => _api.openL2capChannel(address, psm, secure));
+
+  @override
+  Future<void> closeL2capChannel(int channelId) =>
+      _call('closeL2capChannel', () => _api.closeL2capChannel(channelId));
+
   Future<T> _call<T>(String method, Future<T> Function() fn) async {
     await (_restartFuture ??= _flutterRestart());
     // Trace the round-trip at FINEST; the closures are built only if the logger

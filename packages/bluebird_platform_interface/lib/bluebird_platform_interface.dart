@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:logging/logging.dart';
 
+import 'src/l2cap_data_channel.dart';
 import 'src/messages.g.dart';
 
 export 'src/messages.g.dart';
@@ -61,6 +62,9 @@ abstract base class BluebirdPlatform {
   Stream<BmScanFailedEvent> get onScanFailed => _eventsOf();
 
   Stream<BmServicesResetEvent> get onServicesReset => _eventsOf();
+
+  /// Unsolicited L2CAP channel closes (peer close, disconnect, or I/O error).
+  Stream<BmL2capChannelClosedEvent> get onL2capChannelClosed => _eventsOf();
 
   /// The single logger for every Bluebird log — the platform method-channel
   /// tracing emitted from this layer *and* the higher-level events from
@@ -153,4 +157,28 @@ abstract base class BluebirdPlatform {
 
   Future<void> writeDescriptor(String address, BmDescriptorRef descriptor, Uint8List value) =>
       throw UnimplementedError('$runtimeType.writeDescriptor');
+
+  /// Opens an L2CAP connection-oriented channel to [psm], returning the
+  /// native-assigned channel id. Data flows on the dedicated `bluebird/l2cap`
+  /// binary channel — see [l2capInput] / [l2capWrite] and
+  /// [BmL2capChannelClosedEvent].
+  Future<int> openL2capChannel(String address, int psm, bool secure) =>
+      throw UnimplementedError('$runtimeType.openL2capChannel');
+
+  Future<void> closeL2capChannel(int channelId) => throw UnimplementedError('$runtimeType.closeL2capChannel');
+
+  /// The dedicated L2CAP data channel, shared across platforms (the wire
+  /// protocol is identical). Lazily created; unused on platforms without L2CAP.
+  late final L2capDataChannel _l2capData = L2capDataChannel();
+
+  /// Inbound bytes for an open L2CAP channel (see [openL2capChannel]). Pausing
+  /// the subscription backpressures the peer; the stream closes with the channel.
+  Stream<Uint8List> l2capInput(int channelId) => _l2capData.input(channelId);
+
+  /// Writes [data] to an open L2CAP channel; completes once the native side has
+  /// accepted the bytes (backpressure).
+  Future<void> l2capWrite(int channelId, Uint8List data) => _l2capData.write(channelId, data);
+
+  /// Drops local data-channel state for a closed L2CAP channel.
+  void l2capDetach(int channelId) => _l2capData.detach(channelId);
 }
