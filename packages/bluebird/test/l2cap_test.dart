@@ -34,6 +34,7 @@ void main() {
     expect(channel.psm, 0x81);
     expect(channel.device, device);
     expect(channel.isClosed, isFalse);
+    expect(channel.toString(), contains('BluetoothL2CapChannel'));
   });
 
   test('open on a disconnected device throws deviceDisconnected', () {
