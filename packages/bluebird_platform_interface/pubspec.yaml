@@ -1,6 +1,6 @@
 name: bluebird_platform_interface
 description: The common platform interface for bluebird, the Bluetooth Low Energy (BLE) plugin for Flutter.
-version: 0.3.0
+version: 0.4.0
 homepage: https://github.com/nebkat/flutter-bluebird
 repository: https://github.com/nebkat/flutter-bluebird
 issue_tracker: https://github.com/nebkat/flutter-bluebird/issues

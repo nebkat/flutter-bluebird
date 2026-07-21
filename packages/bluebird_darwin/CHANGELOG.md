@@ -1,3 +1,7 @@
+## 0.4.0
+
+- Added L2CAP connection-oriented channel support (CoreBluetooth `openL2CAPChannel`).
+
 ## 0.3.0
 
 - Regenerated for the `BluetoothConnectionState` `connecting` / `disconnecting` additions. Native behaviour is unchanged — CoreBluetooth still reports only connected / disconnected.
