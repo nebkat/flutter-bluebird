@@ -14,3 +14,12 @@ before committing — CI enforces both (`ci.yml` runs `dart analyze` plus a
   whole package).
 
 Do this before staging so a follow-up "fix formatting" commit is never needed.
+
+## Toolchain
+
+Flutter **3.47.0** (Dart 3.13.0). `ci.yml`, `pages.yml` and `release.yml` pin
+that exact version rather than floating `stable`, because `dart format` output
+changes between stable releases: on a mismatched SDK the check reformats files
+nobody touched and fails an unrelated change. Keep fvm on the same version
+(`fvm install 3.47.0 && fvm global 3.47.0`) and bump the workflows in the same
+commit.

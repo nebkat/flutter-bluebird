@@ -30,7 +30,9 @@ jobs:
           java-version: '17'
       - uses: subosito/flutter-action@v2
         with:
+          # pinned to match ci.yml — bump them together
           channel: stable
+          flutter-version: 3.47.0
       - name: Build release APK
         working-directory: packages/bluebird/example
         run: |

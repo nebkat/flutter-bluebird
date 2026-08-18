@@ -30,3 +30,12 @@ linter:
 # Format at 120 columns (dart format reads page_width from here).
 formatter:
   page_width: 120
+analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
