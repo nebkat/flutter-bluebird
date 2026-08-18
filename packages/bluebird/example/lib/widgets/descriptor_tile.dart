@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:bluebird/bluebird.dart';
 
+import "../utils/assigned_numbers.dart";
 import "../utils/snackbar.dart";
 
 class DescriptorTile extends StatefulWidget {
@@ -66,8 +67,7 @@ class _DescriptorTileState extends State<DescriptorTile> {
   }
 
   Widget buildUuid(BuildContext context) {
-    String uuid = '0x${widget.descriptor.uuid.string.toUpperCase()}';
-    return Text(uuid, style: Theme.of(context).textTheme.bodySmall);
+    return Text(widget.descriptor.uuid.hex, style: Theme.of(context).textTheme.bodySmall);
   }
 
   Widget buildValue(BuildContext context) {
@@ -93,7 +93,7 @@ class _DescriptorTileState extends State<DescriptorTile> {
       title: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[Text(d.uuid.name ?? 'Descriptor'), buildUuid(context), buildValue(context)],
+        children: <Widget>[Text(d.uuid.assignedName ?? 'Descriptor'), buildUuid(context), buildValue(context)],
       ),
       subtitle: buildButtonRow(context),
     );

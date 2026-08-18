@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:bluebird/bluebird.dart';
 
+import "../utils/assigned_numbers.dart";
 import "../utils/snackbar.dart";
 
 import "descriptor_tile.dart";
@@ -128,8 +129,7 @@ class _CharacteristicTileState extends State<CharacteristicTile> {
   }
 
   Widget buildUuid(BuildContext context) {
-    String uuid = '0x${widget.characteristic.uuid.string.toUpperCase()}';
-    return Text(uuid, style: Theme.of(context).textTheme.bodySmall);
+    return Text(widget.characteristic.uuid.hex, style: Theme.of(context).textTheme.bodySmall);
   }
 
   Widget buildValue(BuildContext context) {
@@ -205,8 +205,8 @@ class _CharacteristicTileState extends State<CharacteristicTile> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            // the device's own 0x2901 name, else the well-known assigned name
-            Text(_name ?? c.uuid.name ?? 'Characteristic'),
+            // the device's own 0x2901 name, else the SIG assigned name
+            Text(_name ?? c.uuid.assignedName ?? 'Characteristic'),
             buildUuid(context),
             buildValue(context),
           ],

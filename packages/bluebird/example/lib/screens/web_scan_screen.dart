@@ -6,45 +6,42 @@ import 'package:flutter/material.dart';
 import 'package:bluebird/bluebird.dart';
 
 import 'device_screen.dart';
+import '../utils/assigned_numbers.dart';
 import '../utils/snackbar.dart';
 
-// Well-known service names offered as autocomplete suggestions. Values come
-// from the library so they stay in sync.
-final _knownServices = <String, Uuid>{
-  'Generic Access': Uuids.service.genericAccess,
-  'Generic Attribute': Uuids.service.genericAttribute,
-  'Immediate Alert': Uuids.service.immediateAlert,
-  'Link Loss': Uuids.service.linkLoss,
-  'Tx Power': Uuids.service.txPower,
-  'Current Time': Uuids.service.currentTime,
-  'Health Thermometer': Uuids.service.healthThermometer,
-  'Device Information': Uuids.service.deviceInformation,
-  'Heart Rate': Uuids.service.heartRate,
-  'Battery': Uuids.service.battery,
-  'Human Interface Device': Uuids.service.humanInterfaceDevice,
-  'Environmental Sensing': Uuids.service.environmentalSensing,
-};
+/// How many suggestions the dropdown shows at once — a broad query matches
+/// hundreds of member UUIDs, and there is no point building tiles nobody scrolls
+/// to.
+const _maxSuggestions = 50;
+
+class _KnownService {
+  _KnownService(int number, this.name, this.registry) : uuid = Uuid.fromBytes([number >> 8, number & 0xFF]);
+
+  final Uuid uuid;
+  final String name;
+  final UuidRegistry registry;
+}
+
+/// Every 16-bit UUID a device can advertise as a service, from the SIG assigned
+/// numbers: the GATT services, plus the member and SDO ranges that vendors and
+/// other standards bodies advertise under.
+final _knownServices = [
+  for (final registry in const [UuidRegistry.service, UuidRegistry.member, UuidRegistry.sdo])
+    for (final entry in registry.names.entries) _KnownService(entry.key, entry.value, registry),
+];
 
 /// Resolves a typed entry — a known service name or a raw UUID — to a [Uuid].
 Uuid? _resolve(String text) {
   final t = text.trim();
   if (t.isEmpty) return null;
-  for (final e in _knownServices.entries) {
-    if (e.key.toLowerCase() == t.toLowerCase()) return e.value;
+  for (final service in _knownServices) {
+    if (service.name.toLowerCase() == t.toLowerCase()) return service.uuid;
   }
   try {
     return Uuid(t);
   } catch (_) {
     return null;
   }
-}
-
-/// The known name for a service uuid, or null if it isn't a standard one.
-String? _serviceName(Uuid uuid) {
-  for (final e in _knownServices.entries) {
-    if (e.value == uuid) return e.key;
-  }
-  return null;
 }
 
 /// Web has no passive scan — the browser shows a chooser that returns a single
@@ -183,15 +180,16 @@ class _ServiceSelectorState extends State<_ServiceSelector> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Autocomplete<String>(
+        Autocomplete<_KnownService>(
+          displayStringForOption: (service) => service.name,
           // match on the name or the UUID (short or full form), so typing
           // "battery", "180f", or "0000180f-…" all surface the same service
           optionsBuilder: (value) {
             final q = value.text.trim().toLowerCase();
-            if (q.isEmpty) return const Iterable<String>.empty();
-            return _knownServices.entries
-                .where((e) => e.key.toLowerCase().contains(q) || e.value.string128.toLowerCase().contains(q))
-                .map((e) => e.key);
+            if (q.isEmpty) return const Iterable<_KnownService>.empty();
+            return _knownServices
+                .where((s) => s.name.toLowerCase().contains(q) || s.uuid.string128.toLowerCase().contains(q))
+                .take(_maxSuggestions);
           },
           fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
             _controller = controller;
@@ -216,7 +214,8 @@ class _ServiceSelectorState extends State<_ServiceSelector> {
               },
             );
           },
-          // show both the name and the UUID in the dropdown
+          // show both the name and the UUID in the dropdown; the registry tells
+          // a GATT service apart from a member UUID that shares its name
           optionsViewBuilder: (context, onSelected, options) {
             return Align(
               alignment: Alignment.topLeft,
@@ -228,12 +227,12 @@ class _ServiceSelectorState extends State<_ServiceSelector> {
                     padding: EdgeInsets.zero,
                     shrinkWrap: true,
                     children: [
-                      for (final name in options)
+                      for (final service in options)
                         ListTile(
                           dense: true,
-                          title: Text(name),
-                          subtitle: Text(_knownServices[name]!.string),
-                          onTap: () => onSelected(name),
+                          title: Text(service.name),
+                          subtitle: Text('${service.uuid.hex} · ${service.registry.label}'),
+                          onTap: () => onSelected(service),
                         ),
                     ],
                   ),
@@ -241,14 +240,14 @@ class _ServiceSelectorState extends State<_ServiceSelector> {
               ),
             );
           },
-          onSelected: (name) => _add(_knownServices[name]!),
+          onSelected: (service) => _add(service.uuid),
         ),
         for (final uuid in widget.values)
           ListTile(
             dense: true,
             contentPadding: const EdgeInsets.only(left: 12),
-            title: Text(uuid.string),
-            subtitle: _serviceName(uuid) != null ? Text(_serviceName(uuid)!) : null,
+            title: Text(uuid.hex),
+            subtitle: uuid.assignedName != null ? Text(uuid.assignedName!) : null,
             trailing: IconButton(
               icon: const Icon(Icons.close),
               onPressed: () {

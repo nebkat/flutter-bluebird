@@ -22,6 +22,9 @@ dev_dependencies:
   integration_test:
     sdk: flutter
   flutter_launcher_icons: ^0.14.1
+  # used only by tool/gen_assigned_numbers.dart to parse the Bluetooth SIG
+  # assigned-numbers YAML
+  yaml: ^3.1.2
 
 # Launcher icons for every platform, generated from the bluebird icon.
 # Regenerate after changing the source image with:

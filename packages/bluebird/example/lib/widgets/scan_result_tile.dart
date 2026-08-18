@@ -3,8 +3,7 @@ import 'dart:async';
 import 'package:bluebird/bluebird.dart';
 import 'package:flutter/material.dart';
 
-import '../utils/appearance_values.dart';
-import '../utils/manufacturer_ids.dart';
+import '../utils/assigned_numbers.dart';
 
 class ScanResultTile extends StatefulWidget {
   const ScanResultTile({Key? key, required this.result, this.onTap}) : super(key: key);
@@ -40,26 +39,20 @@ class _ScanResultTileState extends State<ScanResultTile> {
     return '[${bytes.map((i) => i.toRadixString(16).padLeft(2, '0')).join(' ')}]'.toUpperCase();
   }
 
-  String _hex16(int id) => '0x${id.toRadixString(16).padLeft(4, '0').toUpperCase()}';
-
-  // manufacturerData maps a 16-bit company id to its payload; append the SIG
-  // company name in brackets when the id is a known assigned number
+  // manufacturerData maps a 16-bit company id to its payload; the label appends
+  // the SIG company name when the id is a known assigned number
   String getNiceManufacturerData(Map<int, List<int>> data) {
-    return data.entries
-        .map((e) {
-          final name = manufacturerIds[e.key];
-          final id = name != null ? '${_hex16(e.key)} ($name)' : _hex16(e.key);
-          return '$id ${getNiceHexArray(e.value)}';
-        })
-        .join('\n');
+    return data.entries.map((e) => '${AssignedNumbers.companyLabel(e.key)} ${getNiceHexArray(e.value)}').join('\n');
   }
 
   String getNiceServiceData(Map<Uuid, List<int>> data) {
-    return data.entries.map((v) => '${v.key} ${getNiceHexArray(v.value)}').join('\n').toUpperCase();
+    return data.entries.map((e) => '${e.key.labelled} ${getNiceHexArray(e.value)}').join('\n');
   }
 
+  // one per line: the assigned names (which for a member UUID is the company
+  // that owns it) are long enough that a comma-separated list wraps badly
   String getNiceServiceUuids(List<Uuid> serviceUuids) {
-    return serviceUuids.join(', ').toUpperCase();
+    return serviceUuids.map((uuid) => uuid.labelled).join('\n');
   }
 
   bool get isConnected => widget.result.device.isConnected;
@@ -94,24 +87,23 @@ class _ScanResultTileState extends State<ScanResultTile> {
     );
   }
 
-  /// The advertised manufacturer, if any: the SIG company name when the company
-  /// id is a known assigned number, otherwise the raw id (so devices with an
-  /// unrecognised manufacturer still show *something*). Null when there is no
-  /// manufacturer data at all.
+  /// Who the advertisement says is behind the device, if anything says so: the
+  /// SIG company name for the manufacturer id, otherwise the raw id (so a device
+  /// with an unassigned id still shows *something*).
+  ///
+  /// Failing that — no manufacturer-specific data at all — a proprietary service
+  /// UUID stands in: a member-range UUID is allocated to one SIG member, so its
+  /// assigned name *is* the company that owns the service.
   String? _manufacturer() {
-    final md = widget.result.advertisementData.manufacturerData;
-    if (md.isEmpty) return null;
-    final id = md.keys.first; // the expanded row lists all; this is the summary
-    return manufacturerIds[id] ?? _hex16(id);
-  }
-
-  /// The appearance as `0xNNNN (Name)`, falling back to the category name when
-  /// the exact subcategory isn't a known value (the low 6 bits are the
-  /// subcategory, so masking them off gives the category).
-  String _appearanceLabel(int value) {
-    final name = appearanceValues[value] ?? appearanceValues[value & 0xFFC0];
-    final hex = '0x${value.toRadixString(16).padLeft(4, '0').toUpperCase()}';
-    return name != null ? '$hex ($name)' : hex;
+    final adv = widget.result.advertisementData;
+    if (adv.manufacturerData.isNotEmpty) {
+      final id = adv.manufacturerData.keys.first; // the expanded row lists all; this is the summary
+      return AssignedNumbers.companyName(id) ?? AssignedNumbers.hex16(id);
+    }
+    for (final uuid in [...adv.serviceUuids, ...adv.serviceData.keys]) {
+      if (uuid.assignedRegistry == UuidRegistry.member) return uuid.assignedName;
+    }
+    return null;
   }
 
   Widget _buildTitle(BuildContext context) {
@@ -190,7 +182,8 @@ class _ScanResultTileState extends State<ScanResultTile> {
         _buildAdvRow(context, 'Connectable', adv.connectable ? 'Yes' : 'No'),
         if (adv.advName?.isNotEmpty ?? false) _buildAdvRow(context, 'Name', adv.advName!),
         if (adv.txPowerLevel != null) _buildAdvRow(context, 'Tx Power Level', '${adv.txPowerLevel} dBm'),
-        if ((adv.appearance ?? 0) > 0) _buildAdvRow(context, 'Appearance', _appearanceLabel(adv.appearance!)),
+        if ((adv.appearance ?? 0) > 0)
+          _buildAdvRow(context, 'Appearance', AssignedNumbers.appearanceLabel(adv.appearance!)),
         if (adv.manufacturerData.isNotEmpty)
           _buildAdvRow(context, 'Manufacturer Data', getNiceManufacturerData(adv.manufacturerData)),
         if (adv.serviceUuids.isNotEmpty) _buildAdvRow(context, 'Service UUIDs', getNiceServiceUuids(adv.serviceUuids)),

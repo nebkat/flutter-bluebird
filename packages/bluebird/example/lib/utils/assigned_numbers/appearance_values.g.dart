@@ -1,6 +1,11 @@
 // GENERATED FILE — do not edit by hand.
-// Bluetooth SIG GAP appearance values (category + subcategory).
-// Source: Bluetooth SIG Assigned Numbers (core/appearance_values.yaml).
+// Regenerate with: dart run tool/gen_assigned_numbers.dart
+//
+// Bluetooth SIG GAP appearance values, category and subcategory flattened
+// into the 16-bit value that appears in an advertisement.
+//
+// Source: https://bitbucket.org/bluetooth-SIG/public (1415ddd9db5770dd21ecbe53173fbfc09e2943b6, 2026-08-13)
+//         assigned_numbers/core/appearance_values.yaml
 
 /// Maps a 16-bit GAP appearance value to its human-readable name.
 /// The low 6 bits are the subcategory; masking them off gives the category.
@@ -298,8 +303,8 @@ const Map<int, String> appearanceValues = {
   0x0CC2: 'Personal Mobility Device: Mobility Scooter',
   0x0D00: 'Continuous Glucose Monitor',
   0x0D40: 'Insulin Pump',
-  0x0D41: 'Insulin Pump: "Insulin Pump, durable pump"',
-  0x0D44: 'Insulin Pump: "Insulin Pump, patch pump"',
+  0x0D41: 'Insulin Pump: Insulin Pump, durable pump',
+  0x0D44: 'Insulin Pump: Insulin Pump, patch pump',
   0x0D48: 'Insulin Pump: Insulin Pen',
   0x0D80: 'Medication Delivery',
   0x0DC0: 'Spirometer',
