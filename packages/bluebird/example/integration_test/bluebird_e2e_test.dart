@@ -141,42 +141,38 @@ void main() {
     }
   });
 
-  test(
-    'service tree shape: both fixture services present with expected characteristics',
-    () async {
-      final a = serviceByUuid(svcA);
-      final b = serviceByUuid(svcB);
+  test('service tree shape: both fixture services present with expected characteristics', () async {
+    final a = serviceByUuid(svcA);
+    final b = serviceByUuid(svcB);
 
-      expect(a.isPrimary, isTrue);
-      expect(b.isPrimary, isTrue);
+    expect(a.isPrimary, isTrue);
+    expect(b.isPrimary, isTrue);
 
-      final aUuids = a.characteristics.map((c) => c.uuid).toList();
-      expect(
-        aUuids,
-        containsAll([
-          chrStaticRead,
-          chrWriteEcho,
-          chrNotify,
-          chrIndicate,
-          chrNotifyInd,
-          chrLong,
-          chrEncrypted,
-          chrControl,
-        ]),
-      );
+    final aUuids = a.characteristics.map((c) => c.uuid).toList();
+    expect(
+      aUuids,
+      containsAll([
+        chrStaticRead,
+        chrWriteEcho,
+        chrNotify,
+        chrIndicate,
+        chrNotifyInd,
+        chrLong,
+        chrEncrypted,
+        chrControl,
+      ]),
+    );
 
-      // spot-check properties
-      expect(chr(svcA, chrStaticRead).properties.read, isTrue);
-      expect(chr(svcA, chrWriteEcho).properties.write, isTrue);
-      expect(chr(svcA, chrWriteEcho).properties.writeWithoutResponse, isTrue);
-      expect(chr(svcA, chrNotify).properties.notify, isTrue);
-      expect(chr(svcA, chrIndicate).properties.indicate, isTrue);
-      expect(chr(svcA, chrNotifyInd).properties.notify, isTrue);
-      expect(chr(svcA, chrNotifyInd).properties.indicate, isTrue);
-      expect(chr(svcA, chrControl).properties.write, isTrue);
-    },
-    timeout: const Timeout(Duration(seconds: 10)),
-  );
+    // spot-check properties
+    expect(chr(svcA, chrStaticRead).properties.read, isTrue);
+    expect(chr(svcA, chrWriteEcho).properties.write, isTrue);
+    expect(chr(svcA, chrWriteEcho).properties.writeWithoutResponse, isTrue);
+    expect(chr(svcA, chrNotify).properties.notify, isTrue);
+    expect(chr(svcA, chrIndicate).properties.indicate, isTrue);
+    expect(chr(svcA, chrNotifyInd).properties.notify, isTrue);
+    expect(chr(svcA, chrNotifyInd).properties.indicate, isTrue);
+    expect(chr(svcA, chrControl).properties.write, isTrue);
+  }, timeout: const Timeout(Duration(seconds: 10)));
 
   test('AttributeId: Service B duplicate-uuid characteristics are distinct instances '
       'with different values', () async {
@@ -217,27 +213,23 @@ void main() {
     expect(await c.read(), payload);
   }, timeout: const Timeout(Duration(seconds: 15)));
 
-  test(
-    'descriptors: 0x2901 user description read + custom descriptor write/read-back',
-    () async {
-      final c = chr(svcA, chrStaticRead);
+  test('descriptors: 0x2901 user description read + custom descriptor write/read-back', () async {
+    final c = chr(svcA, chrStaticRead);
 
-      final userDesc = c.descriptors.firstWhere(
-        (d) => d.uuid == dscUserDescription,
-        orElse: () => fail('0x2901 user description descriptor not found'),
-      );
-      expect(utf8.decode(await userDesc.read()), 'Bluebird static read characteristic');
+    final userDesc = c.descriptors.firstWhere(
+      (d) => d.uuid == dscUserDescription,
+      orElse: () => fail('0x2901 user description descriptor not found'),
+    );
+    expect(utf8.decode(await userDesc.read()), 'Bluebird static read characteristic');
 
-      final custom = c.descriptors.firstWhere(
-        (d) => d.uuid == dscCustom,
-        orElse: () => fail('custom descriptor $dscCustom not found'),
-      );
-      final payload = [0xb1, 0xeb, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06];
-      await custom.write(payload);
-      expect(await custom.read(), payload);
-    },
-    timeout: const Timeout(Duration(seconds: 20)),
-  );
+    final custom = c.descriptors.firstWhere(
+      (d) => d.uuid == dscCustom,
+      orElse: () => fail('custom descriptor $dscCustom not found'),
+    );
+    final payload = [0xb1, 0xeb, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06];
+    await custom.write(payload);
+    expect(await custom.read(), payload);
+  }, timeout: const Timeout(Duration(seconds: 20)));
 
   test('notify: collects >=3 strictly-incrementing counter values', () async {
     // fixture notifies a uint32 LE counter every 1 s while subscribed;
