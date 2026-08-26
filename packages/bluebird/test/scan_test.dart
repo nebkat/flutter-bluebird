@@ -195,6 +195,24 @@ void main() {
     await sub.cancel();
   });
 
+  // A refused scan must reach the caller as an error and terminate. It used to hang: the
+  // internal controller was closed without ever having been listened to, so `close()`
+  // never completed, the stream never ended, and `isScanning` stayed true forever —
+  // wedging every later scan behind operationInProgress.
+  test('a scan the platform refuses errors and terminates', () async {
+    fake.stubs['startScan'] = () => throw PlatformException(code: 'adapter_off', message: 'off');
+
+    Object? caught;
+    var done = false;
+    final sub = Bluebird.performScan().listen((_) {}, onError: (Object e) => caught = e, onDone: () => done = true);
+    await pumpEventQueue();
+
+    expect(caught, isA<BluebirdException>().having((e) => e.code, 'code', BluebirdErrorCode.adapterOff));
+    expect(done, isTrue);
+    expect(Bluebird.isScanning.value, isFalse);
+    await sub.cancel();
+  });
+
   // Not just `off`: authorization can be revoked from the settings app mid-scan, and the
   // adapter can go away, and either leaves the native scan dead with nothing to close the
   // stream.
