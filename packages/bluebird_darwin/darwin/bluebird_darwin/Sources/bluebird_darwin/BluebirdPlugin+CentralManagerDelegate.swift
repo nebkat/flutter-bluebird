@@ -51,8 +51,7 @@ extension BluebirdPlugin: CBCentralManagerDelegate {
       peripherals.removeAll()
       stopMtuPollingIfIdle()
 
-      let error = PigeonError(
-        code: BluebirdErrorCode.adapterOff.wire, message: "the adapter is turned off", details: nil)
+      let error = adapterUnavailableError(central.state)
       states.forEach { $0.failAllPending(error) }
     }
   }

@@ -111,7 +111,7 @@ extension BluebirdPlugin: BluebirdHostApi {
       let central = ensureCentralManager()
 
       guard isAdapterOn else {
-        throw adapterOffError(central.state)
+        throw adapterUnavailableError(central.state)
       }
 
       // remember this for later
@@ -166,7 +166,7 @@ extension BluebirdPlugin: BluebirdHostApi {
       let central = ensureCentralManager()
 
       guard isAdapterOn else {
-        throw adapterOffError(central.state)
+        throw adapterUnavailableError(central.state)
       }
 
       // already connected?

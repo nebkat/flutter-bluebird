@@ -1,3 +1,7 @@
+## Unreleased
+
+- Fixed every non-`poweredOn` adapter state being reported as `adapterOff`. `unauthorized` now surfaces as `permissionDenied` and `unsupported` as `unsupported`, from `startScan`, `connect`, and the operations failed when the adapter goes away mid-flight.
+
 ## 0.4.0
 
 - Added L2CAP connection-oriented channel support (CoreBluetooth `openL2CAPChannel`).
