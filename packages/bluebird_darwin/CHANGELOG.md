@@ -1,3 +1,7 @@
+## Unreleased
+
+- Implemented `getPermission` from the static `CBManager.authorization`, which needs no central manager and so raises no permission prompt as a side effect. `denied` and `restricted` both report as `permanentlyDenied`: iOS asks once and never again.
+
 ## 0.4.4
 
 - Fixed every non-`poweredOn` adapter state being reported as `adapterOff`. `unauthorized` now surfaces as `permissionDenied` and `unsupported` as `unsupported`, from `startScan`, `connect`, and the operations failed when the adapter goes away mid-flight.

@@ -319,6 +319,22 @@ void main() {
     expect(await Bluebird.adapterState.value, BluetoothAdapterState.on);
   });
 
+  test('permission is read straight from the platform', () async {
+    fake.permission = BluetoothPermission.permanentlyDenied;
+    expect(await Bluebird.permission, BluetoothPermission.permanentlyDenied);
+    expect(fake.calls, contains('getPermission'));
+  });
+
+  // The radio and the permission are independent on Android: neither answers for the
+  // other, so an adapter that is on says nothing about being allowed to use it.
+  test('permission is independent of the adapter state', () async {
+    fake.adapterState = BluetoothAdapterState.on;
+    fake.permission = BluetoothPermission.denied;
+
+    expect(await Bluebird.adapterState.value, BluetoothAdapterState.on);
+    expect(await Bluebird.permission, BluetoothPermission.denied);
+  });
+
   test('adapterReady completes immediately when the adapter is already on', () async {
     fake.adapterState = BluetoothAdapterState.on;
     await Bluebird.adapterReady(); // completes without hanging or throwing

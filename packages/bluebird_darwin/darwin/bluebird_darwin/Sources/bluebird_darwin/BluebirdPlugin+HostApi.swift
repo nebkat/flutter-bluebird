@@ -94,6 +94,21 @@ extension BluebirdPlugin: BluebirdHostApi {
     return bmAdapterState(central.state)
   }
 
+  /// Read from the static `CBManager.authorization`, which does not create a central
+  /// manager and so does not raise the permission prompt as a side effect.
+  ///
+  /// `denied` maps to permanentlyDenied because iOS asks once and never again: only the
+  /// settings app can change it. `restricted` is the same from the app's side — it cannot
+  /// be asked for either.
+  func getPermission() throws -> BluetoothPermission {
+    switch CBManager.authorization {
+    case .allowedAlways: return .granted
+    case .notDetermined: return .notDetermined
+    case .denied, .restricted: return .permanentlyDenied
+    @unknown default: return .notDetermined
+    }
+  }
+
   func turnOn(completion: @escaping (Result<Bool, Error>) -> Void) {
     launch(completion) {
       throw unsupportedError("iOS & macOS do not support turning on bluetooth")

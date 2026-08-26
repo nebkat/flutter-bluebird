@@ -88,6 +88,18 @@ int _deepHash(Object? value) {
 
 enum BluetoothAdapterState { unknown, unavailable, unauthorized, turningOn, on, turningOff, off }
 
+/// Whether the app may use Bluetooth at all, separately from whether the radio is on.
+///
+/// Kept apart from [BluetoothAdapterState] because on Android the two are independent —
+/// the radio can be on with the permission refused, and the other way round. Darwin fuses
+/// them into `CBManagerState`, so there it is reported in both places.
+///
+/// [denied] means the user refused and can be asked again; [permanentlyDenied] means only
+/// the settings app can change it. Android tells these apart by whether it will still show
+/// the dialog; Darwin only ever reports [permanentlyDenied], because iOS prompts once and
+/// never again.
+enum BluetoothPermission { notDetermined, denied, permanentlyDenied, granted }
+
 enum BluetoothConnectionState { disconnected, connected, connecting, disconnecting }
 
 enum BmWriteType { withResponse, withoutResponse }
@@ -1485,98 +1497,101 @@ class _PigeonCodec extends StandardMessageCodec {
     } else if (value is BluetoothAdapterState) {
       buffer.putUint8(129);
       writeValue(buffer, value.index);
-    } else if (value is BluetoothConnectionState) {
+    } else if (value is BluetoothPermission) {
       buffer.putUint8(130);
       writeValue(buffer, value.index);
-    } else if (value is BmWriteType) {
+    } else if (value is BluetoothConnectionState) {
       buffer.putUint8(131);
       writeValue(buffer, value.index);
-    } else if (value is ConnectionPriority) {
+    } else if (value is BmWriteType) {
       buffer.putUint8(132);
       writeValue(buffer, value.index);
-    } else if (value is BluetoothBondState) {
+    } else if (value is ConnectionPriority) {
       buffer.putUint8(133);
       writeValue(buffer, value.index);
-    } else if (value is LogLevel) {
+    } else if (value is BluetoothBondState) {
       buffer.putUint8(134);
       writeValue(buffer, value.index);
-    } else if (value is BluebirdErrorCode) {
+    } else if (value is LogLevel) {
       buffer.putUint8(135);
       writeValue(buffer, value.index);
-    } else if (value is BmAttributeId) {
+    } else if (value is BluebirdErrorCode) {
       buffer.putUint8(136);
-      writeValue(buffer, value.encode());
-    } else if (value is BmServiceRef) {
+      writeValue(buffer, value.index);
+    } else if (value is BmAttributeId) {
       buffer.putUint8(137);
       writeValue(buffer, value.encode());
-    } else if (value is BmCharacteristicRef) {
+    } else if (value is BmServiceRef) {
       buffer.putUint8(138);
       writeValue(buffer, value.encode());
-    } else if (value is BmDescriptorRef) {
+    } else if (value is BmCharacteristicRef) {
       buffer.putUint8(139);
       writeValue(buffer, value.encode());
-    } else if (value is BmMsdFilter) {
+    } else if (value is BmDescriptorRef) {
       buffer.putUint8(140);
       writeValue(buffer, value.encode());
-    } else if (value is BmServiceDataFilter) {
+    } else if (value is BmMsdFilter) {
       buffer.putUint8(141);
       writeValue(buffer, value.encode());
-    } else if (value is BmScanSettings) {
+    } else if (value is BmServiceDataFilter) {
       buffer.putUint8(142);
       writeValue(buffer, value.encode());
-    } else if (value is BmScanAdvertisement) {
+    } else if (value is BmScanSettings) {
       buffer.putUint8(143);
       writeValue(buffer, value.encode());
-    } else if (value is BmBluetoothDevice) {
+    } else if (value is BmScanAdvertisement) {
       buffer.putUint8(144);
       writeValue(buffer, value.encode());
-    } else if (value is BmBluetoothService) {
+    } else if (value is BmBluetoothDevice) {
       buffer.putUint8(145);
       writeValue(buffer, value.encode());
-    } else if (value is BmBluetoothCharacteristic) {
+    } else if (value is BmBluetoothService) {
       buffer.putUint8(146);
       writeValue(buffer, value.encode());
-    } else if (value is BmBluetoothDescriptor) {
+    } else if (value is BmBluetoothCharacteristic) {
       buffer.putUint8(147);
       writeValue(buffer, value.encode());
-    } else if (value is BmCharacteristicProperties) {
+    } else if (value is BmBluetoothDescriptor) {
       buffer.putUint8(148);
       writeValue(buffer, value.encode());
-    } else if (value is BmPhySupport) {
+    } else if (value is BmCharacteristicProperties) {
       buffer.putUint8(149);
       writeValue(buffer, value.encode());
-    } else if (value is BmAdapterStateEvent) {
+    } else if (value is BmPhySupport) {
       buffer.putUint8(150);
       writeValue(buffer, value.encode());
-    } else if (value is BmScanAdvertisementEvent) {
+    } else if (value is BmAdapterStateEvent) {
       buffer.putUint8(151);
       writeValue(buffer, value.encode());
-    } else if (value is BmScanFailedEvent) {
+    } else if (value is BmScanAdvertisementEvent) {
       buffer.putUint8(152);
       writeValue(buffer, value.encode());
-    } else if (value is BmConnectionStateEvent) {
+    } else if (value is BmScanFailedEvent) {
       buffer.putUint8(153);
       writeValue(buffer, value.encode());
-    } else if (value is BmCharacteristicNotificationEvent) {
+    } else if (value is BmConnectionStateEvent) {
       buffer.putUint8(154);
       writeValue(buffer, value.encode());
-    } else if (value is BmBondStateEvent) {
+    } else if (value is BmCharacteristicNotificationEvent) {
       buffer.putUint8(155);
       writeValue(buffer, value.encode());
-    } else if (value is BmNameChangedEvent) {
+    } else if (value is BmBondStateEvent) {
       buffer.putUint8(156);
       writeValue(buffer, value.encode());
-    } else if (value is BmServicesResetEvent) {
+    } else if (value is BmNameChangedEvent) {
       buffer.putUint8(157);
       writeValue(buffer, value.encode());
-    } else if (value is BmMtuChangedEvent) {
+    } else if (value is BmServicesResetEvent) {
       buffer.putUint8(158);
       writeValue(buffer, value.encode());
-    } else if (value is BmDetachedFromEngineEvent) {
+    } else if (value is BmMtuChangedEvent) {
       buffer.putUint8(159);
       writeValue(buffer, value.encode());
-    } else if (value is BmL2capChannelClosedEvent) {
+    } else if (value is BmDetachedFromEngineEvent) {
       buffer.putUint8(160);
+      writeValue(buffer, value.encode());
+    } else if (value is BmL2capChannelClosedEvent) {
+      buffer.putUint8(161);
       writeValue(buffer, value.encode());
     } else {
       super.writeValue(buffer, value);
@@ -1591,71 +1606,74 @@ class _PigeonCodec extends StandardMessageCodec {
         return value == null ? null : BluetoothAdapterState.values[value];
       case 130:
         final value = readValue(buffer) as int?;
-        return value == null ? null : BluetoothConnectionState.values[value];
+        return value == null ? null : BluetoothPermission.values[value];
       case 131:
         final value = readValue(buffer) as int?;
-        return value == null ? null : BmWriteType.values[value];
+        return value == null ? null : BluetoothConnectionState.values[value];
       case 132:
         final value = readValue(buffer) as int?;
-        return value == null ? null : ConnectionPriority.values[value];
+        return value == null ? null : BmWriteType.values[value];
       case 133:
         final value = readValue(buffer) as int?;
-        return value == null ? null : BluetoothBondState.values[value];
+        return value == null ? null : ConnectionPriority.values[value];
       case 134:
         final value = readValue(buffer) as int?;
-        return value == null ? null : LogLevel.values[value];
+        return value == null ? null : BluetoothBondState.values[value];
       case 135:
         final value = readValue(buffer) as int?;
-        return value == null ? null : BluebirdErrorCode.values[value];
+        return value == null ? null : LogLevel.values[value];
       case 136:
-        return BmAttributeId.decode(readValue(buffer)!);
+        final value = readValue(buffer) as int?;
+        return value == null ? null : BluebirdErrorCode.values[value];
       case 137:
-        return BmServiceRef.decode(readValue(buffer)!);
+        return BmAttributeId.decode(readValue(buffer)!);
       case 138:
-        return BmCharacteristicRef.decode(readValue(buffer)!);
+        return BmServiceRef.decode(readValue(buffer)!);
       case 139:
-        return BmDescriptorRef.decode(readValue(buffer)!);
+        return BmCharacteristicRef.decode(readValue(buffer)!);
       case 140:
-        return BmMsdFilter.decode(readValue(buffer)!);
+        return BmDescriptorRef.decode(readValue(buffer)!);
       case 141:
-        return BmServiceDataFilter.decode(readValue(buffer)!);
+        return BmMsdFilter.decode(readValue(buffer)!);
       case 142:
-        return BmScanSettings.decode(readValue(buffer)!);
+        return BmServiceDataFilter.decode(readValue(buffer)!);
       case 143:
-        return BmScanAdvertisement.decode(readValue(buffer)!);
+        return BmScanSettings.decode(readValue(buffer)!);
       case 144:
-        return BmBluetoothDevice.decode(readValue(buffer)!);
+        return BmScanAdvertisement.decode(readValue(buffer)!);
       case 145:
-        return BmBluetoothService.decode(readValue(buffer)!);
+        return BmBluetoothDevice.decode(readValue(buffer)!);
       case 146:
-        return BmBluetoothCharacteristic.decode(readValue(buffer)!);
+        return BmBluetoothService.decode(readValue(buffer)!);
       case 147:
-        return BmBluetoothDescriptor.decode(readValue(buffer)!);
+        return BmBluetoothCharacteristic.decode(readValue(buffer)!);
       case 148:
-        return BmCharacteristicProperties.decode(readValue(buffer)!);
+        return BmBluetoothDescriptor.decode(readValue(buffer)!);
       case 149:
-        return BmPhySupport.decode(readValue(buffer)!);
+        return BmCharacteristicProperties.decode(readValue(buffer)!);
       case 150:
-        return BmAdapterStateEvent.decode(readValue(buffer)!);
+        return BmPhySupport.decode(readValue(buffer)!);
       case 151:
-        return BmScanAdvertisementEvent.decode(readValue(buffer)!);
+        return BmAdapterStateEvent.decode(readValue(buffer)!);
       case 152:
-        return BmScanFailedEvent.decode(readValue(buffer)!);
+        return BmScanAdvertisementEvent.decode(readValue(buffer)!);
       case 153:
-        return BmConnectionStateEvent.decode(readValue(buffer)!);
+        return BmScanFailedEvent.decode(readValue(buffer)!);
       case 154:
-        return BmCharacteristicNotificationEvent.decode(readValue(buffer)!);
+        return BmConnectionStateEvent.decode(readValue(buffer)!);
       case 155:
-        return BmBondStateEvent.decode(readValue(buffer)!);
+        return BmCharacteristicNotificationEvent.decode(readValue(buffer)!);
       case 156:
-        return BmNameChangedEvent.decode(readValue(buffer)!);
+        return BmBondStateEvent.decode(readValue(buffer)!);
       case 157:
-        return BmServicesResetEvent.decode(readValue(buffer)!);
+        return BmNameChangedEvent.decode(readValue(buffer)!);
       case 158:
-        return BmMtuChangedEvent.decode(readValue(buffer)!);
+        return BmServicesResetEvent.decode(readValue(buffer)!);
       case 159:
-        return BmDetachedFromEngineEvent.decode(readValue(buffer)!);
+        return BmMtuChangedEvent.decode(readValue(buffer)!);
       case 160:
+        return BmDetachedFromEngineEvent.decode(readValue(buffer)!);
+      case 161:
         return BmL2capChannelClosedEvent.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
@@ -1821,6 +1839,28 @@ class BluebirdHostApi {
       isNullValid: false,
     );
     return pigeonVar_replyValue! as BluetoothAdapterState;
+  }
+
+  /// Whether the app is allowed to use Bluetooth. Android reads its runtime permissions;
+  /// Darwin reads `CBManager.authorization`, which needs no central manager and so raises
+  /// no prompt. Web has no app-level permission to check and reports granted.
+  Future<BluetoothPermission> getPermission() async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluebird.BluebirdHostApi.getPermission$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
+    return pigeonVar_replyValue! as BluetoothPermission;
   }
 
   /// Android: shows the enable-bluetooth dialog; completes with user consent.

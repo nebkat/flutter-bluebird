@@ -208,6 +208,31 @@ enum class BluetoothAdapterState(val raw: Int) {
   }
 }
 
+/**
+ * Whether the app may use Bluetooth at all, separately from whether the radio is on.
+ *
+ * Kept apart from [BluetoothAdapterState] because on Android the two are independent —
+ * the radio can be on with the permission refused, and the other way round. Darwin fuses
+ * them into `CBManagerState`, so there it is reported in both places.
+ *
+ * [denied] means the user refused and can be asked again; [permanentlyDenied] means only
+ * the settings app can change it. Android tells these apart by whether it will still show
+ * the dialog; Darwin only ever reports [permanentlyDenied], because iOS prompts once and
+ * never again.
+ */
+enum class BluetoothPermission(val raw: Int) {
+  NOT_DETERMINED(0),
+  DENIED(1),
+  PERMANENTLY_DENIED(2),
+  GRANTED(3);
+
+  companion object {
+    fun ofRaw(raw: Int): BluetoothPermission? {
+      return values().firstOrNull { it.raw == raw }
+    }
+  }
+}
+
 enum class BluetoothConnectionState(val raw: Int) {
   DISCONNECTED(0),
   CONNECTED(1),
@@ -1534,155 +1559,160 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
       }
       130.toByte() -> {
         return (readValue(buffer) as Long?)?.let {
-          BluetoothConnectionState.ofRaw(it.toInt())
+          BluetoothPermission.ofRaw(it.toInt())
         }
       }
       131.toByte() -> {
         return (readValue(buffer) as Long?)?.let {
-          BmWriteType.ofRaw(it.toInt())
+          BluetoothConnectionState.ofRaw(it.toInt())
         }
       }
       132.toByte() -> {
         return (readValue(buffer) as Long?)?.let {
-          ConnectionPriority.ofRaw(it.toInt())
+          BmWriteType.ofRaw(it.toInt())
         }
       }
       133.toByte() -> {
         return (readValue(buffer) as Long?)?.let {
-          BluetoothBondState.ofRaw(it.toInt())
+          ConnectionPriority.ofRaw(it.toInt())
         }
       }
       134.toByte() -> {
         return (readValue(buffer) as Long?)?.let {
-          LogLevel.ofRaw(it.toInt())
+          BluetoothBondState.ofRaw(it.toInt())
         }
       }
       135.toByte() -> {
         return (readValue(buffer) as Long?)?.let {
-          BluebirdErrorCode.ofRaw(it.toInt())
+          LogLevel.ofRaw(it.toInt())
         }
       }
       136.toByte() -> {
-        return (readValue(buffer) as? List<Any?>)?.let {
-          BmAttributeId.fromList(it)
+        return (readValue(buffer) as Long?)?.let {
+          BluebirdErrorCode.ofRaw(it.toInt())
         }
       }
       137.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmServiceRef.fromList(it)
+          BmAttributeId.fromList(it)
         }
       }
       138.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmCharacteristicRef.fromList(it)
+          BmServiceRef.fromList(it)
         }
       }
       139.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmDescriptorRef.fromList(it)
+          BmCharacteristicRef.fromList(it)
         }
       }
       140.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmMsdFilter.fromList(it)
+          BmDescriptorRef.fromList(it)
         }
       }
       141.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmServiceDataFilter.fromList(it)
+          BmMsdFilter.fromList(it)
         }
       }
       142.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmScanSettings.fromList(it)
+          BmServiceDataFilter.fromList(it)
         }
       }
       143.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmScanAdvertisement.fromList(it)
+          BmScanSettings.fromList(it)
         }
       }
       144.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmBluetoothDevice.fromList(it)
+          BmScanAdvertisement.fromList(it)
         }
       }
       145.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmBluetoothService.fromList(it)
+          BmBluetoothDevice.fromList(it)
         }
       }
       146.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmBluetoothCharacteristic.fromList(it)
+          BmBluetoothService.fromList(it)
         }
       }
       147.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmBluetoothDescriptor.fromList(it)
+          BmBluetoothCharacteristic.fromList(it)
         }
       }
       148.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmCharacteristicProperties.fromList(it)
+          BmBluetoothDescriptor.fromList(it)
         }
       }
       149.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmPhySupport.fromList(it)
+          BmCharacteristicProperties.fromList(it)
         }
       }
       150.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmAdapterStateEvent.fromList(it)
+          BmPhySupport.fromList(it)
         }
       }
       151.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmScanAdvertisementEvent.fromList(it)
+          BmAdapterStateEvent.fromList(it)
         }
       }
       152.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmScanFailedEvent.fromList(it)
+          BmScanAdvertisementEvent.fromList(it)
         }
       }
       153.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmConnectionStateEvent.fromList(it)
+          BmScanFailedEvent.fromList(it)
         }
       }
       154.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmCharacteristicNotificationEvent.fromList(it)
+          BmConnectionStateEvent.fromList(it)
         }
       }
       155.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmBondStateEvent.fromList(it)
+          BmCharacteristicNotificationEvent.fromList(it)
         }
       }
       156.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmNameChangedEvent.fromList(it)
+          BmBondStateEvent.fromList(it)
         }
       }
       157.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmServicesResetEvent.fromList(it)
+          BmNameChangedEvent.fromList(it)
         }
       }
       158.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmMtuChangedEvent.fromList(it)
+          BmServicesResetEvent.fromList(it)
         }
       }
       159.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BmDetachedFromEngineEvent.fromList(it)
+          BmMtuChangedEvent.fromList(it)
         }
       }
       160.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          BmDetachedFromEngineEvent.fromList(it)
+        }
+      }
+      161.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
           BmL2capChannelClosedEvent.fromList(it)
         }
@@ -1696,128 +1726,132 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
         stream.write(129)
         writeValue(stream, value.raw.toLong())
       }
-      is BluetoothConnectionState -> {
+      is BluetoothPermission -> {
         stream.write(130)
         writeValue(stream, value.raw.toLong())
       }
-      is BmWriteType -> {
+      is BluetoothConnectionState -> {
         stream.write(131)
         writeValue(stream, value.raw.toLong())
       }
-      is ConnectionPriority -> {
+      is BmWriteType -> {
         stream.write(132)
         writeValue(stream, value.raw.toLong())
       }
-      is BluetoothBondState -> {
+      is ConnectionPriority -> {
         stream.write(133)
         writeValue(stream, value.raw.toLong())
       }
-      is LogLevel -> {
+      is BluetoothBondState -> {
         stream.write(134)
         writeValue(stream, value.raw.toLong())
       }
-      is BluebirdErrorCode -> {
+      is LogLevel -> {
         stream.write(135)
         writeValue(stream, value.raw.toLong())
       }
-      is BmAttributeId -> {
+      is BluebirdErrorCode -> {
         stream.write(136)
-        writeValue(stream, value.toList())
+        writeValue(stream, value.raw.toLong())
       }
-      is BmServiceRef -> {
+      is BmAttributeId -> {
         stream.write(137)
         writeValue(stream, value.toList())
       }
-      is BmCharacteristicRef -> {
+      is BmServiceRef -> {
         stream.write(138)
         writeValue(stream, value.toList())
       }
-      is BmDescriptorRef -> {
+      is BmCharacteristicRef -> {
         stream.write(139)
         writeValue(stream, value.toList())
       }
-      is BmMsdFilter -> {
+      is BmDescriptorRef -> {
         stream.write(140)
         writeValue(stream, value.toList())
       }
-      is BmServiceDataFilter -> {
+      is BmMsdFilter -> {
         stream.write(141)
         writeValue(stream, value.toList())
       }
-      is BmScanSettings -> {
+      is BmServiceDataFilter -> {
         stream.write(142)
         writeValue(stream, value.toList())
       }
-      is BmScanAdvertisement -> {
+      is BmScanSettings -> {
         stream.write(143)
         writeValue(stream, value.toList())
       }
-      is BmBluetoothDevice -> {
+      is BmScanAdvertisement -> {
         stream.write(144)
         writeValue(stream, value.toList())
       }
-      is BmBluetoothService -> {
+      is BmBluetoothDevice -> {
         stream.write(145)
         writeValue(stream, value.toList())
       }
-      is BmBluetoothCharacteristic -> {
+      is BmBluetoothService -> {
         stream.write(146)
         writeValue(stream, value.toList())
       }
-      is BmBluetoothDescriptor -> {
+      is BmBluetoothCharacteristic -> {
         stream.write(147)
         writeValue(stream, value.toList())
       }
-      is BmCharacteristicProperties -> {
+      is BmBluetoothDescriptor -> {
         stream.write(148)
         writeValue(stream, value.toList())
       }
-      is BmPhySupport -> {
+      is BmCharacteristicProperties -> {
         stream.write(149)
         writeValue(stream, value.toList())
       }
-      is BmAdapterStateEvent -> {
+      is BmPhySupport -> {
         stream.write(150)
         writeValue(stream, value.toList())
       }
-      is BmScanAdvertisementEvent -> {
+      is BmAdapterStateEvent -> {
         stream.write(151)
         writeValue(stream, value.toList())
       }
-      is BmScanFailedEvent -> {
+      is BmScanAdvertisementEvent -> {
         stream.write(152)
         writeValue(stream, value.toList())
       }
-      is BmConnectionStateEvent -> {
+      is BmScanFailedEvent -> {
         stream.write(153)
         writeValue(stream, value.toList())
       }
-      is BmCharacteristicNotificationEvent -> {
+      is BmConnectionStateEvent -> {
         stream.write(154)
         writeValue(stream, value.toList())
       }
-      is BmBondStateEvent -> {
+      is BmCharacteristicNotificationEvent -> {
         stream.write(155)
         writeValue(stream, value.toList())
       }
-      is BmNameChangedEvent -> {
+      is BmBondStateEvent -> {
         stream.write(156)
         writeValue(stream, value.toList())
       }
-      is BmServicesResetEvent -> {
+      is BmNameChangedEvent -> {
         stream.write(157)
         writeValue(stream, value.toList())
       }
-      is BmMtuChangedEvent -> {
+      is BmServicesResetEvent -> {
         stream.write(158)
         writeValue(stream, value.toList())
       }
-      is BmDetachedFromEngineEvent -> {
+      is BmMtuChangedEvent -> {
         stream.write(159)
         writeValue(stream, value.toList())
       }
-      is BmL2capChannelClosedEvent -> {
+      is BmDetachedFromEngineEvent -> {
         stream.write(160)
+        writeValue(stream, value.toList())
+      }
+      is BmL2capChannelClosedEvent -> {
+        stream.write(161)
         writeValue(stream, value.toList())
       }
       else -> super.writeValue(stream, value)
@@ -1896,6 +1930,12 @@ interface BluebirdHostApi {
   /** @async: may need to request runtime permissions before answering. */
   fun getAdapterName(callback: (Result<String>) -> Unit)
   fun getAdapterState(): BluetoothAdapterState
+  /**
+   * Whether the app is allowed to use Bluetooth. Android reads its runtime permissions;
+   * Darwin reads `CBManager.authorization`, which needs no central manager and so raises
+   * no prompt. Web has no app-level permission to check and reports granted.
+   */
+  fun getPermission(): BluetoothPermission
   /** Android: shows the enable-bluetooth dialog; completes with user consent. */
   fun turnOn(callback: (Result<Boolean>) -> Unit)
   fun turnOff(callback: (Result<Boolean>) -> Unit)
@@ -2039,6 +2079,21 @@ interface BluebirdHostApi {
           channel.setMessageHandler { _, reply ->
             val wrapped: List<Any?> = try {
               listOf(api.getAdapterState())
+            } catch (exception: Throwable) {
+              MessagesPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.bluebird.BluebirdHostApi.getPermission$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            val wrapped: List<Any?> = try {
+              listOf(api.getPermission())
             } catch (exception: Throwable) {
               MessagesPigeonUtils.wrapError(exception)
             }
