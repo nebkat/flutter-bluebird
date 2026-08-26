@@ -195,6 +195,32 @@ void main() {
     await sub.cancel();
   });
 
+  // Not just `off`: authorization can be revoked from the settings app mid-scan, and the
+  // adapter can go away, and either leaves the native scan dead with nothing to close the
+  // stream.
+  for (final state in [
+    BluetoothAdapterState.off,
+    BluetoothAdapterState.turningOff,
+    BluetoothAdapterState.unauthorized,
+    BluetoothAdapterState.unavailable,
+  ]) {
+    test('an adapter going $state ends the scan in progress', () async {
+      fake.adapterState = BluetoothAdapterState.on;
+
+      var done = false;
+      final sub = Bluebird.performScan().listen((_) {}, onDone: () => done = true);
+      await pumpEventQueue();
+      expect(Bluebird.isScanning.value, isTrue);
+
+      fake.emit(BmAdapterStateEvent(adapterState: state));
+      await pumpEventQueue();
+
+      expect(done, isTrue);
+      expect(Bluebird.isScanning.value, isFalse);
+      await sub.cancel();
+    });
+  }
+
   test('platform errors map to BluebirdException by wire code', () async {
     fake.stubs['isSupported'] = () => throw PlatformException(code: 'adapter_off', message: 'off');
     await expectLater(

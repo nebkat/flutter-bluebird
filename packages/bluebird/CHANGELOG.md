@@ -1,3 +1,7 @@
+## Unreleased
+
+- Fixed a scan outliving the adapter it runs on: `Bluebird.performScan(...)` now also ends when the adapter goes `unauthorized` or `unavailable`, not only `off`/`turningOff`. Authorization can be revoked from the settings app mid-scan, and the adapter can disappear; either leaves the native scan dead while the stream stays open, waiting for advertisements that can never arrive.
+
 ## 0.4.2
 
 - Fixed (Web) a spurious `deviceDisconnected` when a device is disconnected and quickly reconnected: a delayed `gattserverdisconnected` event from the previous connection could tear down the new one. Requires `bluebird_web` 0.4.2.

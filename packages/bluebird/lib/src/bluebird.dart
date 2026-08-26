@@ -387,9 +387,19 @@ class Bluebird {
     final failures = extractEventStream<OnScanFailedEvent>().listen(
       (e) => endScan(error: BluebirdException("scan", BluebirdErrorCode.platform, "(${e.errorCode}) ${e.errorString}")),
     );
-    final adapterOff = adapterState.changes
-        .where((s) => s == BluetoothAdapterState.off || s == BluetoothAdapterState.turningOff)
-        .listen((_) => endScan());
+    // Every state a running scan cannot survive. `unauthorized` and `unavailable` belong
+    // here as much as `off` does: authorization can be revoked from the settings app
+    // mid-scan, and the adapter can disappear, and in both cases the native scan is dead
+    // while the stream would otherwise stay open forever waiting for advertisements that
+    // can never arrive. `unknown` is left out — it is the state before the adapter has
+    // reported itself, not one it falls back into.
+    const dead = {
+      BluetoothAdapterState.off,
+      BluetoothAdapterState.turningOff,
+      BluetoothAdapterState.unauthorized,
+      BluetoothAdapterState.unavailable,
+    };
+    final adapterOff = adapterState.changes.where(dead.contains).listen((_) => endScan());
     final detached = extractEventStream<OnDetachedFromEngineEvent>().listen((_) => endScan());
 
     Timer? timeoutTimer;
