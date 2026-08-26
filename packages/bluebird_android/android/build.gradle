@@ -1,28 +1,7 @@
 group 'com.lib.bluebird'
 version '1.0'
 
-buildscript {
-    ext.kotlin_version = '2.2.20'
-    repositories {
-        google()
-        mavenCentral()
-    }
-    dependencies {
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-    }
-}
-
 apply plugin: 'com.android.library'
-
-// Built-in Kotlin migration (conditional variant, so Flutter < 3.44 keeps
-// working): AGP 9+ (or Flutter's android.builtInKotlin opt-in) ships Kotlin
-// support built in; only apply KGP ourselves when neither is present.
-// https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-plugin-authors
-def agpMajor = com.android.Version.ANDROID_GRADLE_PLUGIN_VERSION.tokenize('.')[0] as int
-def builtInKotlin = agpMajor >= 9 || project.findProperty('android.builtInKotlin')?.toString() == 'true'
-if (!builtInKotlin) {
-    apply plugin: 'kotlin-android'
-}
 
 android {
     compileSdkVersion = flutter.compileSdkVersion
@@ -57,9 +36,7 @@ android {
     }
 }
 
-// configure the jvm target whenever KGP is present (self-applied above, or
-// provided by the AGP9/built-in-Kotlin flow); under built-in Kotlin the
-// extension may not exist, and the toolchain aligns with compileOptions
+// KGP is supplied by AGP 9+ or by Flutter's Gradle plugin, so configure it only once present
 pluginManager.withPlugin('org.jetbrains.kotlin.android') {
     kotlin {
         compilerOptions {
