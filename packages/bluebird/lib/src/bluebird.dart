@@ -415,14 +415,19 @@ class Bluebird {
           if (!controller.isClosed) controller.close();
         });
       }
-      yield* controller.stream;
+      // Awaiting close on a controller that was never listened to hangs forever, so it
+      // lives with the listen rather than in the outer finally.
+      try {
+        yield* controller.stream;
+      } finally {
+        if (!controller.isClosed) await controller.close();
+      }
     } finally {
       timeoutTimer?.cancel();
       await advertisements.cancel();
       await failures.cancel();
       await adapterOff.cancel();
       await detached.cancel();
-      if (!controller.isClosed) await controller.close();
       try {
         // release the guard only after the native scan has actually stopped, so
         // a new scan can't start before this one's stopScan lands

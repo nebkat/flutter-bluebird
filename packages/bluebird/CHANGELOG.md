@@ -1,3 +1,7 @@
+## Unreleased
+
+- Fixed a scan refused by the platform hanging forever instead of failing. When `startScan` was rejected — the adapter off, the permission denied — the internal advertisement controller was closed without ever having been listened to, so `close()` never completed: no error reached the caller, the stream never ended, `isScanning` stayed `true`, and every later scan was wedged behind `operationInProgress` for the life of the process.
+
 ## 0.4.3
 
 - Fixed a scan outliving the adapter it runs on: `Bluebird.performScan(...)` now also ends when the adapter goes `unauthorized` or `unavailable`, not only `off`/`turningOff`. Authorization can be revoked from the settings app mid-scan, and the adapter can disappear; either leaves the native scan dead while the stream stays open, waiting for advertisements that can never arrive.
