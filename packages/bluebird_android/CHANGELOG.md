@@ -1,4 +1,4 @@
-## Unreleased
+## 0.4.3
 
 - Stopped applying the Kotlin Gradle Plugin. Under AGP 9+ (or `android.builtInKotlin=true`) the Android Gradle Plugin compiles Kotlin itself, and below that Flutter's Gradle plugin applies `kotlin-android` to plugin modules that don't declare it — so nothing is lost, and apps no longer list `bluebird_android` under "uses the following plugins that apply Kotlin Gradle Plugin (KGP)", which future Flutter versions will make a build failure. Applying it conditionally was not enough: Flutter detects the declaration by scanning `build.gradle` with a regex, not by inspecting Gradle state.
 

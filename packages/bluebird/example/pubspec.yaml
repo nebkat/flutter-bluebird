@@ -14,7 +14,7 @@ dependencies:
   flutter:
     sdk: flutter
 
-  bluebird: 0.4.2
+  bluebird: 0.4.3
 
 dev_dependencies:
   flutter_test:

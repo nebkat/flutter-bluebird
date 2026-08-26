@@ -1,7 +1,7 @@
-## Unreleased
+## 0.4.3
 
 - Fixed a scan outliving the adapter it runs on: `Bluebird.performScan(...)` now also ends when the adapter goes `unauthorized` or `unavailable`, not only `off`/`turningOff`. Authorization can be revoked from the settings app mid-scan, and the adapter can disappear; either leaves the native scan dead while the stream stays open, waiting for advertisements that can never arrive.
-- (Android) `bluebird_android` no longer applies the Kotlin Gradle Plugin, so it drops off the "uses plugins that apply KGP" warning list that future Flutter versions will turn into a build failure. Requires `bluebird_android` from this release.
+- (Android) `bluebird_android` no longer applies the Kotlin Gradle Plugin, so it drops off the "uses plugins that apply KGP" warning list that future Flutter versions will turn into a build failure. Requires `bluebird_android` 0.4.3.
 
 ## 0.4.2
 
