@@ -1,6 +1,7 @@
 ## Unreleased
 
 - Fixed a scan refused by the platform hanging forever instead of failing. When `startScan` was rejected — the adapter off, the permission denied — the internal advertisement controller was closed without ever having been listened to, so `close()` never completed: no error reached the caller, the stream never ended, `isScanning` stayed `true`, and every later scan was wedged behind `operationInProgress` for the life of the process.
+- (Darwin) Fixed every non-`poweredOn` adapter state being reported as `adapterOff`. `unauthorized` now surfaces as `permissionDenied` and `unsupported` as `unsupported`, from `startScan`, `connect`, and the operations failed when the adapter goes away mid-flight. The three call for different things from the user — Control Centre, the settings app, and nothing at all — and were indistinguishable to callers. Requires `bluebird_darwin` from this release.
 
 ## 0.4.3
 

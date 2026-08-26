@@ -65,11 +65,28 @@ func operationInProgressError() -> PigeonError {
     details: nil)
 }
 
-func adapterOffError(_ state: CBManagerState) -> PigeonError {
-  PigeonError(
-    code: BluebirdErrorCode.adapterOff.wire,
-    message: "bluetooth must be turned on. (\(cbManagerStateString(state)))",
-    details: nil)
+/// The error for an adapter that is not `poweredOn`, carrying *why* it is not.
+///
+/// Not every one of these is a radio that is merely switched off: `.unauthorized` is the
+/// user having refused Bluetooth access, and `.unsupported` is hardware that has none.
+/// Reporting all three as `adapterOff` loses the only thing a caller can act on — one is
+/// fixed in Control Centre, one in the settings app, and one not at all.
+func adapterUnavailableError(_ state: CBManagerState) -> PigeonError {
+  let code: BluebirdErrorCode =
+    switch state {
+    case .unauthorized: .permissionDenied
+    case .unsupported: .unsupported
+    default: .adapterOff
+    }
+
+  let message =
+    switch state {
+    case .unauthorized: "bluetooth permission was denied. (\(cbManagerStateString(state)))"
+    case .unsupported: "bluetooth is not supported on this device. (\(cbManagerStateString(state)))"
+    default: "bluetooth must be turned on. (\(cbManagerStateString(state)))"
+    }
+
+  return PigeonError(code: code.wire, message: message, details: nil)
 }
 
 func unsupportedError(_ message: String) -> PigeonError {
