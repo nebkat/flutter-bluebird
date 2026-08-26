@@ -22,9 +22,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -558,6 +560,29 @@ class BluebirdPlugin :
             BluetoothPermission.PERMANENTLY_DENIED
         } else {
             BluetoothPermission.NOT_DETERMINED
+        }
+    }
+
+    override fun getLocationEnabled(): Boolean {
+        // From Android 12 the neverForLocation flag on BLUETOOTH_SCAN retires the
+        // requirement; below it, a scan with the toggle off returns nothing and says
+        // nothing about why.
+        if (Build.VERSION.SDK_INT >= 31) { // Android 12 (October 2021)
+            return true
+        }
+
+        val ctx = context ?: return true
+        val manager = ctx.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return true
+
+        return if (Build.VERSION.SDK_INT >= 28) { // Android 9 (August 2018)
+            manager.isLocationEnabled
+        } else {
+            @Suppress("DEPRECATION")
+            Settings.Secure.getInt(
+                ctx.contentResolver,
+                Settings.Secure.LOCATION_MODE,
+                Settings.Secure.LOCATION_MODE_OFF,
+            ) != Settings.Secure.LOCATION_MODE_OFF
         }
     }
 

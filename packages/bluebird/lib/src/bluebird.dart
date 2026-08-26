@@ -160,6 +160,16 @@ class Bluebird {
   /// reading that means the same thing everywhere.
   static Future<BluetoothPermission> get permission async => await invoke("getPermission", (p) => p.getPermission());
 
+  /// Whether scanning's location requirement is met (Android 11 and below).
+  ///
+  /// Those versions treat a BLE scan as a way to derive position, so they gate it on the
+  /// system location toggle as well as the location permission — with it off, a scan
+  /// returns nothing at all and reports no error. Android 12 retires the requirement for
+  /// an app that declares `neverForLocation`, and no other platform ever had it, so this
+  /// is true everywhere else.
+  static Future<bool> get androidLocationEnabled async =>
+      await invoke("getLocationEnabled", (p) => p.getLocationEnabled());
+
   /// Completes once the adapter is on; returns immediately if it already is.
   ///
   /// Fails fast on a terminal state that will never reach `on`, so it can't

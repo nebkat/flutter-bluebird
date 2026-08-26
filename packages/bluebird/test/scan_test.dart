@@ -335,6 +335,11 @@ void main() {
     expect(await Bluebird.permission, BluetoothPermission.denied);
   });
 
+  test('androidLocationEnabled is read straight from the platform', () async {
+    fake.locationEnabled = false;
+    expect(await Bluebird.androidLocationEnabled, isFalse);
+  });
+
   test('adapterReady completes immediately when the adapter is already on', () async {
     fake.adapterState = BluetoothAdapterState.on;
     await Bluebird.adapterReady(); // completes without hanging or throwing

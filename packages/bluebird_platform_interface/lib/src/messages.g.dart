@@ -1863,6 +1863,29 @@ class BluebirdHostApi {
     return pigeonVar_replyValue! as BluetoothPermission;
   }
 
+  /// Android: whether scanning's location requirement is met — the system location toggle
+  /// on API 30 and below, where a scan with it off returns nothing at all and says
+  /// nothing about why. True from API 31 up, where `neverForLocation` retires the
+  /// requirement, and true on every other platform, which never had it.
+  Future<bool> getLocationEnabled() async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.bluebird.BluebirdHostApi.getLocationEnabled$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
+    return pigeonVar_replyValue! as bool;
+  }
+
   /// Android: shows the enable-bluetooth dialog; completes with user consent.
   Future<bool> turnOn() async {
     final pigeonVar_channelName = 'dev.flutter.pigeon.bluebird.BluebirdHostApi.turnOn$pigeonVar_messageChannelSuffix';

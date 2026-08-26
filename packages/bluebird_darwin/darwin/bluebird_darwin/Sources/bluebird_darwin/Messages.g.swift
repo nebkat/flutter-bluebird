@@ -1791,6 +1791,11 @@ protocol BluebirdHostApi {
   /// Darwin reads `CBManager.authorization`, which needs no central manager and so raises
   /// no prompt. Web has no app-level permission to check and reports granted.
   func getPermission() throws -> BluetoothPermission
+  /// Android: whether scanning's location requirement is met — the system location toggle
+  /// on API 30 and below, where a scan with it off returns nothing at all and says
+  /// nothing about why. True from API 31 up, where `neverForLocation` retires the
+  /// requirement, and true on every other platform, which never had it.
+  func getLocationEnabled() throws -> Bool
   /// Android: shows the enable-bluetooth dialog; completes with user consent.
   func turnOn(completion: @escaping (Result<Bool, Error>) -> Void)
   func turnOff(completion: @escaping (Result<Bool, Error>) -> Void)
@@ -1942,6 +1947,23 @@ class BluebirdHostApiSetup {
       }
     } else {
       getPermissionChannel.setMessageHandler(nil)
+    }
+    /// Android: whether scanning's location requirement is met — the system location toggle
+    /// on API 30 and below, where a scan with it off returns nothing at all and says
+    /// nothing about why. True from API 31 up, where `neverForLocation` retires the
+    /// requirement, and true on every other platform, which never had it.
+    let getLocationEnabledChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.bluebird.BluebirdHostApi.getLocationEnabled\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      getLocationEnabledChannel.setMessageHandler { _, reply in
+        do {
+          let result = try api.getLocationEnabled()
+          reply(wrapResult(result))
+        } catch {
+          reply(wrapError(error))
+        }
+      }
+    } else {
+      getLocationEnabledChannel.setMessageHandler(nil)
     }
     /// Android: shows the enable-bluetooth dialog; completes with user consent.
     let turnOnChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.bluebird.BluebirdHostApi.turnOn\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)

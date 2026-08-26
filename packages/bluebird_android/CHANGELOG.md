@@ -1,6 +1,6 @@
 ## Unreleased
 
-- Implemented `getPermission`, distinguishing never-asked from refused by whether the OS still offers a rationale, falling back to whether this process has already asked.
+- Implemented `getPermission`, distinguishing never-asked from refused by whether the OS still offers a rationale, falling back to whether this process has already asked. Implemented `getLocationEnabled` against `LocationManager.isLocationEnabled` (API 28+) and `Settings.Secure.LOCATION_MODE` below it; always true from API 31, where `neverForLocation` retires the requirement.
 
 ## 0.4.3
 

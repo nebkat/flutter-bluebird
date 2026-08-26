@@ -1936,6 +1936,13 @@ interface BluebirdHostApi {
    * no prompt. Web has no app-level permission to check and reports granted.
    */
   fun getPermission(): BluetoothPermission
+  /**
+   * Android: whether scanning's location requirement is met — the system location toggle
+   * on API 30 and below, where a scan with it off returns nothing at all and says
+   * nothing about why. True from API 31 up, where `neverForLocation` retires the
+   * requirement, and true on every other platform, which never had it.
+   */
+  fun getLocationEnabled(): Boolean
   /** Android: shows the enable-bluetooth dialog; completes with user consent. */
   fun turnOn(callback: (Result<Boolean>) -> Unit)
   fun turnOff(callback: (Result<Boolean>) -> Unit)
@@ -2094,6 +2101,21 @@ interface BluebirdHostApi {
           channel.setMessageHandler { _, reply ->
             val wrapped: List<Any?> = try {
               listOf(api.getPermission())
+            } catch (exception: Throwable) {
+              MessagesPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.bluebird.BluebirdHostApi.getLocationEnabled$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            val wrapped: List<Any?> = try {
+              listOf(api.getLocationEnabled())
             } catch (exception: Throwable) {
               MessagesPigeonUtils.wrapError(exception)
             }

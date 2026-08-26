@@ -109,6 +109,11 @@ extension BluebirdPlugin: BluebirdHostApi {
     }
   }
 
+  /// Darwin never gated Bluetooth on location services.
+  func getLocationEnabled() throws -> Bool {
+    true
+  }
+
   func turnOn(completion: @escaping (Result<Bool, Error>) -> Void) {
     launch(completion) {
       throw unsupportedError("iOS & macOS do not support turning on bluetooth")

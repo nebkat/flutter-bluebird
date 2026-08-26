@@ -337,6 +337,12 @@ abstract class BluebirdHostApi {
   /// no prompt. Web has no app-level permission to check and reports granted.
   BluetoothPermission getPermission();
 
+  /// Android: whether scanning's location requirement is met — the system location toggle
+  /// on API 30 and below, where a scan with it off returns nothing at all and says
+  /// nothing about why. True from API 31 up, where `neverForLocation` retires the
+  /// requirement, and true on every other platform, which never had it.
+  bool getLocationEnabled();
+
   /// Android: shows the enable-bluetooth dialog; completes with user consent.
   @async
   bool turnOn();

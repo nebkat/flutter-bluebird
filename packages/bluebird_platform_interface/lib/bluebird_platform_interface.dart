@@ -99,6 +99,9 @@ abstract base class BluebirdPlatform {
 
   Future<BluetoothPermission> getPermission() => throw UnimplementedError('$runtimeType.getPermission');
 
+  /// Defaults to true: only Android has ever gated scanning on the location toggle.
+  Future<bool> getLocationEnabled() async => true;
+
   Future<BluetoothBondState> getBondState(String address) => throw UnimplementedError('$runtimeType.getBondState');
 
   Future<List<BmBluetoothDevice>> getBondedDevices() {
