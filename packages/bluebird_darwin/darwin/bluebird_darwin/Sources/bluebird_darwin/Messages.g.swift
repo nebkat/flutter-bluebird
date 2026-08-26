@@ -194,6 +194,23 @@ enum BluetoothAdapterState: Int, CaseIterable {
   case off = 6
 }
 
+/// Whether the app may use Bluetooth at all, separately from whether the radio is on.
+///
+/// Kept apart from [BluetoothAdapterState] because on Android the two are independent —
+/// the radio can be on with the permission refused, and the other way round. Darwin fuses
+/// them into `CBManagerState`, so there it is reported in both places.
+///
+/// [denied] means the user refused and can be asked again; [permanentlyDenied] means only
+/// the settings app can change it. Android tells these apart by whether it will still show
+/// the dialog; Darwin only ever reports [permanentlyDenied], because iOS prompts once and
+/// never again.
+enum BluetoothPermission: Int, CaseIterable {
+  case notDetermined = 0
+  case denied = 1
+  case permanentlyDenied = 2
+  case granted = 3
+}
+
 enum BluetoothConnectionState: Int, CaseIterable {
   case disconnected = 0
   case connected = 1
@@ -1475,88 +1492,94 @@ private class MessagesPigeonCodecReader: FlutterStandardReader {
     case 130:
       let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
       if let enumResultAsInt = enumResultAsInt {
-        return BluetoothConnectionState(rawValue: enumResultAsInt)
+        return BluetoothPermission(rawValue: enumResultAsInt)
       }
       return nil
     case 131:
       let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
       if let enumResultAsInt = enumResultAsInt {
-        return BmWriteType(rawValue: enumResultAsInt)
+        return BluetoothConnectionState(rawValue: enumResultAsInt)
       }
       return nil
     case 132:
       let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
       if let enumResultAsInt = enumResultAsInt {
-        return ConnectionPriority(rawValue: enumResultAsInt)
+        return BmWriteType(rawValue: enumResultAsInt)
       }
       return nil
     case 133:
       let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
       if let enumResultAsInt = enumResultAsInt {
-        return BluetoothBondState(rawValue: enumResultAsInt)
+        return ConnectionPriority(rawValue: enumResultAsInt)
       }
       return nil
     case 134:
       let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
       if let enumResultAsInt = enumResultAsInt {
-        return LogLevel(rawValue: enumResultAsInt)
+        return BluetoothBondState(rawValue: enumResultAsInt)
       }
       return nil
     case 135:
       let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
       if let enumResultAsInt = enumResultAsInt {
-        return BluebirdErrorCode(rawValue: enumResultAsInt)
+        return LogLevel(rawValue: enumResultAsInt)
       }
       return nil
     case 136:
-      return BmAttributeId.fromList(self.readValue() as! [Any?])
+      let enumResultAsInt: Int? = nilOrValue(self.readValue() as! Int?)
+      if let enumResultAsInt = enumResultAsInt {
+        return BluebirdErrorCode(rawValue: enumResultAsInt)
+      }
+      return nil
     case 137:
-      return BmServiceRef.fromList(self.readValue() as! [Any?])
+      return BmAttributeId.fromList(self.readValue() as! [Any?])
     case 138:
-      return BmCharacteristicRef.fromList(self.readValue() as! [Any?])
+      return BmServiceRef.fromList(self.readValue() as! [Any?])
     case 139:
-      return BmDescriptorRef.fromList(self.readValue() as! [Any?])
+      return BmCharacteristicRef.fromList(self.readValue() as! [Any?])
     case 140:
-      return BmMsdFilter.fromList(self.readValue() as! [Any?])
+      return BmDescriptorRef.fromList(self.readValue() as! [Any?])
     case 141:
-      return BmServiceDataFilter.fromList(self.readValue() as! [Any?])
+      return BmMsdFilter.fromList(self.readValue() as! [Any?])
     case 142:
-      return BmScanSettings.fromList(self.readValue() as! [Any?])
+      return BmServiceDataFilter.fromList(self.readValue() as! [Any?])
     case 143:
-      return BmScanAdvertisement.fromList(self.readValue() as! [Any?])
+      return BmScanSettings.fromList(self.readValue() as! [Any?])
     case 144:
-      return BmBluetoothDevice.fromList(self.readValue() as! [Any?])
+      return BmScanAdvertisement.fromList(self.readValue() as! [Any?])
     case 145:
-      return BmBluetoothService.fromList(self.readValue() as! [Any?])
+      return BmBluetoothDevice.fromList(self.readValue() as! [Any?])
     case 146:
-      return BmBluetoothCharacteristic.fromList(self.readValue() as! [Any?])
+      return BmBluetoothService.fromList(self.readValue() as! [Any?])
     case 147:
-      return BmBluetoothDescriptor.fromList(self.readValue() as! [Any?])
+      return BmBluetoothCharacteristic.fromList(self.readValue() as! [Any?])
     case 148:
-      return BmCharacteristicProperties.fromList(self.readValue() as! [Any?])
+      return BmBluetoothDescriptor.fromList(self.readValue() as! [Any?])
     case 149:
-      return BmPhySupport.fromList(self.readValue() as! [Any?])
+      return BmCharacteristicProperties.fromList(self.readValue() as! [Any?])
     case 150:
-      return BmAdapterStateEvent.fromList(self.readValue() as! [Any?])
+      return BmPhySupport.fromList(self.readValue() as! [Any?])
     case 151:
-      return BmScanAdvertisementEvent.fromList(self.readValue() as! [Any?])
+      return BmAdapterStateEvent.fromList(self.readValue() as! [Any?])
     case 152:
-      return BmScanFailedEvent.fromList(self.readValue() as! [Any?])
+      return BmScanAdvertisementEvent.fromList(self.readValue() as! [Any?])
     case 153:
-      return BmConnectionStateEvent.fromList(self.readValue() as! [Any?])
+      return BmScanFailedEvent.fromList(self.readValue() as! [Any?])
     case 154:
-      return BmCharacteristicNotificationEvent.fromList(self.readValue() as! [Any?])
+      return BmConnectionStateEvent.fromList(self.readValue() as! [Any?])
     case 155:
-      return BmBondStateEvent.fromList(self.readValue() as! [Any?])
+      return BmCharacteristicNotificationEvent.fromList(self.readValue() as! [Any?])
     case 156:
-      return BmNameChangedEvent.fromList(self.readValue() as! [Any?])
+      return BmBondStateEvent.fromList(self.readValue() as! [Any?])
     case 157:
-      return BmServicesResetEvent.fromList(self.readValue() as! [Any?])
+      return BmNameChangedEvent.fromList(self.readValue() as! [Any?])
     case 158:
-      return BmMtuChangedEvent.fromList(self.readValue() as! [Any?])
+      return BmServicesResetEvent.fromList(self.readValue() as! [Any?])
     case 159:
-      return BmDetachedFromEngineEvent.fromList(self.readValue() as! [Any?])
+      return BmMtuChangedEvent.fromList(self.readValue() as! [Any?])
     case 160:
+      return BmDetachedFromEngineEvent.fromList(self.readValue() as! [Any?])
+    case 161:
       return BmL2capChannelClosedEvent.fromList(self.readValue() as! [Any?])
     default:
       return super.readValue(ofType: type)
@@ -1569,98 +1592,101 @@ private class MessagesPigeonCodecWriter: FlutterStandardWriter {
     if let value = value as? BluetoothAdapterState {
       super.writeByte(129)
       super.writeValue(value.rawValue)
-    } else if let value = value as? BluetoothConnectionState {
+    } else if let value = value as? BluetoothPermission {
       super.writeByte(130)
       super.writeValue(value.rawValue)
-    } else if let value = value as? BmWriteType {
+    } else if let value = value as? BluetoothConnectionState {
       super.writeByte(131)
       super.writeValue(value.rawValue)
-    } else if let value = value as? ConnectionPriority {
+    } else if let value = value as? BmWriteType {
       super.writeByte(132)
       super.writeValue(value.rawValue)
-    } else if let value = value as? BluetoothBondState {
+    } else if let value = value as? ConnectionPriority {
       super.writeByte(133)
       super.writeValue(value.rawValue)
-    } else if let value = value as? LogLevel {
+    } else if let value = value as? BluetoothBondState {
       super.writeByte(134)
       super.writeValue(value.rawValue)
-    } else if let value = value as? BluebirdErrorCode {
+    } else if let value = value as? LogLevel {
       super.writeByte(135)
       super.writeValue(value.rawValue)
-    } else if let value = value as? BmAttributeId {
+    } else if let value = value as? BluebirdErrorCode {
       super.writeByte(136)
-      super.writeValue(value.toList())
-    } else if let value = value as? BmServiceRef {
+      super.writeValue(value.rawValue)
+    } else if let value = value as? BmAttributeId {
       super.writeByte(137)
       super.writeValue(value.toList())
-    } else if let value = value as? BmCharacteristicRef {
+    } else if let value = value as? BmServiceRef {
       super.writeByte(138)
       super.writeValue(value.toList())
-    } else if let value = value as? BmDescriptorRef {
+    } else if let value = value as? BmCharacteristicRef {
       super.writeByte(139)
       super.writeValue(value.toList())
-    } else if let value = value as? BmMsdFilter {
+    } else if let value = value as? BmDescriptorRef {
       super.writeByte(140)
       super.writeValue(value.toList())
-    } else if let value = value as? BmServiceDataFilter {
+    } else if let value = value as? BmMsdFilter {
       super.writeByte(141)
       super.writeValue(value.toList())
-    } else if let value = value as? BmScanSettings {
+    } else if let value = value as? BmServiceDataFilter {
       super.writeByte(142)
       super.writeValue(value.toList())
-    } else if let value = value as? BmScanAdvertisement {
+    } else if let value = value as? BmScanSettings {
       super.writeByte(143)
       super.writeValue(value.toList())
-    } else if let value = value as? BmBluetoothDevice {
+    } else if let value = value as? BmScanAdvertisement {
       super.writeByte(144)
       super.writeValue(value.toList())
-    } else if let value = value as? BmBluetoothService {
+    } else if let value = value as? BmBluetoothDevice {
       super.writeByte(145)
       super.writeValue(value.toList())
-    } else if let value = value as? BmBluetoothCharacteristic {
+    } else if let value = value as? BmBluetoothService {
       super.writeByte(146)
       super.writeValue(value.toList())
-    } else if let value = value as? BmBluetoothDescriptor {
+    } else if let value = value as? BmBluetoothCharacteristic {
       super.writeByte(147)
       super.writeValue(value.toList())
-    } else if let value = value as? BmCharacteristicProperties {
+    } else if let value = value as? BmBluetoothDescriptor {
       super.writeByte(148)
       super.writeValue(value.toList())
-    } else if let value = value as? BmPhySupport {
+    } else if let value = value as? BmCharacteristicProperties {
       super.writeByte(149)
       super.writeValue(value.toList())
-    } else if let value = value as? BmAdapterStateEvent {
+    } else if let value = value as? BmPhySupport {
       super.writeByte(150)
       super.writeValue(value.toList())
-    } else if let value = value as? BmScanAdvertisementEvent {
+    } else if let value = value as? BmAdapterStateEvent {
       super.writeByte(151)
       super.writeValue(value.toList())
-    } else if let value = value as? BmScanFailedEvent {
+    } else if let value = value as? BmScanAdvertisementEvent {
       super.writeByte(152)
       super.writeValue(value.toList())
-    } else if let value = value as? BmConnectionStateEvent {
+    } else if let value = value as? BmScanFailedEvent {
       super.writeByte(153)
       super.writeValue(value.toList())
-    } else if let value = value as? BmCharacteristicNotificationEvent {
+    } else if let value = value as? BmConnectionStateEvent {
       super.writeByte(154)
       super.writeValue(value.toList())
-    } else if let value = value as? BmBondStateEvent {
+    } else if let value = value as? BmCharacteristicNotificationEvent {
       super.writeByte(155)
       super.writeValue(value.toList())
-    } else if let value = value as? BmNameChangedEvent {
+    } else if let value = value as? BmBondStateEvent {
       super.writeByte(156)
       super.writeValue(value.toList())
-    } else if let value = value as? BmServicesResetEvent {
+    } else if let value = value as? BmNameChangedEvent {
       super.writeByte(157)
       super.writeValue(value.toList())
-    } else if let value = value as? BmMtuChangedEvent {
+    } else if let value = value as? BmServicesResetEvent {
       super.writeByte(158)
       super.writeValue(value.toList())
-    } else if let value = value as? BmDetachedFromEngineEvent {
+    } else if let value = value as? BmMtuChangedEvent {
       super.writeByte(159)
       super.writeValue(value.toList())
-    } else if let value = value as? BmL2capChannelClosedEvent {
+    } else if let value = value as? BmDetachedFromEngineEvent {
       super.writeByte(160)
+      super.writeValue(value.toList())
+    } else if let value = value as? BmL2capChannelClosedEvent {
+      super.writeByte(161)
       super.writeValue(value.toList())
     } else {
       super.writeValue(value)
@@ -1761,6 +1787,15 @@ protocol BluebirdHostApi {
   /// @async: may need to request runtime permissions before answering.
   func getAdapterName(completion: @escaping (Result<String, Error>) -> Void)
   func getAdapterState() throws -> BluetoothAdapterState
+  /// Whether the app is allowed to use Bluetooth. Android reads its runtime permissions;
+  /// Darwin reads `CBManager.authorization`, which needs no central manager and so raises
+  /// no prompt. Web has no app-level permission to check and reports granted.
+  func getPermission() throws -> BluetoothPermission
+  /// Android: whether scanning's location requirement is met — the system location toggle
+  /// on API 30 and below, where a scan with it off returns nothing at all and says
+  /// nothing about why. True from API 31 up, where `neverForLocation` retires the
+  /// requirement, and true on every other platform, which never had it.
+  func getLocationEnabled() throws -> Bool
   /// Android: shows the enable-bluetooth dialog; completes with user consent.
   func turnOn(completion: @escaping (Result<Bool, Error>) -> Void)
   func turnOff(completion: @escaping (Result<Bool, Error>) -> Void)
@@ -1896,6 +1931,39 @@ class BluebirdHostApiSetup {
       }
     } else {
       getAdapterStateChannel.setMessageHandler(nil)
+    }
+    /// Whether the app is allowed to use Bluetooth. Android reads its runtime permissions;
+    /// Darwin reads `CBManager.authorization`, which needs no central manager and so raises
+    /// no prompt. Web has no app-level permission to check and reports granted.
+    let getPermissionChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.bluebird.BluebirdHostApi.getPermission\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      getPermissionChannel.setMessageHandler { _, reply in
+        do {
+          let result = try api.getPermission()
+          reply(wrapResult(result))
+        } catch {
+          reply(wrapError(error))
+        }
+      }
+    } else {
+      getPermissionChannel.setMessageHandler(nil)
+    }
+    /// Android: whether scanning's location requirement is met — the system location toggle
+    /// on API 30 and below, where a scan with it off returns nothing at all and says
+    /// nothing about why. True from API 31 up, where `neverForLocation` retires the
+    /// requirement, and true on every other platform, which never had it.
+    let getLocationEnabledChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.bluebird.BluebirdHostApi.getLocationEnabled\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      getLocationEnabledChannel.setMessageHandler { _, reply in
+        do {
+          let result = try api.getLocationEnabled()
+          reply(wrapResult(result))
+        } catch {
+          reply(wrapError(error))
+        }
+      }
+    } else {
+      getLocationEnabledChannel.setMessageHandler(nil)
     }
     /// Android: shows the enable-bluetooth dialog; completes with user consent.
     let turnOnChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.bluebird.BluebirdHostApi.turnOn\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)

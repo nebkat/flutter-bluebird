@@ -20,6 +20,16 @@ class Permissions {
     private val operations = HashMap<Int, (granted: Boolean, permission: String?) -> Unit>()
     private var lastEventId = 1452
 
+    /** Permissions this process has actually put to the user. */
+    private val requested = HashSet<String>()
+
+    /**
+     * Whether [permission] has been requested since the process started. Android cannot
+     * otherwise distinguish "never asked" from "don't ask again" — both report no
+     * rationale — so having asked and still not been granted means the latter.
+     */
+    fun hasRequested(permission: String): Boolean = requested.contains(permission)
+
     /**
      * Ensures that all [permissions] are granted, requesting any missing ones,
      * then invokes [operation] with the overall result. If a permission was
@@ -57,6 +67,7 @@ class Permissions {
         // Store the operation with the current request code
         operations[lastEventId] = operation
 
+        requested.addAll(permissionsNeeded)
         ActivityCompat.requestPermissions(activity, permissionsNeeded.toTypedArray(), lastEventId)
 
         lastEventId++

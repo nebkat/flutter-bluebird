@@ -1,3 +1,7 @@
+## Unreleased
+
+- Added `getPermission` and `getLocationEnabled` to the host API, with a `BluetoothPermission` enum. `getLocationEnabled` defaults to true, since only Android ever gated scanning on the location toggle.
+
 ## 0.4.0
 
 - Added the L2CAP channel protocol: `openL2capChannel` / `closeL2capChannel` host methods, the `BmL2capChannelClosedEvent`, and the shared `bluebird/l2cap` binary data channel exposed as `l2capInput` / `l2capWrite` / `l2capDetach`.

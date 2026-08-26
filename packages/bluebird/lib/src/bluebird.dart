@@ -148,6 +148,28 @@ class Bluebird {
     changes: () => extractEventStream<OnAdapterStateChangedEvent>().map((e) => e.adapterState),
   );
 
+  /// Whether the app is allowed to use Bluetooth, separately from whether the radio is
+  /// on. The two are independent on Android — the radio can be on with the permission
+  /// refused, and the other way round — so neither answers for the other.
+  ///
+  /// Read on demand rather than streamed: nothing on Android broadcasts a permission
+  /// change, so re-read it when the app comes back to the foreground.
+  ///
+  /// Darwin also folds this into [adapterState] as `unauthorized`, because
+  /// `CBManagerState` does; Android's adapter state covers the radio alone. This is the
+  /// reading that means the same thing everywhere.
+  static Future<BluetoothPermission> get permission async => await invoke("getPermission", (p) => p.getPermission());
+
+  /// Whether scanning's location requirement is met (Android 11 and below).
+  ///
+  /// Those versions treat a BLE scan as a way to derive position, so they gate it on the
+  /// system location toggle as well as the location permission — with it off, a scan
+  /// returns nothing at all and reports no error. Android 12 retires the requirement for
+  /// an app that declares `neverForLocation`, and no other platform ever had it, so this
+  /// is true everywhere else.
+  static Future<bool> get androidLocationEnabled async =>
+      await invoke("getLocationEnabled", (p) => p.getLocationEnabled());
+
   /// Completes once the adapter is on; returns immediately if it already is.
   ///
   /// Fails fast on a terminal state that will never reach `on`, so it can't

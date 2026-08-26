@@ -20,6 +20,18 @@ import 'package:pigeon/pigeon.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 enum BluetoothAdapterState { unknown, unavailable, unauthorized, turningOn, on, turningOff, off }
 
+/// Whether the app may use Bluetooth at all, separately from whether the radio is on.
+///
+/// Kept apart from [BluetoothAdapterState] because on Android the two are independent —
+/// the radio can be on with the permission refused, and the other way round. Darwin fuses
+/// them into `CBManagerState`, so there it is reported in both places.
+///
+/// [denied] means the user refused and can be asked again; [permanentlyDenied] means only
+/// the settings app can change it. Android tells these apart by whether it will still show
+/// the dialog; Darwin only ever reports [permanentlyDenied], because iOS prompts once and
+/// never again.
+enum BluetoothPermission { notDetermined, denied, permanentlyDenied, granted }
+
 // `connecting` and `disconnecting` are synthesized on the Dart side (around
 // device.connect()/disconnect()); the natives only ever emit `connected` /
 // `disconnected`. Appended (not reordered) so the existing wire indices for
@@ -319,6 +331,17 @@ abstract class BluebirdHostApi {
   @async
   String getAdapterName();
   BluetoothAdapterState getAdapterState();
+
+  /// Whether the app is allowed to use Bluetooth. Android reads its runtime permissions;
+  /// Darwin reads `CBManager.authorization`, which needs no central manager and so raises
+  /// no prompt. Web has no app-level permission to check and reports granted.
+  BluetoothPermission getPermission();
+
+  /// Android: whether scanning's location requirement is met — the system location toggle
+  /// on API 30 and below, where a scan with it off returns nothing at all and says
+  /// nothing about why. True from API 31 up, where `neverForLocation` retires the
+  /// requirement, and true on every other platform, which never had it.
+  bool getLocationEnabled();
 
   /// Android: shows the enable-bluetooth dialog; completes with user consent.
   @async

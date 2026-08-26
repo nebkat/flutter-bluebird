@@ -108,6 +108,11 @@ final class BluebirdWeb extends BluebirdPlatform {
   Future<BluetoothAdapterState> getAdapterState() async =>
       (await isSupported()) ? BluetoothAdapterState.on : BluetoothAdapterState.unavailable;
 
+  /// The browser has no app-level Bluetooth permission to grant or refuse: access is
+  /// given per device, by the user picking one in the chooser.
+  @override
+  Future<BluetoothPermission> getPermission() async => BluetoothPermission.granted;
+
   @override
   Future<void> startScan(BmScanSettings settings) async {
     final filters = <BluetoothLEScanFilterInit>[

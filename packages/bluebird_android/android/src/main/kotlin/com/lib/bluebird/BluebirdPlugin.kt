@@ -21,10 +21,15 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.util.Log
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -277,6 +282,21 @@ class BluebirdPlugin :
         }
     }
 
+    /** What scanning needs here. [usesFineLocation] mirrors `BmScanSettings`. */
+    private fun scanPermissions(usesFineLocation: Boolean = false): List<String> = buildList {
+        if (Build.VERSION.SDK_INT >= 31) { // Android 12 (October 2021)
+            add(Manifest.permission.BLUETOOTH_SCAN)
+            if (usesFineLocation) {
+                add(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
+            // it is unclear why this is needed, but some phones throw a
+            // SecurityException AdapterService getRemoteName, without it
+            add(Manifest.permission.BLUETOOTH_CONNECT)
+        } else { // Android 11 (September 2020) and below
+            add(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+
     private fun connectPermissions(): List<String> =
         if (Build.VERSION.SDK_INT >= 31) { // Android 12 (October 2021)
             listOf(Manifest.permission.BLUETOOTH_CONNECT)
@@ -516,6 +536,56 @@ class BluebirdPlugin :
         return Proto.bmAdapterStateEnum(state)
     }
 
+    override fun getPermission(): BluetoothPermission {
+        val ctx = context ?: return BluetoothPermission.NOT_DETERMINED
+
+        val missing = scanPermissions().filter {
+            ContextCompat.checkSelfPermission(ctx, it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (missing.isEmpty()) {
+            return BluetoothPermission.GRANTED
+        }
+
+        // A rationale is offered only once the user has refused at least once and the
+        // dialog would still be shown, so it is the one unambiguous "denied, ask again".
+        val activity = activityBinding?.activity
+        if (activity != null && missing.any { ActivityCompat.shouldShowRequestPermissionRationale(activity, it) }) {
+            return BluetoothPermission.DENIED
+        }
+
+        // Never asked and don't-ask-again look identical from here. Having asked in this
+        // process settles it; otherwise the next request answers instantly, without a
+        // dialog, and settles it then.
+        return if (missing.any { permissions.hasRequested(it) }) {
+            BluetoothPermission.PERMANENTLY_DENIED
+        } else {
+            BluetoothPermission.NOT_DETERMINED
+        }
+    }
+
+    override fun getLocationEnabled(): Boolean {
+        // From Android 12 the neverForLocation flag on BLUETOOTH_SCAN retires the
+        // requirement; below it, a scan with the toggle off returns nothing and says
+        // nothing about why.
+        if (Build.VERSION.SDK_INT >= 31) { // Android 12 (October 2021)
+            return true
+        }
+
+        val ctx = context ?: return true
+        val manager = ctx.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return true
+
+        return if (Build.VERSION.SDK_INT >= 28) { // Android 9 (August 2018)
+            manager.isLocationEnabled
+        } else {
+            @Suppress("DEPRECATION")
+            Settings.Secure.getInt(
+                ctx.contentResolver,
+                Settings.Secure.LOCATION_MODE,
+                Settings.Secure.LOCATION_MODE_OFF,
+            ) != Settings.Secure.LOCATION_MODE_OFF
+        }
+    }
+
     override fun turnOn(callback: (Result<Boolean>) -> Unit) = launch("turnOn", callback) {
         val a = requireAdapter()
         requirePermissions(connectPermissions()) { perm -> "Permission $perm required to turn Bluetooth on" }
@@ -554,19 +624,7 @@ class BluebirdPlugin :
     override fun startScan(settings: BmScanSettings, callback: (Result<Unit>) -> Unit) = launch("startScan", callback) {
         val a = requireAdapter()
 
-        val perms = buildList {
-            if (Build.VERSION.SDK_INT >= 31) { // Android 12 (October 2021)
-                add(Manifest.permission.BLUETOOTH_SCAN)
-                if (settings.androidUsesFineLocation) {
-                    add(Manifest.permission.ACCESS_FINE_LOCATION)
-                }
-                // it is unclear why this is needed, but some phones throw a
-                // SecurityException AdapterService getRemoteName, without it
-                add(Manifest.permission.BLUETOOTH_CONNECT)
-            } else { // Android 11 (September 2020) and below
-                add(Manifest.permission.ACCESS_FINE_LOCATION)
-            }
-        }
+        val perms = scanPermissions(settings.androidUsesFineLocation)
 
         requirePermissions(perms) { perm -> "Permission $perm required to scan devices" }
 

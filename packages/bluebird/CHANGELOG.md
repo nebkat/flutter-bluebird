@@ -1,3 +1,8 @@
+## Unreleased
+
+- Added `Bluebird.permission`, reporting whether the app may use Bluetooth at all — `granted`, `denied` (refused, and the OS will still ask again), `permanentlyDenied` (only the settings app can change it) or `notDetermined`. Permission and radio power are independent on Android, so neither answered for the other and there was no way to ask about the first. Darwin reads `CBManager.authorization`, which raises no prompt of its own; Web has no app-level permission and reports `granted`. Read it on demand — nothing broadcasts a permission change — and re-read it when the app returns to the foreground.
+- Added `Bluebird.androidLocationEnabled`. Android 11 and below treat a BLE scan as a way to derive position and gate it on the system location toggle as well as the location permission; with the toggle off a scan returns nothing at all and reports no error. True from Android 12, where `neverForLocation` retires the requirement, and true on every other platform. Requires `bluebird_android` from this release.
+
 ## 0.4.4
 
 - Fixed a scan refused by the platform hanging forever instead of failing. When `startScan` was rejected — the adapter off, the permission denied — the internal advertisement controller was closed without ever having been listened to, so `close()` never completed: no error reached the caller, the stream never ended, `isScanning` stayed `true`, and every later scan was wedged behind `operationInProgress` for the life of the process.

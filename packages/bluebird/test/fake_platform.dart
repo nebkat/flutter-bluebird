@@ -10,6 +10,8 @@ final class FakePlatform extends BluebirdPlatform {
   final _events = StreamController<BmEvent>.broadcast();
 
   BluetoothAdapterState adapterState = BluetoothAdapterState.on;
+  BluetoothPermission permission = BluetoothPermission.granted;
+  bool locationEnabled = true;
   bool supported = true;
   List<BmBluetoothService> services = const [];
 
@@ -46,6 +48,12 @@ final class FakePlatform extends BluebirdPlatform {
 
   @override
   Future<BluetoothAdapterState> getAdapterState() => _run('getAdapterState', adapterState);
+
+  @override
+  Future<BluetoothPermission> getPermission() => _run('getPermission', permission);
+
+  @override
+  Future<bool> getLocationEnabled() => _run('getLocationEnabled', locationEnabled);
 
   @override
   Future<void> startScan(BmScanSettings settings) => _run('startScan', null);
