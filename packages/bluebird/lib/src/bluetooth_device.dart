@@ -21,6 +21,9 @@ import 'utils.dart';
 
 const int _mtuMax = 517;
 
+/// How long to wait for the cancellation of a connection attempt that timed out.
+const Duration _cancelTimeout = Duration(seconds: 15);
+
 class BluetoothDevice implements BluebirdLoggable {
   final String remoteId;
 
@@ -142,10 +145,16 @@ class BluetoothDevice implements BluebirdLoggable {
     // make sure no one else is calling disconnect
     await Mutex.disconnect.take();
     bool disconnectReturned = false;
+    void giveDisconnect() {
+      if (disconnectReturned) return;
+      disconnectReturned = true;
+      Mutex.disconnect.give();
+    }
 
     // enter the `connecting` state up front (the platforms don't report it)
     _emitConnectionState(BluetoothConnectionState.connecting);
 
+    var timedOut = false;
     try {
       await Mutex.global.protect(() async {
         // record connection time
@@ -161,8 +170,7 @@ class BluetoothDevice implements BluebirdLoggable {
 
           // we return the disconnect mutex now so that this
           // connection attempt can be canceled by calling disconnect
-          Mutex.disconnect.give();
-          disconnectReturned = true;
+          giveDisconnect();
 
           await future;
 
@@ -171,13 +179,29 @@ class BluetoothDevice implements BluebirdLoggable {
           // travels on a separate channel and may be processed after we return
           _connectionState = BluetoothConnectionState.connected;
         } on BluebirdException catch (e) {
-          if (e.code == BluebirdErrorCode.timeout) {
-            await Bluebird.invoke("disconnect", (p) => p.disconnect(remoteId));
-          }
+          // note the timeout, but cancel outside this mutex — see below
+          timedOut = e.code == BluebirdErrorCode.timeout;
           rethrow;
         }
       });
     } catch (_) {
+      // a timed-out connect is still in flight on the platform, so cancel it —
+      // outside `Mutex.global` and jumping the platform queue, because it is
+      // canceling the very call that may still be occupying both. Bounded, and
+      // its own failure must not mask the connect error we are propagating.
+      if (timedOut) {
+        try {
+          await Bluebird.invoke(
+            "disconnect",
+            (p) => p.disconnect(remoteId),
+            timeout: _cancelTimeout,
+            bypassQueue: true,
+          );
+        } catch (e) {
+          logger.warning("connect: failed to cancel the timed-out attempt: $e");
+        }
+      }
+
       // connect failed: the synthesized `connecting` never resolves on its own.
       // Android/darwin also emit a native disconnected event, but web does not —
       // so revert here (skipped if a native event already moved us on).
@@ -185,9 +209,9 @@ class BluetoothDevice implements BluebirdLoggable {
         _emitConnectionState(BluetoothConnectionState.disconnected);
       }
       rethrow;
+    } finally {
+      giveDisconnect();
     }
-
-    if (!disconnectReturned) Mutex.disconnect.give();
 
     // request larger mtu
     if (System.isAndroid && isConnected && mtu != null) {
@@ -222,8 +246,16 @@ class BluetoothDevice implements BluebirdLoggable {
         // Workaround Android race condition
         await _ensureAndroidDisconnectionDelay(androidDelay);
 
-        // invoke
-        await Bluebird.invoke("disconnect", (p) => p.disconnect(remoteId), ensureAdapterIsOn: true, timeout: timeout);
+        // invoke; an unqueued disconnect also jumps the platform queue, or it
+        // could not reach the platform at all while the connect it is meant to
+        // cancel is still in flight
+        await Bluebird.invoke(
+          "disconnect",
+          (p) => p.disconnect(remoteId),
+          ensureAdapterIsOn: true,
+          timeout: timeout,
+          bypassQueue: !queue,
+        );
 
         if (System.isAndroid) {
           // Disconnected, remove connect timestamp
