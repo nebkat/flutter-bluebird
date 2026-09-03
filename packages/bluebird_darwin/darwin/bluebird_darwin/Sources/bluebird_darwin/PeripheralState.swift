@@ -60,6 +60,12 @@ final class PeripheralState {
   var pendingDisconnect: CheckedContinuation<Void, Error>?
   var pendingGatt: PendingGatt?
 
+  /// Watchdog for `pendingConnect`. CoreBluetooth's `connect` has no timeout of
+  /// its own — it waits for the peripheral indefinitely — so nothing else ever
+  /// resumes the connect slot of a device that is powered off or out of range.
+  /// Cleared with the slot by `takeConnect`, whichever of the two fires first.
+  var connectWatchdog: Timer?
+
   /// A write-without-response blocked on CoreBluetooth's flow control
   /// (`canSendWriteWithoutResponse` is false), waiting to be resumed by
   /// `peripheralIsReady(toSendWriteWithoutResponse:)`. Unacknowledged writes
@@ -87,9 +93,14 @@ final class PeripheralState {
     return pending
   }
 
-  /// Removes and returns the pending connect continuation, if any.
+  /// Removes and returns the pending connect continuation, if any, and stands
+  /// its watchdog down.
   func takeConnect() -> CheckedContinuation<Void, Error>? {
-    defer { pendingConnect = nil }
+    defer {
+      pendingConnect = nil
+      connectWatchdog?.invalidate()
+      connectWatchdog = nil
+    }
     return pendingConnect
   }
 

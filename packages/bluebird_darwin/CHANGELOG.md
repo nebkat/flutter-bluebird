@@ -1,5 +1,6 @@
 ## Unreleased
 
+- Added a watchdog to `connect`. CoreBluetooth never gives up on a connection attempt of its own accord, so a peripheral that is powered off or out of range left the call outstanding forever — and the device stuck in `connecting` with its slot occupied, which failed every later attempt with `operationInProgress`. An attempt nothing else cancels is now abandoned after 60s: the connection is canceled, the peripheral's state is torn down, and the call fails with `timeout`. It sits above the 35s default `BluetoothDevice.connect` applies, so it only ever acts as a backstop.
 - Implemented `getPermission` from the static `CBManager.authorization`, which needs no central manager and so raises no permission prompt as a side effect. `denied` and `restricted` both report as `permanentlyDenied`: iOS asks once and never again.
 
 ## 0.4.4
