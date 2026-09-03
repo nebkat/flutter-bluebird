@@ -607,29 +607,46 @@ class Bluebird {
   /// Runs one platform call with the standard guard pipeline, stating the
   /// operation [name] once. Device-scoped calls go through
   /// [BluetoothDevice.invoke], which adds the connection guards.
+  ///   - [bypassQueue] runs the call without taking the platform queue, so it
+  ///     reaches the platform while another call is still in flight. Only for
+  ///     cancellation (`disconnect`), which must be able to cut short the very
+  ///     call that is holding the queue.
   @internal
   static Future<T> invoke<T>(
     String name,
     Future<T> Function(BluebirdPlatform p) call, {
     Duration? timeout,
     bool ensureAdapterIsOn = false,
+    bool bypassQueue = false,
   }) {
-    // Only allow 1 invocation at a time (guarantees that hot restart finishes)
-    var future = Mutex.platform.protect(() async {
+    Future<T> run() {
       _initBluebird();
-      try {
-        return await call(BluebirdPlatform.instance);
-      } on PlatformException catch (e) {
-        final code = _errorCodes[e.code] ?? BluebirdErrorCode.platform;
-        if (code == BluebirdErrorCode.attError && e.details is int) {
-          throw BluetoothAttException(e.code, e.details as int, e.message);
-        }
-        throw BluebirdException(e.code, code, e.message, e.details);
+      var future = _call(call);
+      if (ensureAdapterIsOn) future = future.bluebirdEnsureAdapterIsOn(name);
+      if (timeout != null) future = future.bluebirdTimeout(timeout, name);
+      return future;
+    }
+
+    // Only allow 1 invocation at a time (guarantees that hot restart finishes).
+    // The guards run *inside* the queue: giving up on a call — its timeout, or
+    // the adapter going away — has to release it. Guarding from the outside
+    // instead left the abandoned call holding the queue for as long as the
+    // platform stayed stuck, wedging every later invocation for the life of
+    // the process.
+    return bypassQueue ? run() : Mutex.platform.protect(run);
+  }
+
+  /// The raw platform call, with its [PlatformException]s translated.
+  static Future<T> _call<T>(Future<T> Function(BluebirdPlatform p) call) async {
+    try {
+      return await call(BluebirdPlatform.instance);
+    } on PlatformException catch (e) {
+      final code = _errorCodes[e.code] ?? BluebirdErrorCode.platform;
+      if (code == BluebirdErrorCode.attError && e.details is int) {
+        throw BluetoothAttException(e.code, e.details as int, e.message);
       }
-    });
-    if (ensureAdapterIsOn) future = future.bluebirdEnsureAdapterIsOn(name);
-    if (timeout != null) future = future.bluebirdTimeout(timeout, name);
-    return future;
+      throw BluebirdException(e.code, code, e.message, e.details);
+    }
   }
 
   /// Wire-string -> [BluebirdErrorCode] lookup, built from the shared pigeon enum.

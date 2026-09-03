@@ -53,6 +53,21 @@ public class BluebirdPlugin: NSObject, FlutterPlugin {
   /// random error code defined by bluebird for adapter-off
   /// disconnections
   static let adapterOffDisconnectCode: Int64 = 1573878
+  /// random error code defined by bluebird for a connection attempt
+  /// abandoned by the connect watchdog
+  static let connectTimeoutErrorCode: Int64 = 8291447
+
+  /// How long a connection attempt may stay outstanding before the plugin
+  /// abandons it. CoreBluetooth never gives up on a `connect` of its own
+  /// accord, so without this the pigeon call for a peripheral that is powered
+  /// off or out of range never completes at all.
+  ///
+  /// This is a backstop, not the user-facing bound: `BluetoothDevice.connect`
+  /// applies its own timeout (35s by default) and cancels the attempt when it
+  /// fires. This sits above that so it never preempts one — it exists so that
+  /// an attempt nothing cancels still ends, with the peripheral's state torn
+  /// back down rather than left `connecting` and unretryable.
+  static let connectWatchdogTimeout: TimeInterval = 60
 
   public static func register(with registrar: FlutterPluginRegistrar) {
     #if os(macOS)
@@ -230,6 +245,11 @@ public class BluebirdPlugin: NSObject, FlutterPlugin {
         return
       }
       state.pendingConnect = continuation
+      state.connectWatchdog = Timer.scheduledTimer(
+        withTimeInterval: Self.connectWatchdogTimeout, repeats: false
+      ) { [weak self] _ in
+        self?.connectWatchdogFired(state)
+      }
 
       do {
         try start()
@@ -237,6 +257,34 @@ public class BluebirdPlugin: NSObject, FlutterPlugin {
         state.takeConnect()?.resume(throwing: error)
       }
     }
+  }
+
+  /// The connect watchdog fired: abandon the attempt the way an explicit
+  /// `disconnect` would, so the slot, the peripheral entry and the pigeon call
+  /// are all released and the device can be tried again.
+  private func connectWatchdogFired(_ state: PeripheralState) {
+    guard state.pendingConnect != nil else { return }
+
+    let address = state.peripheral.identifier.uuidString
+    log(.error, "connect: giving up after \(Int(Self.connectWatchdogTimeout))s (\(address))")
+
+    if peripherals[address] === state, state.connection == .connecting {
+      peripherals.removeValue(forKey: address)
+    }
+    centralManager?.cancelPeripheralConnection(state.peripheral)
+
+    // canceling a pending connection does not reliably invoke
+    // didDisconnectPeripheral, so complete everything here
+    state.takeConnect()?.resume(
+      throwing: PigeonError(
+        code: BluebirdErrorCode.timeout.wire, message: "connection timed out", details: nil))
+
+    sink?.success(
+      BmConnectionStateEvent(
+        address: address,
+        connectionState: .disconnected,
+        disconnectReasonCode: Self.connectTimeoutErrorCode,
+        disconnectReasonString: "connection timed out"))
   }
 
   /// Occupies the device's disconnect slot, runs `start`, then suspends until
