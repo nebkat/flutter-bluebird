@@ -22,10 +22,12 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.util.Log
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
@@ -212,6 +214,20 @@ class BluebirdPlugin :
         if (state == lastAdapterState) return
         lastAdapterState = state
         emitEvent(BmAdapterStateEvent(state))
+    }
+
+    /** Whether scanning's location requirement is met; only Android 11 and below have one. */
+    private fun isLocationEnabled(): Boolean {
+        if (Build.VERSION.SDK_INT >= 31) return true // Android 12 (October 2021)
+        val ctx = context ?: return true
+        val manager = ctx.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return true
+        return if (Build.VERSION.SDK_INT >= 28) { // Android 9 (August 2018)
+            manager.isLocationEnabled
+        } else {
+            @Suppress("DEPRECATION")
+            Settings.Secure.getInt(ctx.contentResolver, Settings.Secure.LOCATION_MODE, Settings.Secure.LOCATION_MODE_OFF) !=
+                Settings.Secure.LOCATION_MODE_OFF
+        }
     }
 
     /** What scanning needs here. [usesFineLocation] mirrors `BmScanSettings`. */
@@ -613,6 +629,11 @@ class BluebirdPlugin :
 
         // check adapter
         requireAdapterOn()
+
+        // with the toggle off a scan would return nothing and never say why
+        check(isLocationEnabled(), BluebirdErrorCode.LOCATION_DISABLED) {
+            "location services must be on to scan on Android 11 and below"
+        }
 
         // get scanner
         val leScanner = a.bluetoothLeScanner

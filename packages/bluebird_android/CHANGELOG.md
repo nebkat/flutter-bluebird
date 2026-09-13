@@ -1,6 +1,7 @@
 ## Unreleased
 
 - `getAdapterState` and the adapter-state events overlay the scan permission: a radio that is on with the permission refused reads `unauthorized`, re-evaluated on a permission result and on activity resume. Never-asked reads as the radio alone.
+- `startScan` fails with `locationDisabled` when the system location toggle is off on Android 11 and below, where a scan would otherwise return nothing at all.
 
 ## 0.4.3
 

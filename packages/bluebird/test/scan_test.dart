@@ -246,6 +246,12 @@ void main() {
       throwsA(isA<BluebirdException>().having((e) => e.code, 'code', BluebirdErrorCode.adapterOff)),
     );
 
+    fake.stubs['isSupported'] = () => throw PlatformException(code: 'location_disabled');
+    await expectLater(
+      Bluebird.isSupported,
+      throwsA(isA<BluebirdException>().having((e) => e.code, 'code', BluebirdErrorCode.locationDisabled)),
+    );
+
     fake.stubs['isSupported'] = () => throw PlatformException(code: 'something_unmapped');
     await expectLater(
       Bluebird.isSupported,

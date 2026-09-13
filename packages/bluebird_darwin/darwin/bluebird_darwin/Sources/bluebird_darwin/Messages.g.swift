@@ -266,6 +266,9 @@ enum BluebirdErrorCode: Int, CaseIterable {
   case operationInProgress = 17
   case permissionDenied = 18
   case invalidArgument = 19
+  /// Android 11 and below gate a BLE scan on the system location toggle; with it off
+  /// a scan would return nothing and say nothing about why, so it fails with this.
+  case locationDisabled = 20
 }
 
 /// The universal uuid:instance pair identifying one attribute.

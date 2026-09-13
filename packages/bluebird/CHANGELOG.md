@@ -1,6 +1,7 @@
 ## Unreleased
 
 - `adapterState` now means the same thing on every platform: `on`, or the most actionable blocker. Android reported the radio alone; it now reads `unauthorized` when the radio is on and the scan permission has been refused, as Darwin already did, pushed on refusal and on return to the foreground. A permission never asked for is not a blocker, so nothing prompts before the first scan would have.
+- Added `BluebirdErrorCode.locationDisabled`. Android 11 and below gate a BLE scan on the system location toggle and, with it off, return nothing and say nothing about why; `startScan` now fails with this instead.
 
 ## 0.4.4
 

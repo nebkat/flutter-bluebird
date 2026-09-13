@@ -1,3 +1,7 @@
+## Unreleased
+
+- Added `BluebirdErrorCode.locationDisabled`, for a scan refused because the system location toggle is off (Android 11 and below).
+
 ## 0.4.0
 
 - Added the L2CAP channel protocol: `openL2capChannel` / `closeL2capChannel` host methods, the `BmL2capChannelClosedEvent`, and the shared `bluebird/l2cap` binary data channel exposed as `l2capInput` / `l2capWrite` / `l2capDetach`.

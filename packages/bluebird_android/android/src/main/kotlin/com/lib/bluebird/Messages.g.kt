@@ -317,7 +317,12 @@ enum class BluebirdErrorCode(val raw: Int) {
   UNSUPPORTED(16),
   OPERATION_IN_PROGRESS(17),
   PERMISSION_DENIED(18),
-  INVALID_ARGUMENT(19);
+  INVALID_ARGUMENT(19),
+  /**
+   * Android 11 and below gate a BLE scan on the system location toggle; with it off
+   * a scan would return nothing and say nothing about why, so it fails with this.
+   */
+  LOCATION_DISABLED(20);
 
   companion object {
     fun ofRaw(raw: Int): BluebirdErrorCode? {
