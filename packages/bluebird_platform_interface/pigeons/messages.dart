@@ -76,6 +76,7 @@ enum BluebirdErrorCode {
   operationInProgress,
   permissionDenied,
   invalidArgument,
+
   /// Android 11 and below gate a BLE scan on the system location toggle; with it off
   /// a scan would return nothing and say nothing about why, so it fails with this.
   locationDisabled,
