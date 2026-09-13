@@ -1,3 +1,7 @@
+## Unreleased
+
+- `adapterState` now means the same thing on every platform: `on`, or the most actionable blocker. Android reported the radio alone; it now reads `unauthorized` when the radio is on and the scan permission has been refused, as Darwin already did, pushed on refusal and on return to the foreground. A permission never asked for is not a blocker, so nothing prompts before the first scan would have.
+
 ## 0.4.4
 
 - Fixed a scan refused by the platform hanging forever instead of failing. When `startScan` was rejected — the adapter off, the permission denied — the internal advertisement controller was closed without ever having been listened to, so `close()` never completed: no error reached the caller, the stream never ended, `isScanning` stayed `true`, and every later scan was wedged behind `operationInProgress` for the life of the process.

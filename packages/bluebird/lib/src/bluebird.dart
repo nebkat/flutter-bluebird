@@ -139,8 +139,9 @@ class Bluebird {
     await adapterReady(timeout: timeout);
   }
 
-  /// The state of the Bluetooth adapter, as a stream that also exposes the
-  /// current value via `await Bluebird.adapterState.value`.
+  /// The state of the Bluetooth adapter — `on`, or the most actionable blocker —
+  /// as a stream that also exposes the current value via `await Bluebird.adapterState.value`.
+  ///   - `unauthorized` is a refused permission on every platform; one never asked for is not a blocker.
   ///   - the platform reports adapter state only on demand (events fire on
   ///     *changes*), so the current value is fetched the first time it is needed.
   static final AsyncValueStream<BluetoothAdapterState> adapterState = AsyncValueStream(

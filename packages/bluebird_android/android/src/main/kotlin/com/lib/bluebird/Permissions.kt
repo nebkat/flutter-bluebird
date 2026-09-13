@@ -20,6 +20,16 @@ class Permissions {
     private val operations = HashMap<Int, (granted: Boolean, permission: String?) -> Unit>()
     private var lastEventId = 1452
 
+    /** Permissions this process has put to the user. */
+    private val requested = HashSet<String>()
+
+    /** Missing and known refused: a rationale is on offer, or it was asked for in this process. */
+    fun isRefused(context: Context, activity: Activity?, permission: String): Boolean {
+        if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED) return false
+        if (activity != null && ActivityCompat.shouldShowRequestPermissionRationale(activity, permission)) return true
+        return requested.contains(permission)
+    }
+
     /**
      * Ensures that all [permissions] are granted, requesting any missing ones,
      * then invokes [operation] with the overall result. If a permission was
@@ -57,6 +67,7 @@ class Permissions {
         // Store the operation with the current request code
         operations[lastEventId] = operation
 
+        requested.addAll(permissionsNeeded)
         ActivityCompat.requestPermissions(activity, permissionsNeeded.toTypedArray(), lastEventId)
 
         lastEventId++

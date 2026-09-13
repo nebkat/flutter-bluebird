@@ -9,6 +9,7 @@ package com.lib.bluebird
 
 import android.Manifest
 import android.app.Activity
+import android.app.Application
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
@@ -22,6 +23,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -64,6 +66,9 @@ class BluebirdPlugin :
     private var context: Context? = null
     private var pluginBinding: FlutterPlugin.FlutterPluginBinding? = null
     private var activityBinding: ActivityPluginBinding? = null
+
+    /** The readiness last reported to Dart, so re-evaluations only emit on change. */
+    private var lastAdapterState: BluetoothAdapterState? = null
 
     private var bluetoothManager: BluetoothManager? = null
     private var bluetoothAdapter: BluetoothAdapter? = null
@@ -184,6 +189,57 @@ class BluebirdPlugin :
         if (!isAdapterOn()) {
             throw FlutterError(BluebirdErrorCode.ADAPTER_OFF.wire, "Bluetooth must be turned on", null)
         }
+    }
+
+    /** `on`, or the most actionable blocker: a refused scan permission reads `unauthorized`, as on Darwin. */
+    private fun adapterReadiness(radio: Int = radioState()): BluetoothAdapterState {
+        val state = Proto.bmAdapterStateEnum(radio)
+        if (state != BluetoothAdapterState.ON) return state
+        val ctx = context ?: return state
+        val refused = scanPermissions().any { permissions.isRefused(ctx, activityBinding?.activity, it) }
+        return if (refused) BluetoothAdapterState.UNAUTHORIZED else state
+    }
+
+    private fun radioState(): Int = try {
+        adapter()?.state ?: -1
+    } catch (e: Exception) {
+        -1
+    }
+
+    /** Re-reads readiness after something other than the radio may have changed it. */
+    private fun refreshAdapterState() {
+        val state = adapterReadiness()
+        if (state == lastAdapterState) return
+        lastAdapterState = state
+        emitEvent(BmAdapterStateEvent(state))
+    }
+
+    /** What scanning needs here. [usesFineLocation] mirrors `BmScanSettings`. */
+    private fun scanPermissions(usesFineLocation: Boolean = false): List<String> = buildList {
+        if (Build.VERSION.SDK_INT >= 31) { // Android 12 (October 2021)
+            add(Manifest.permission.BLUETOOTH_SCAN)
+            if (usesFineLocation) {
+                add(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
+            // it is unclear why this is needed, but some phones throw a
+            // SecurityException AdapterService getRemoteName, without it
+            add(Manifest.permission.BLUETOOTH_CONNECT)
+        } else { // Android 11 (September 2020) and below
+            add(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+
+    // a permission changed in the settings app only shows once the app is back
+    private val activityLifecycle = object : Application.ActivityLifecycleCallbacks {
+        override fun onActivityResumed(activity: Activity) {
+            if (activity === activityBinding?.activity) refreshAdapterState()
+        }
+        override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
+        override fun onActivityStarted(activity: Activity) {}
+        override fun onActivityPaused(activity: Activity) {}
+        override fun onActivityStopped(activity: Activity) {}
+        override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
+        override fun onActivityDestroyed(activity: Activity) {}
     }
 
     /** Throws a [FlutterError] with [code] and [message] when [value] is false. */
@@ -409,6 +465,7 @@ class BluebirdPlugin :
         activityBinding = binding
         binding.addRequestPermissionsResultListener(this)
         binding.addActivityResultListener(this)
+        binding.activity.application.registerActivityLifecycleCallbacks(activityLifecycle)
     }
 
     override fun onDetachedFromActivityForConfigChanges() {
@@ -425,6 +482,7 @@ class BluebirdPlugin :
         log(LogLevel.DEBUG, "onDetachedFromActivity")
         activityBinding?.removeRequestPermissionsResultListener(this)
         activityBinding?.removeActivityResultListener(this)
+        activityBinding?.activity?.application?.unregisterActivityLifecycleCallbacks(activityLifecycle)
         activityBinding = null
     }
 
@@ -436,7 +494,9 @@ class BluebirdPlugin :
         permissions: Array<String>,
         grantResults: IntArray,
     ): Boolean {
-        return this.permissions.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        val handled = this.permissions.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (handled) refreshAdapterState()
+        return handled
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
@@ -507,14 +567,7 @@ class BluebirdPlugin :
         } ?: ""
     }
 
-    override fun getAdapterState(): BluetoothAdapterState {
-        val state = try {
-            adapter()?.state ?: -1
-        } catch (e: Exception) {
-            -1
-        }
-        return Proto.bmAdapterStateEnum(state)
-    }
+    override fun getAdapterState(): BluetoothAdapterState = adapterReadiness().also { lastAdapterState = it }
 
     override fun turnOn(callback: (Result<Boolean>) -> Unit) = launch("turnOn", callback) {
         val a = requireAdapter()
@@ -554,19 +607,7 @@ class BluebirdPlugin :
     override fun startScan(settings: BmScanSettings, callback: (Result<Unit>) -> Unit) = launch("startScan", callback) {
         val a = requireAdapter()
 
-        val perms = buildList {
-            if (Build.VERSION.SDK_INT >= 31) { // Android 12 (October 2021)
-                add(Manifest.permission.BLUETOOTH_SCAN)
-                if (settings.androidUsesFineLocation) {
-                    add(Manifest.permission.ACCESS_FINE_LOCATION)
-                }
-                // it is unclear why this is needed, but some phones throw a
-                // SecurityException AdapterService getRemoteName, without it
-                add(Manifest.permission.BLUETOOTH_CONNECT)
-            } else { // Android 11 (September 2020) and below
-                add(Manifest.permission.ACCESS_FINE_LOCATION)
-            }
-        }
+        val perms = scanPermissions(settings.androidUsesFineLocation)
 
         requirePermissions(perms) { perm -> "Permission $perm required to scan devices" }
 
@@ -1080,7 +1121,7 @@ class BluebirdPlugin :
                 scanner.stop(bluetoothAdapter?.bluetoothLeScanner, "Bluetooth Restarted")
             }
 
-            emitEvent(BmAdapterStateEvent(Proto.bmAdapterStateEnum(adapterState)))
+            emitEvent(BmAdapterStateEvent(adapterReadiness(adapterState).also { lastAdapterState = it }))
 
             // disconnect all devices
             if (adapterState == BluetoothAdapter.STATE_TURNING_OFF ||
