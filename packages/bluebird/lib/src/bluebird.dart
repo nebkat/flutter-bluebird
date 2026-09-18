@@ -932,8 +932,15 @@ class _ScanSession {
 
   Future<void> _stop() async {
     _timer?.cancel();
+    // Not awaited: these are subscriptions to the broadcast event stream, and cancelling
+    // one detaches its listener there and then — the future it hands back carries
+    // nothing worth waiting for. Awaiting it wedges this whole teardown under
+    // `flutter_test`'s fake async, where a broadcast subscription's cancel future does
+    // not complete between pumps: `stopScan` would never be reached and the scan guard
+    // never released, leaving every later scan in the test refused as one already
+    // running.
     for (final subscription in _subscriptions) {
-      await subscription.cancel();
+      unawaited(subscription.cancel());
     }
     if (!_claimed) return;
 
