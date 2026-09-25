@@ -1,3 +1,7 @@
+## Unreleased
+
+- (Android) Fixed a manufacturer data scan filter with no `data` matching every advertisement.
+
 ## 0.5.0
 
 - Fixed permission and scan issues. `adapterState` reflects a refused permission.

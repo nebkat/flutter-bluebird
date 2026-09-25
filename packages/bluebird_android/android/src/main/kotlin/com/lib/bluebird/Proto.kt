@@ -297,11 +297,14 @@ object Proto {
 
         // msd
         for (msd in settings.withMsd) {
+            // Android drops the manufacturer id from a filter whose data is null, so it matches every
+            // advertisement. Empty data still requires the id, which is what Darwin does.
+            val data = msd.data ?: ByteArray(0)
             val mask = msd.mask
             add(if (mask == null || mask.isEmpty()) {
-                ScanFilter.Builder().setManufacturerData(msd.manufacturerId.toInt(), msd.data).build()
+                ScanFilter.Builder().setManufacturerData(msd.manufacturerId.toInt(), data).build()
             } else {
-                ScanFilter.Builder().setManufacturerData(msd.manufacturerId.toInt(), msd.data, mask).build()
+                ScanFilter.Builder().setManufacturerData(msd.manufacturerId.toInt(), data, mask).build()
             })
         }
 
