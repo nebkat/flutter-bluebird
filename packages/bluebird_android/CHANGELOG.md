@@ -1,4 +1,4 @@
-## Unreleased
+## 0.5.1
 
 - (Android) Fixed a manufacturer data scan filter with no `data` matching every advertisement.
 

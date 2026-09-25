@@ -1,6 +1,7 @@
-## Unreleased
+## 0.5.1
 
-- Fixed a cancelled scan never finishing its teardown in a widget test. `flutter_test`'s fake async does not complete a broadcast subscription's `cancel()` future between pumps, and the scan's teardown awaited exactly those — so it never reached `stopScan`, never released the one-scan-at-a-time guard, and never delivered the stream's done event. Every later scan in the same test was then refused with `operationInProgress`, which made anything that scans untestable with `testWidgets`. The event-stream subscriptions are no longer awaited: cancelling one detaches its listener there and then, and the future it returns carries nothing worth waiting for.
+- Fixed a cancelled scan never finishing its teardown in a widget test, which refused every later scan in that test.
+- (Android) Fixed a manufacturer data scan filter with no `data` matching every advertisement. Requires `bluebird_android` 0.5.1.
 
 ## 0.5.0
 
