@@ -92,12 +92,14 @@ class DeviceConnection(
     val isConnected: Boolean get() = state == State.CONNECTED
     val isConnecting: Boolean get() = state == State.CONNECTING
 
+    /** Orders this device's GATT operations; see [GattQueue]. */
+    val queue = GattQueue()
+
     // One continuation slot per concurrency class. Android allows only one
     // in-flight GATT op per device (starting a second while one is pending
-    // returns false) and the Dart layer additionally serializes globally,
-    // so a single gatt slot suffices; `kind` is kept so callbacks can be
-    // matched (e.g. an unsolicited onMtuChanged must not resume a pending
-    // read).
+    // returns false) and [queue] admits one at a time, so a single gatt slot
+    // suffices; `kind` is kept so callbacks can be matched (e.g. an
+    // unsolicited onMtuChanged must not resume a pending read).
     //
     // All slots are mutated under the ConnectionRegistry's lock: callbacks
     // arrive on binder threads.
@@ -156,6 +158,13 @@ class ConnectionRegistry {
 
     fun requireConnected(address: String): DeviceConnection =
         connections[address]?.takeIf { it.isConnected } ?: throw notConnected()
+
+    /** Throws unless [conn] is still the device's live connection, e.g. after waiting in its queue. */
+    fun requireCurrent(conn: DeviceConnection) {
+        if (connections[conn.address] !== conn || !conn.isConnected) {
+            throw FlutterError(BluebirdErrorCode.DEVICE_DISCONNECTED.wire, "device is disconnected", null)
+        }
+    }
 
     /////////////////////////////////////////////////////////////////////////////
     // pending-operation slots

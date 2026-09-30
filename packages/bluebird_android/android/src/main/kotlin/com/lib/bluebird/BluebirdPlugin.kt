@@ -36,6 +36,8 @@ import io.flutter.plugin.common.PluginRegistry
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -61,6 +63,15 @@ class BluebirdPlugin :
 
         // random number defined by bluebird.
         private const val USER_CANCELED_ERROR_CODE = 23789258L
+
+        // disconnect reason for a link torn down over a GATT operation that never completed
+        private const val OPERATION_TIMED_OUT_ERROR_CODE = 23789259
+
+        // A little past the stack's own 30 s ATT transaction timeout, so its handling wins when it has any.
+        private val GATT_BACKSTOP = 35.seconds
+
+        // Pairing can wait on the user.
+        private val BOND_BACKSTOP = 90.seconds
     }
 
     private var logLevel = LogLevel.DEBUG
@@ -280,6 +291,42 @@ class BluebirdPlugin :
             set = { if (it != null) pendingRemoveBond[address] = it else pendingRemoveBond.remove(address) },
             start = start,
         )
+
+    /**
+     * Runs [block] as [address]'s next GATT operation. The connection is
+     * checked again when its turn comes, since it may have dropped while it
+     * waited. One still running after [backstop] fails with `timeout`; with
+     * [teardown] the link goes with it, as an ATT transaction that never
+     * completes leaves the bearer unusable until reconnection (Core Spec
+     * Vol 3, Part F, 3.3.3).
+     */
+    private suspend fun <T> queued(
+        address: String,
+        name: String,
+        teardown: Boolean,
+        backstop: Duration = GATT_BACKSTOP,
+        block: suspend (DeviceConnection) -> T,
+    ): T {
+        val conn = registry.requireConnected(address)
+        return conn.queue.submit(backstop, { expired(conn, name, backstop, teardown) }) {
+            registry.requireCurrent(conn)
+            block(conn)
+        }
+    }
+
+    private fun expired(conn: DeviceConnection, name: String, backstop: Duration, teardown: Boolean): FlutterError {
+        val message = "$name did not complete within $backstop"
+        log(LogLevel.ERROR, if (teardown) "$message; disconnecting" else message)
+        if (teardown) {
+            registry.withLock {
+                if (registry[conn.address] === conn) {
+                    conn.gatt.disconnect()
+                    onDisconnected(conn.gatt, OPERATION_TIMED_OUT_ERROR_CODE, message)
+                }
+            }
+        }
+        return FlutterError(BluebirdErrorCode.TIMEOUT.wire, message, null)
+    }
 
     /** Removes and returns every in-flight continuation, emptying all slots. */
     private fun takeAllPending(): List<CancellableContinuation<*>> = registry.withLock {
@@ -541,6 +588,10 @@ class BluebirdPlugin :
         // because the pending continuations live on DeviceConnection slots.
         cancelAllPending()
 
+        // operations still queued would otherwise reach their turn and answer an isolate that is gone
+        scope.cancel()
+        scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
         // all dart state is reset after flutter restart
         // (i.e. Hot Restart) so also reset native state
         l2capManager?.closeAll()
@@ -777,13 +828,14 @@ class BluebirdPlugin :
         address: String,
         callback: (Result<List<BmBluetoothService>>) -> Unit,
     ) = launch("discoverServices", callback) {
-        val conn = registry.requireConnected(address)
-        val gatt = conn.gatt
+        queued(address, "discoverServices", teardown = true) { conn ->
+            val gatt = conn.gatt
 
-        // completes via onServicesDiscovered
-        registry.awaitGatt(conn, GattOp.DiscoverServices) {
-            if (!gatt.discoverServices()) {
-                throw FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire, "gatt.discoverServices() returned false", null)
+            // completes via onServicesDiscovered
+            registry.awaitGatt(conn, GattOp.DiscoverServices) {
+                if (!gatt.discoverServices()) {
+                    throw FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire, "gatt.discoverServices() returned false", null)
+                }
             }
         }
     }
@@ -793,19 +845,20 @@ class BluebirdPlugin :
         characteristic: BmCharacteristicRef,
         callback: (Result<ByteArray>) -> Unit,
     ) = launch("readCharacteristic", callback) {
-        val conn = registry.requireConnected(address)
-        val gatt = conn.gatt
-        val chr = resolveCharacteristicOrThrow(gatt, characteristic)
+        queued(address, "readCharacteristic", teardown = true) { conn ->
+            val gatt = conn.gatt
+            val chr = resolveCharacteristicOrThrow(gatt, characteristic)
 
-        // check readable
-        check(chr.canRead, BluebirdErrorCode.UNSUPPORTED) {
-            "The READ property is not supported by this BLE characteristic"
-        }
+            // check readable
+            check(chr.canRead, BluebirdErrorCode.UNSUPPORTED) {
+                "The READ property is not supported by this BLE characteristic"
+            }
 
-        // completes via onCharacteristicRead
-        registry.awaitGatt(conn, GattOp.ReadChar(chr)) {
-            if (!gatt.readCharacteristic(chr)) {
-                throw FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire, "gatt.readCharacteristic() returned false", null)
+            // completes via onCharacteristicRead
+            registry.awaitGatt(conn, GattOp.ReadChar(chr)) {
+                if (!gatt.readCharacteristic(chr)) {
+                    throw FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire, "gatt.readCharacteristic() returned false", null)
+                }
             }
         }
     }
@@ -818,41 +871,42 @@ class BluebirdPlugin :
         value: ByteArray,
         callback: (Result<Unit>) -> Unit,
     ) = launch("writeCharacteristic", callback) {
-        val conn = registry.requireConnected(address)
-        val gatt = conn.gatt
-        val chr = resolveCharacteristicOrThrow(gatt, characteristic)
+        queued(address, "writeCharacteristic", teardown = true) { conn ->
+            val gatt = conn.gatt
+            val chr = resolveCharacteristicOrThrow(gatt, characteristic)
 
-        val writeTypeInt = when (writeType) {
-            BmWriteType.WITH_RESPONSE -> BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-            BmWriteType.WITHOUT_RESPONSE -> BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
-        }
-
-        // check writeable
-        if (writeTypeInt == BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE) {
-            check(chr.canWriteNoResponse, BluebirdErrorCode.UNSUPPORTED) {
-                "The WRITE_NO_RESPONSE property is not supported by this BLE characteristic"
+            val writeTypeInt = when (writeType) {
+                BmWriteType.WITH_RESPONSE -> BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                BmWriteType.WITHOUT_RESPONSE -> BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
             }
-        } else {
-            check(chr.canWrite, BluebirdErrorCode.UNSUPPORTED) {
-                "The WRITE property is not supported by this BLE characteristic"
-            }
-        }
 
-        // check maximum payload
-        val maxLen = getMaxPayload(address, writeTypeInt, allowLongWrite)
-        check(value.size <= maxLen, BluebirdErrorCode.INVALID_ARGUMENT) {
-            val a = if (writeType == BmWriteType.WITH_RESPONSE) "withResponse" else "withoutResponse"
-            val b = if (writeType == BmWriteType.WITH_RESPONSE) {
-                if (allowLongWrite) ", allowLongWrite" else ", noLongWrite"
+            // check writeable
+            if (writeTypeInt == BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE) {
+                check(chr.canWriteNoResponse, BluebirdErrorCode.UNSUPPORTED) {
+                    "The WRITE_NO_RESPONSE property is not supported by this BLE characteristic"
+                }
             } else {
-                ""
+                check(chr.canWrite, BluebirdErrorCode.UNSUPPORTED) {
+                    "The WRITE property is not supported by this BLE characteristic"
+                }
             }
-            "data longer than allowed. value.length: ${value.size} > max: $maxLen ($a$b)"
-        }
 
-        // completes via onCharacteristicWrite
-        registry.awaitGatt<Unit>(conn, GattOp.WriteChar(chr)) {
-            gatt.writeCharacteristicCompat(chr, value, writeTypeInt)
+            // check maximum payload
+            val maxLen = getMaxPayload(address, writeTypeInt, allowLongWrite)
+            check(value.size <= maxLen, BluebirdErrorCode.INVALID_ARGUMENT) {
+                val a = if (writeType == BmWriteType.WITH_RESPONSE) "withResponse" else "withoutResponse"
+                val b = if (writeType == BmWriteType.WITH_RESPONSE) {
+                    if (allowLongWrite) ", allowLongWrite" else ", noLongWrite"
+                } else {
+                    ""
+                }
+                "data longer than allowed. value.length: ${value.size} > max: $maxLen ($a$b)"
+            }
+
+            // completes via onCharacteristicWrite
+            registry.awaitGatt<Unit>(conn, GattOp.WriteChar(chr)) {
+                gatt.writeCharacteristicCompat(chr, value, writeTypeInt)
+            }
         }
     }
 
@@ -861,14 +915,15 @@ class BluebirdPlugin :
         descriptor: BmDescriptorRef,
         callback: (Result<ByteArray>) -> Unit,
     ) = launch("readDescriptor", callback) {
-        val conn = registry.requireConnected(address)
-        val gatt = conn.gatt
-        val desc = resolveDescriptorOrThrow(gatt, descriptor)
+        queued(address, "readDescriptor", teardown = true) { conn ->
+            val gatt = conn.gatt
+            val desc = resolveDescriptorOrThrow(gatt, descriptor)
 
-        // completes via onDescriptorRead
-        registry.awaitGatt(conn, GattOp.ReadDesc(desc)) {
-            if (!gatt.readDescriptor(desc)) {
-                throw FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire, "gatt.readDescriptor() returned false", null)
+            // completes via onDescriptorRead
+            registry.awaitGatt(conn, GattOp.ReadDesc(desc)) {
+                if (!gatt.readDescriptor(desc)) {
+                    throw FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire, "gatt.readDescriptor() returned false", null)
+                }
             }
         }
     }
@@ -879,19 +934,20 @@ class BluebirdPlugin :
         value: ByteArray,
         callback: (Result<Unit>) -> Unit,
     ) = launch("writeDescriptor", callback) {
-        val conn = registry.requireConnected(address)
-        val gatt = conn.gatt
-        val desc = resolveDescriptorOrThrow(gatt, descriptor)
+        queued(address, "writeDescriptor", teardown = true) { conn ->
+            val gatt = conn.gatt
+            val desc = resolveDescriptorOrThrow(gatt, descriptor)
 
-        // check mtu
-        val mtu = conn.mtu
-        check((mtu - 3) >= value.size, BluebirdErrorCode.INVALID_ARGUMENT) {
-            "data longer than mtu allows. dataLength: ${value.size} > max: ${mtu - 3}"
-        }
+            // check mtu
+            val mtu = conn.mtu
+            check((mtu - 3) >= value.size, BluebirdErrorCode.INVALID_ARGUMENT) {
+                "data longer than mtu allows. dataLength: ${value.size} > max: ${mtu - 3}"
+            }
 
-        // completes via onDescriptorWrite
-        registry.awaitGatt<Unit>(conn, GattOp.WriteDesc(desc)) {
-            gatt.writeDescriptorCompat(desc, value)
+            // completes via onDescriptorWrite
+            registry.awaitGatt<Unit>(conn, GattOp.WriteDesc(desc)) {
+                gatt.writeDescriptorCompat(desc, value)
+            }
         }
     }
 
@@ -901,72 +957,76 @@ class BluebirdPlugin :
         enable: Boolean,
         callback: (Result<Boolean>) -> Unit,
     ) = launch("setNotifyValue", callback) {
-        val conn = registry.requireConnected(address)
-        val gatt = conn.gatt
+        queued(address, "setNotifyValue", teardown = true) { conn ->
+            val gatt = conn.gatt
 
-        // wait if any device is bonding (increases reliability)
-        waitIfBonding()
+            // wait if any device is bonding (increases reliability)
+            waitIfBonding()
 
-        val chr = resolveCharacteristicOrThrow(gatt, characteristic)
+            val chr = resolveCharacteristicOrThrow(gatt, characteristic)
 
-        // configure local Android device to listen for characteristic changes
-        check(gatt.setCharacteristicNotification(chr, enable), BluebirdErrorCode.ANDROID_ERROR) {
-            "gatt.setCharacteristicNotification($enable) returned false"
-        }
-
-        // find cccd descriptor
-        val cccd = chr.descriptors.firstOrNull { Uuid(it.uuid) == CCCD }
-        if (cccd == null) {
-            // Some ble devices do not actually need their CCCD updated.
-            // thus setCharacteristicNotification() is all that is required to enable notifications.
-            // The arduino "bluno" devices are an example.
-            log(LogLevel.WARNING, "CCCD descriptor for characteristic not found: ${Uuid(chr.uuid)}")
-            return@launch true
-        }
-
-        // determine value to write
-        val descriptorValue: ByteArray
-        if (enable) {
-            check(chr.canIndicate || chr.canNotify, BluebirdErrorCode.UNSUPPORTED) {
-                "neither NOTIFY nor INDICATE properties are supported by this BLE characteristic"
+            // configure local Android device to listen for characteristic changes
+            check(gatt.setCharacteristicNotification(chr, enable), BluebirdErrorCode.ANDROID_ERROR) {
+                "gatt.setCharacteristicNotification($enable) returned false"
             }
 
-            // If a characteristic supports both notifications and indications,
-            // we use notifications. This matches how CoreBluetooth works on iOS.
-            descriptorValue = when {
-                chr.canNotify -> BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-                else -> BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
+            // find cccd descriptor
+            val cccd = chr.descriptors.firstOrNull { Uuid(it.uuid) == CCCD }
+            if (cccd == null) {
+                // Some ble devices do not actually need their CCCD updated.
+                // thus setCharacteristicNotification() is all that is required to enable notifications.
+                // The arduino "bluno" devices are an example.
+                log(LogLevel.WARNING, "CCCD descriptor for characteristic not found: ${Uuid(chr.uuid)}")
+                return@queued true
             }
-        } else {
-            descriptorValue = BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE
-        }
 
-        // completes when the CCCD write confirms (onDescriptorWrite)
-        registry.awaitGatt(conn, GattOp.SetNotify(chr)) {
-            gatt.writeDescriptorCompat(cccd, descriptorValue, label = "cccd")
+            // determine value to write
+            val descriptorValue: ByteArray
+            if (enable) {
+                check(chr.canIndicate || chr.canNotify, BluebirdErrorCode.UNSUPPORTED) {
+                    "neither NOTIFY nor INDICATE properties are supported by this BLE characteristic"
+                }
+
+                // If a characteristic supports both notifications and indications,
+                // we use notifications. This matches how CoreBluetooth works on iOS.
+                descriptorValue = when {
+                    chr.canNotify -> BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                    else -> BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
+                }
+            } else {
+                descriptorValue = BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE
+            }
+
+            // completes when the CCCD write confirms (onDescriptorWrite)
+            registry.awaitGatt(conn, GattOp.SetNotify(chr)) {
+                gatt.writeDescriptorCompat(cccd, descriptorValue, label = "cccd")
+            }
         }
     }
 
     override fun requestMtu(address: String, mtu: Long, callback: (Result<Long>) -> Unit) = launch("requestMtu", callback) {
-        val conn = registry.requireConnected(address)
-        val gatt = conn.gatt
+        queued(address, "requestMtu", teardown = true) { conn ->
+            val gatt = conn.gatt
 
-        // completes via onMtuChanged
-        registry.awaitGatt(conn, GattOp.Mtu) {
-            if (!gatt.requestMtu(mtu.toInt())) {
-                throw FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire, "gatt.requestMtu() returned false", null)
+            // completes via onMtuChanged
+            registry.awaitGatt(conn, GattOp.Mtu) {
+                if (!gatt.requestMtu(mtu.toInt())) {
+                    throw FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire, "gatt.requestMtu() returned false", null)
+                }
             }
         }
     }
 
     override fun readRssi(address: String, callback: (Result<Long>) -> Unit) = launch("readRssi", callback) {
-        val conn = registry.requireConnected(address)
-        val gatt = conn.gatt
+        // an HCI command, not an ATT transaction: a lost reply does not wedge the link
+        queued(address, "readRssi", teardown = false) { conn ->
+            val gatt = conn.gatt
 
-        // completes via onReadRemoteRssi
-        registry.awaitGatt(conn, GattOp.Rssi) {
-            if (!gatt.readRemoteRssi()) {
-                throw FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire, "gatt.readRemoteRssi() returned false", null)
+            // completes via onReadRemoteRssi
+            registry.awaitGatt(conn, GattOp.Rssi) {
+                if (!gatt.readRemoteRssi()) {
+                    throw FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire, "gatt.readRemoteRssi() returned false", null)
+                }
             }
         }
     }
@@ -1000,12 +1060,14 @@ class BluebirdPlugin :
                 "Only supported on devices >= API 26. This device == ${Build.VERSION.SDK_INT}", null)
         }
 
-        val conn = registry.requireConnected(address)
-        val gatt = conn.gatt
+        // a link-layer procedure, not an ATT transaction: a lost reply does not wedge the link
+        queued(address, "setPreferredPhy", teardown = false) { conn ->
+            val gatt = conn.gatt
 
-        // completes via onPhyUpdate
-        registry.awaitGatt<Unit>(conn, GattOp.Phy) {
-            gatt.setPreferredPhy(txPhy.toInt(), rxPhy.toInt(), phyOptions.toInt())
+            // completes via onPhyUpdate
+            registry.awaitGatt<Unit>(conn, GattOp.Phy) {
+                gatt.setPreferredPhy(txPhy.toInt(), rxPhy.toInt(), phyOptions.toInt())
+            }
         }
     }
 
@@ -1021,24 +1083,24 @@ class BluebirdPlugin :
             bondingPins[address] = pin
         }
 
-        // check connection
-        val conn = registry.requireConnected(address)
+        // queued so no GATT operation runs while bonding
+        queued(address, "createBond", teardown = false, backstop = BOND_BACKSTOP) { conn ->
+            val device = a.getRemoteDevice(address)
 
-        val device = a.getRemoteDevice(address)
+            // already bonded?
+            if (device.bondState == BluetoothDevice.BOND_BONDED) {
+                log(LogLevel.WARNING, "already bonded")
+                return@queued true // no work to do
+            }
 
-        // already bonded?
-        if (device.bondState == BluetoothDevice.BOND_BONDED) {
-            log(LogLevel.WARNING, "already bonded")
-            return@launch true // no work to do
-        }
-
-        // completes via the bond state receiver
-        registry.awaitBond(conn) {
-            // bonding already in progress? wait for completion
-            if (device.bondState == BluetoothDevice.BOND_BONDING) {
-                log(LogLevel.WARNING, "bonding already in progress")
-            } else if (!device.createBond()) {
-                throw FlutterError(BluebirdErrorCode.BOND_FAILED.wire, "device.createBond() returned false", null)
+            // completes via the bond state receiver
+            registry.awaitBond(conn) {
+                // bonding already in progress? wait for completion
+                if (device.bondState == BluetoothDevice.BOND_BONDING) {
+                    log(LogLevel.WARNING, "bonding already in progress")
+                } else if (!device.createBond()) {
+                    throw FlutterError(BluebirdErrorCode.BOND_FAILED.wire, "device.createBond() returned false", null)
+                }
             }
         }
     }
@@ -1069,15 +1131,17 @@ class BluebirdPlugin :
     }
 
     override fun clearGattCache(address: String, callback: (Result<Unit>) -> Unit) = launch("clearGattCache", callback) {
-        val gatt = registry.requireConnected(address).gatt
+        queued(address, "clearGattCache", teardown = false) { conn ->
+            val gatt = conn.gatt
 
-        try {
-            val refreshMethod = gatt.javaClass.getMethod("refresh")
-            refreshMethod.invoke(gatt)
-            // mirror the Java plugin: complete immediately after invoking
-        } catch (e: Exception) {
-            throw FlutterError(BluebirdErrorCode.UNSUPPORTED.wire,
-                "gatt.refresh() unsupported on this android version: $e", null)
+            try {
+                val refreshMethod = gatt.javaClass.getMethod("refresh")
+                refreshMethod.invoke(gatt)
+                // mirror the Java plugin: complete immediately after invoking
+            } catch (e: Exception) {
+                throw FlutterError(BluebirdErrorCode.UNSUPPORTED.wire,
+                    "gatt.refresh() unsupported on this android version: $e", null)
+            }
         }
     }
 
@@ -1268,6 +1332,45 @@ class BluebirdPlugin :
         return true
     }
 
+    /**
+     * Forgets [gatt]'s device, fails whatever it had in flight, and reports it
+     * disconnected with [reasonCode] and [reasonString]. Caller holds the
+     * registry lock.
+     */
+    private fun onDisconnected(gatt: BluetoothGatt, reasonCode: Int, reasonString: String) {
+        val remoteId = gatt.device.address
+
+        // remove from connected devices
+        val conn = registry.remove(remoteId)
+
+        // remove from currently bonding devices & cached PINs
+        bondingDevices.remove(remoteId)
+        bondingPins.remove(remoteId)
+
+        // it is important to close after disconnection, otherwise we will
+        // quickly run out of bluetooth resources, preventing new connections
+        gatt.close()
+
+        // close any L2CAP channels this device had open
+        l2capManager?.closeForDevice(remoteId)
+
+        // complete in-flight ops for this device
+        if (conn != null) {
+            conn.pendingDisconnect?.also { conn.pendingDisconnect = null }?.resume(Unit)
+            conn.pendingConnect?.also { conn.pendingConnect = null }?.resumeWithException(
+                FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire, reasonString, reasonCode))
+            conn.failAllPending(
+                FlutterError(BluebirdErrorCode.DEVICE_DISCONNECTED.wire, "device is disconnected", null))
+        }
+
+        emitEvent(BmConnectionStateEvent(
+            address = remoteId,
+            connectionState = BluetoothConnectionState.DISCONNECTED,
+            disconnectReasonCode = reasonCode.toLong(),
+            disconnectReasonString = reasonString,
+        ))
+    }
+
     private val gattCallback = object : BluetoothGattCallback() {
 
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
@@ -1308,35 +1411,7 @@ class BluebirdPlugin :
                         disconnectReasonString = null,
                     ))
                 } else {
-                    // remove from connected devices
-                    val conn = registry.remove(remoteId)
-
-                    // remove from currently bonding devices & cached PINs
-                    bondingDevices.remove(remoteId)
-                    bondingPins.remove(remoteId)
-
-                    // it is important to close after disconnection, otherwise we will
-                    // quickly run out of bluetooth resources, preventing new connections
-                    gatt.close()
-
-                    // close any L2CAP channels this device had open
-                    l2capManager?.closeForDevice(remoteId)
-
-                    // complete in-flight ops for this device
-                    if (conn != null) {
-                        conn.pendingDisconnect?.also { conn.pendingDisconnect = null }?.resume(Unit)
-                        conn.pendingConnect?.also { conn.pendingConnect = null }?.resumeWithException(
-                            FlutterError(BluebirdErrorCode.ANDROID_ERROR.wire, ErrorStrings.hciStatusString(status), status))
-                        conn.failAllPending(
-                            FlutterError(BluebirdErrorCode.DEVICE_DISCONNECTED.wire, "device is disconnected", null))
-                    }
-
-                    emitEvent(BmConnectionStateEvent(
-                        address = remoteId,
-                        connectionState = BluetoothConnectionState.DISCONNECTED,
-                        disconnectReasonCode = status.toLong(),
-                        disconnectReasonString = ErrorStrings.hciStatusString(status),
-                    ))
+                    onDisconnected(gatt, status, ErrorStrings.hciStatusString(status))
                 }
             }
         }
