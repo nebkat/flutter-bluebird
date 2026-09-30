@@ -203,8 +203,7 @@ extension StreamNewStreamWithInitialValue<T> on Stream<T> {
 // dart is single threaded, but still has task switching.
 // this mutex lets a single task through at a time.
 class Mutex {
-  static final global = Mutex();
-  static final platform = Mutex();
+  static final connect = Mutex();
 
   final StreamController _controller = StreamController.broadcast();
   int execute = 0;

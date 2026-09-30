@@ -52,10 +52,10 @@ void main() {
   });
 
   test('disconnect(queue: false) cancels a connect that has not reached the platform', () async {
-    // hold the platform queue so the connect stays queued behind it
-    final busy = Completer<bool>();
-    fake.stubs['isSupported'] = () => busy.future;
-    unawaited(Bluebird.isSupported);
+    // another device's connect holds the connect queue, so this one waits behind it
+    final other = Bluebird.deviceForAddress('11:22:33:44:55:66');
+    unawaited(other.connect(timeout: const Duration(seconds: 30)).then((_) {}, onError: (_) {}));
+    await Future<void>.delayed(const Duration(milliseconds: 50));
 
     final connect = expectLater(
       device.connect(),
@@ -63,11 +63,11 @@ void main() {
     );
     await Future<void>.delayed(const Duration(milliseconds: 50));
     final disconnect = device.disconnect(queue: false);
-    busy.complete(true);
+    stuck.complete();
     await disconnect;
     await connect;
 
-    expect(fake.calls, isNot(contains('connect')));
+    expect(fake.calls.where((c) => c == 'connect'), hasLength(1), reason: "only the other device's connect");
     expect(fake.calls, isNot(contains('disconnect')));
     expect(device.isConnected, isFalse);
   });
