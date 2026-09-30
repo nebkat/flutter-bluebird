@@ -13,6 +13,7 @@ android {
 
     sourceSets {
         main.java.srcDirs += 'src/main/kotlin'
+        test.java.srcDirs += 'src/test/kotlin'
     }
 
     lintOptions {
@@ -47,4 +48,7 @@ pluginManager.withPlugin('org.jetbrains.kotlin.android') {
 
 dependencies {
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2"
+
+    testImplementation "junit:junit:4.13.2"
+    testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2"
 }
