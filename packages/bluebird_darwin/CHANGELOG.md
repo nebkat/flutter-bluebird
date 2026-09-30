@@ -1,3 +1,7 @@
+## Unreleased
+
+- GATT operations and L2CAP opens wait their turn on a per-device queue instead of failing with `operationInProgress` when another is in flight. One CoreBluetooth never completes fails with `timeout` after 35 seconds, and an ATT transaction that does so disconnects the device.
+
 ## 0.5.0
 
 - Fixed connection attempts that never ended.

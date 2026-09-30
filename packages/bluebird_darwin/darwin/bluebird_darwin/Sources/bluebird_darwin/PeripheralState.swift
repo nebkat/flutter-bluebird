@@ -45,14 +45,20 @@ final class PeripheralState {
   /// last observed mtu (see checkForMtuChanges)
   var mtu = 23
 
+  /// Orders this device's GATT operations; see `GattQueue`.
+  let queue = GattQueue()
+
+  /// Why we are tearing the link down ourselves, reported once it is gone.
+  var teardownReason: String?
+
   // service discovery bookkeeping
   var discoveredServices: [CBService] = []
   var servicesToDiscover: [CBService] = []
   var characteristicsToDiscover: [CBCharacteristic] = []
 
   // In-flight operations, one slot per concurrency class. CoreBluetooth
-  // correlates results only by attribute on a shared delegate, and the Dart
-  // layer serializes operations, so a single in-flight GATT slot suffices;
+  // correlates results only by attribute on a shared delegate, and `queue`
+  // admits one operation at a time, so a single in-flight GATT slot suffices;
   // `kind` lets delegate callbacks match (e.g. a notification must not
   // resume a pending read). The take* helpers clear a slot before resuming
   // it, guaranteeing exactly-once resumption.
@@ -67,12 +73,12 @@ final class PeripheralState {
   /// A write-without-response blocked on CoreBluetooth's flow control
   /// (`canSendWriteWithoutResponse` is false), waiting to be resumed by
   /// `peripheralIsReady(toSendWriteWithoutResponse:)`. Unacknowledged writes
-  /// don't occupy the GATT slot, so this is separate; the Dart layer
-  /// serializes writes, so at most one is ever parked here.
+  /// don't occupy the GATT slot, so this is separate; `queue` admits one
+  /// write at a time, so at most one is ever parked here.
   var pendingWriteReady: CheckedContinuation<Void, Error>?
 
   /// An in-flight `openL2capChannel`, resumed by `peripheral(_:didOpen:error:)`.
-  /// The Dart layer serializes operations, so at most one is ever parked here.
+  /// `queue` admits one open at a time, so at most one is ever parked here.
   var pendingL2capOpen: CheckedContinuation<CBL2CAPChannel, Error>?
 
   init(_ peripheral: CBPeripheral) { self.peripheral = peripheral }
@@ -120,8 +126,9 @@ final class PeripheralState {
   }
 
   /// Fails every pending operation on this device (device disconnected or
-  /// adapter turned off).
+  /// adapter turned off), including those still queued.
   func failAllPending(_ error: Error) {
+    queue.failWaiting(error)
     takeGatt()?.continuation.resume(throwing: error)
     takeConnect()?.resume(throwing: error)
     takeDisconnect()?.resume(throwing: error)

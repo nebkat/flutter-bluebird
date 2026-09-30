@@ -56,6 +56,13 @@ public class BluebirdPlugin: NSObject, FlutterPlugin {
   /// random error code defined by bluebird for a connection attempt
   /// that reached its deadline
   static let connectTimeoutErrorCode: Int64 = 8291447
+  /// random error code defined by bluebird for a link torn down over a
+  /// GATT operation that never completed
+  static let operationTimedOutDisconnectCode: Int64 = 23789259
+
+  /// A little past the ATT transaction timeout (30 s), after which
+  /// CoreBluetooth drops the link itself, so its handling wins when it has any.
+  static let gattBackstop: TimeInterval = 35
 
   public static func register(with registrar: FlutterPluginRegistrar) {
     #if os(macOS)
@@ -194,6 +201,44 @@ public class BluebirdPlugin: NSObject, FlutterPlugin {
   // Pending-operation slots
   // ───────────────────────────────────────────────────────────────────────────
 
+  /// Runs `body` as `address`'s next GATT operation. The connection is checked
+  /// again when its turn comes, since it may have dropped while it waited. One
+  /// still running after `gattBackstop` fails with `timeout`; with `teardown`
+  /// the link goes with it, as an ATT transaction that never completes leaves
+  /// the bearer unusable until reconnection (Core Spec Vol 3, Part F, 3.3.3).
+  @MainActor
+  func queued<T>(
+    _ address: String, _ name: String, teardown: Bool,
+    _ body: @MainActor (PeripheralState) async throws -> T
+  ) async throws -> T {
+    let state = try requireConnectedState(address)
+    return try await state.queue.submit(
+      backstop: Self.gattBackstop,
+      onExpired: { [weak self] in self?.expired(state, name, teardown: teardown) }
+    ) {
+      guard peripherals[address] === state, state.connection == .connected else {
+        throw deviceDisconnectedError()
+      }
+      return try await body(state)
+    }
+  }
+
+  private func expired(_ state: PeripheralState, _ name: String, teardown: Bool) {
+    let message = "\(name) did not complete within \(Int(Self.gattBackstop))s"
+    log(.error, teardown ? "\(message); disconnecting" : message)
+
+    let error = PigeonError(code: BluebirdErrorCode.timeout.wire, message: message, details: nil)
+    state.takeGatt()?.continuation.resume(throwing: error)
+    state.takeWriteReady()?.resume(throwing: error)
+    state.takeL2capOpen()?.resume(throwing: error)
+
+    let address = state.peripheral.identifier.uuidString
+    if teardown, peripherals[address] === state {
+      state.teardownReason = message
+      centralManager?.cancelPeripheralConnection(state.peripheral)
+    }
+  }
+
   /// Occupies the device's GATT slot with `kind`, runs `start`, then suspends
   /// until a delegate callback resumes the operation.
   ///
@@ -305,9 +350,9 @@ public class BluebirdPlugin: NSObject, FlutterPlugin {
   /// Unacknowledged writes carry no ATT response, so this readiness signal is
   /// the only backpressure CoreBluetooth exposes; awaiting it gives the Dart
   /// `write(withoutResponse: true)` future the same "resolves once the stack
-  /// accepted the bytes" meaning it already has on Android and Web. The Dart
-  /// layer serializes writes, so at most one is ever parked; a second arrival
-  /// throws operation_in_progress, mirroring the GATT slot.
+  /// accepted the bytes" meaning it already has on Android and Web. The
+  /// device's queue admits one write at a time, so at most one is ever parked;
+  /// a second arrival throws operation_in_progress, mirroring the GATT slot.
   @MainActor
   func awaitWriteReady(_ state: PeripheralState) async throws {
     // No suspension point between this check and installing the continuation,
