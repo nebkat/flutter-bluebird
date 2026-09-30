@@ -260,13 +260,13 @@ extension BluebirdPlugin: BluebirdHostApi {
     launch(completion) { [self] in
       ensureCentralManager()
 
-      let state = try requireConnectedState(address)
+      return try await queued(address, "discoverServices", teardown: true) { state in
+        try await awaitGatt(state, .discoverServices) {
+          // reset discovery bookkeeping
+          state.clearDiscoveryState()
 
-      return try await awaitGatt(state, .discoverServices) {
-        // reset discovery bookkeeping
-        state.clearDiscoveryState()
-
-        state.peripheral.discoverServices(nil)
+          state.peripheral.discoverServices(nil)
+        }
       }
     }
   }
@@ -279,20 +279,21 @@ extension BluebirdPlugin: BluebirdHostApi {
     launch(completion) { [self] in
       ensureCentralManager()
 
-      let state = try requireConnectedState(address)
-      let peripheral = state.peripheral
-      let chr = try locateCharacteristic(characteristic, in: peripheral)
+      return try await queued(address, "readCharacteristic", teardown: true) { state in
+        let peripheral = state.peripheral
+        let chr = try locateCharacteristic(characteristic, in: peripheral)
 
-      // check readable
-      guard chr.properties.contains(.read) else {
-        throw unsupportedError("The READ property is not supported by this BLE characteristic")
-      }
+        // check readable
+        guard chr.properties.contains(.read) else {
+          throw unsupportedError("The READ property is not supported by this BLE characteristic")
+        }
 
-      // key by the canonical ref so the delegate callback finds it
-      let ref = try canonicalRef(chr, in: peripheral)
+        // key by the canonical ref so the delegate callback finds it
+        let ref = try canonicalRef(chr, in: peripheral)
 
-      return try await awaitGatt(state, .readChar(ref)) {
-        peripheral.readValue(for: chr)
+        return try await awaitGatt(state, .readChar(ref)) {
+          peripheral.readValue(for: chr)
+        }
       }
     }
   }
@@ -308,51 +309,52 @@ extension BluebirdPlugin: BluebirdHostApi {
     launch(completion) { [self] in
       ensureCentralManager()
 
-      let state = try requireConnectedState(address)
-      let peripheral = state.peripheral
+      return try await queued(address, "writeCharacteristic", teardown: true) { state in
+        let peripheral = state.peripheral
 
-      let cbWriteType: CBCharacteristicWriteType =
-        writeType == .withResponse ? .withResponse : .withoutResponse
+        let cbWriteType: CBCharacteristicWriteType =
+          writeType == .withResponse ? .withResponse : .withoutResponse
 
-      // check maximum payload
-      let maxLen = getMaxPayload(peripheral, type: cbWriteType, allowLongWrite: allowLongWrite)
-      let dataLen = value.data.count
-      if dataLen > maxLen {
-        let t = writeType == .withResponse ? "withResponse" : "withoutResponse"
-        let a = allowLongWrite ? ", allowLongWrite" : ", noLongWrite"
-        let b = writeType == .withResponse ? a : ""
-        throw unsupportedError(
-          "data longer than allowed. dataLen: \(dataLen) > max: \(maxLen) (\(t)\(b))")
-      }
-
-      let chr = try locateCharacteristic(characteristic, in: peripheral)
-
-      // check writeable
-      if cbWriteType == .withoutResponse {
-        guard chr.properties.contains(.writeWithoutResponse) else {
+        // check maximum payload
+        let maxLen = getMaxPayload(peripheral, type: cbWriteType, allowLongWrite: allowLongWrite)
+        let dataLen = value.data.count
+        if dataLen > maxLen {
+          let t = writeType == .withResponse ? "withResponse" : "withoutResponse"
+          let a = allowLongWrite ? ", allowLongWrite" : ", noLongWrite"
+          let b = writeType == .withResponse ? a : ""
           throw unsupportedError(
-            "The WRITE_NO_RESPONSE property is not supported by this BLE characteristic")
+            "data longer than allowed. dataLen: \(dataLen) > max: \(maxLen) (\(t)\(b))")
         }
-      } else {
-        guard chr.properties.contains(.write) else {
-          throw unsupportedError("The WRITE property is not supported by this BLE characteristic")
-        }
-      }
 
-      if cbWriteType == .withResponse {
-        // key by the canonical ref so the delegate callback finds it
-        let ref = try canonicalRef(chr, in: peripheral)
+        let chr = try locateCharacteristic(characteristic, in: peripheral)
 
-        return try await awaitGatt(state, .writeChar(ref)) {
-          peripheral.writeValue(value.data, for: chr, type: .withResponse)
+        // check writeable
+        if cbWriteType == .withoutResponse {
+          guard chr.properties.contains(.writeWithoutResponse) else {
+            throw unsupportedError(
+              "The WRITE_NO_RESPONSE property is not supported by this BLE characteristic")
+          }
+        } else {
+          guard chr.properties.contains(.write) else {
+            throw unsupportedError("The WRITE property is not supported by this BLE characteristic")
+          }
         }
-      } else {
-        // Writes without response are unacknowledged. CoreBluetooth throttles
-        // them via canSendWriteWithoutResponse; wait until the peripheral can
-        // accept another (backpressure) rather than dropping the write, then
-        // enqueue and complete immediately — there is no response to await.
-        try await awaitWriteReady(state)
-        peripheral.writeValue(value.data, for: chr, type: .withoutResponse)
+
+        if cbWriteType == .withResponse {
+          // key by the canonical ref so the delegate callback finds it
+          let ref = try canonicalRef(chr, in: peripheral)
+
+          return try await awaitGatt(state, .writeChar(ref)) {
+            peripheral.writeValue(value.data, for: chr, type: .withResponse)
+          }
+        } else {
+          // Writes without response are unacknowledged. CoreBluetooth throttles
+          // them via canSendWriteWithoutResponse; wait until the peripheral can
+          // accept another (backpressure) rather than dropping the write, then
+          // enqueue and complete immediately — there is no response to await.
+          try await awaitWriteReady(state)
+          peripheral.writeValue(value.data, for: chr, type: .withoutResponse)
+        }
       }
     }
   }
@@ -365,15 +367,16 @@ extension BluebirdPlugin: BluebirdHostApi {
     launch(completion) { [self] in
       ensureCentralManager()
 
-      let state = try requireConnectedState(address)
-      let peripheral = state.peripheral
-      let desc = try locateDescriptor(descriptor, in: peripheral)
+      return try await queued(address, "readDescriptor", teardown: true) { state in
+        let peripheral = state.peripheral
+        let desc = try locateDescriptor(descriptor, in: peripheral)
 
-      // key by the canonical ref so the delegate callback finds it
-      let ref = try canonicalRef(desc, in: peripheral)
+        // key by the canonical ref so the delegate callback finds it
+        let ref = try canonicalRef(desc, in: peripheral)
 
-      return try await awaitGatt(state, .readDesc(ref)) {
-        peripheral.readValue(for: desc)
+        return try await awaitGatt(state, .readDesc(ref)) {
+          peripheral.readValue(for: desc)
+        }
       }
     }
   }
@@ -387,24 +390,25 @@ extension BluebirdPlugin: BluebirdHostApi {
     launch(completion) { [self] in
       ensureCentralManager()
 
-      let state = try requireConnectedState(address)
-      let peripheral = state.peripheral
+      return try await queued(address, "writeDescriptor", teardown: true) { state in
+        let peripheral = state.peripheral
 
-      // check mtu
-      let mtu = getMtu(peripheral)
-      let dataLen = value.data.count
-      if (mtu - 3) < dataLen {
-        throw unsupportedError(
-          "data is longer than MTU allows. dataLen: \(dataLen) > maxDataLen: \(mtu - 3)")
-      }
+        // check mtu
+        let mtu = getMtu(peripheral)
+        let dataLen = value.data.count
+        if (mtu - 3) < dataLen {
+          throw unsupportedError(
+            "data is longer than MTU allows. dataLen: \(dataLen) > maxDataLen: \(mtu - 3)")
+        }
 
-      let desc = try locateDescriptor(descriptor, in: peripheral)
+        let desc = try locateDescriptor(descriptor, in: peripheral)
 
-      // key by the canonical ref so the delegate callback finds it
-      let ref = try canonicalRef(desc, in: peripheral)
+        // key by the canonical ref so the delegate callback finds it
+        let ref = try canonicalRef(desc, in: peripheral)
 
-      return try await awaitGatt(state, .writeDesc(ref)) {
-        peripheral.writeValue(value.data, for: desc)
+        return try await awaitGatt(state, .writeDesc(ref)) {
+          peripheral.writeValue(value.data, for: desc)
+        }
       }
     }
   }
@@ -418,31 +422,32 @@ extension BluebirdPlugin: BluebirdHostApi {
     launch(completion) { [self] in
       ensureCentralManager()
 
-      let state = try requireConnectedState(address)
-      let peripheral = state.peripheral
-      let chr = try locateCharacteristic(characteristic, in: peripheral)
+      return try await queued(address, "setNotifyValue", teardown: true) { state in
+        let peripheral = state.peripheral
+        let chr = try locateCharacteristic(characteristic, in: peripheral)
 
-      // check notify-able
-      let canNotify = chr.properties.contains(.notify)
-      let canIndicate = chr.properties.contains(.indicate)
-      guard canNotify || canIndicate else {
-        throw unsupportedError(
-          "neither NOTIFY nor INDICATE properties are supported by this BLE characteristic")
-      }
+        // check notify-able
+        let canNotify = chr.properties.contains(.notify)
+        let canIndicate = chr.properties.contains(.indicate)
+        guard canNotify || canIndicate else {
+          throw unsupportedError(
+            "neither NOTIFY nor INDICATE properties are supported by this BLE characteristic")
+        }
 
-      // check that the CCCD is present — necessary for subscribing
-      let cccd = CBUUID(string: CBUUIDClientCharacteristicConfigurationString)
-      if !(chr.descriptors?.contains(where: { $0.uuid == cccd }) ?? false) {
-        log(
-          .warning,
-          "Warning: CCCD descriptor for characteristic not found: \(chr.uuid.uuidStr)")
-      }
+        // check that the CCCD is present — necessary for subscribing
+        let cccd = CBUUID(string: CBUUIDClientCharacteristicConfigurationString)
+        if !(chr.descriptors?.contains(where: { $0.uuid == cccd }) ?? false) {
+          log(
+            .warning,
+            "Warning: CCCD descriptor for characteristic not found: \(chr.uuid.uuidStr)")
+        }
 
-      // key by the canonical ref so the delegate callback finds it
-      let ref = try canonicalRef(chr, in: peripheral)
+        // key by the canonical ref so the delegate callback finds it
+        let ref = try canonicalRef(chr, in: peripheral)
 
-      return try await awaitGatt(state, .setNotify(ref)) {
-        peripheral.setNotifyValue(enable, for: chr)
+        return try await awaitGatt(state, .setNotify(ref)) {
+          peripheral.setNotifyValue(enable, for: chr)
+        }
       }
     }
   }
@@ -459,10 +464,11 @@ extension BluebirdPlugin: BluebirdHostApi {
     launch(completion) { [self] in
       ensureCentralManager()
 
-      let state = try requireConnectedState(address)
-
-      return try await awaitGatt(state, .readRssi) {
-        state.peripheral.readRSSI()
+      // an HCI command, not an ATT transaction: a lost reply does not wedge the link
+      return try await queued(address, "readRssi", teardown: false) { state in
+        try await awaitGatt(state, .readRssi) {
+          state.peripheral.readRSSI()
+        }
       }
     }
   }
@@ -518,18 +524,20 @@ extension BluebirdPlugin: BluebirdHostApi {
     launch(completion) { [self] in
       ensureCentralManager()
 
-      let state = try requireConnectedState(address)
-
       guard psm > 0, psm <= 0xFFFF else {
         throw PigeonError(
           code: BluebirdErrorCode.invalidArgument.wire, message: "psm out of range: \(psm)",
           details: nil)
       }
 
-      // `secure` is Android-only; CoreBluetooth derives channel security from
-      // the PSM, so it is intentionally ignored here.
-      let cbChannel = try await awaitL2capOpen(state) {
-        state.peripheral.openL2CAPChannel(CBL2CAPPSM(psm))
+      // queued only because the open slot takes one at a time; the channel's
+      // data bypasses the queue
+      let cbChannel = try await queued(address, "openL2capChannel", teardown: false) { state in
+        // `secure` is Android-only; CoreBluetooth derives channel security from
+        // the PSM, so it is intentionally ignored here.
+        try await awaitL2capOpen(state) {
+          state.peripheral.openL2CAPChannel(CBL2CAPPSM(psm))
+        }
       }
 
       // a disconnect during the open would have failed the slot; still, guard

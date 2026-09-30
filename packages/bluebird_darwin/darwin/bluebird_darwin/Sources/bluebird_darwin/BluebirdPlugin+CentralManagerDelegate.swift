@@ -208,6 +208,16 @@ extension BluebirdPlugin: CBCentralManagerDelegate {
     // fail whatever GATT operation was still in flight
     state?.failAllPending(deviceDisconnectedError())
 
+    if let reason = state?.teardownReason {
+      sink?.success(
+        BmConnectionStateEvent(
+          address: address,
+          connectionState: .disconnected,
+          disconnectReasonCode: Self.operationTimedOutDisconnectCode,
+          disconnectReasonString: reason))
+      return
+    }
+
     sink?.success(
       BmConnectionStateEvent(
         address: address,
