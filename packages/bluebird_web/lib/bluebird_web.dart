@@ -6,6 +6,7 @@ import 'package:bluebird_platform_interface/bluebird_platform_interface.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:web/web.dart' show Event;
 
+import 'src/gatt_queue.dart';
 import 'src/html.dart';
 import 'src/web_bluetooth.dart';
 
@@ -70,6 +71,8 @@ final class BluebirdWeb extends BluebirdPlatform {
   /// return until the corresponding event has been handled, so a delayed event
   /// can never straggle past a subsequent reconnect.
   final _pendingDisconnects = <String, Completer<void>>{};
+
+  final _gattQueue = GattQueue();
 
   late final _characteristicValueChangedListener = _handleCharacteristicValueChanged.toJS;
   late final _gattServerDisconnectedListener = _handleGattServerDisconnected.toJS;
@@ -208,7 +211,10 @@ final class BluebirdWeb extends BluebirdPlatform {
   }
 
   @override
-  Future<List<BmBluetoothService>> discoverServices(String address) async {
+  Future<List<BmBluetoothService>> discoverServices(String address) =>
+      _gattQueue.run(address, () => _discoverServices(address));
+
+  Future<List<BmBluetoothService>> _discoverServices(String address) async {
     final gatt = _gattForDevice(address);
 
     // Drop any stale cache/notification handles before rebuilding.
@@ -304,7 +310,10 @@ final class BluebirdWeb extends BluebirdPlatform {
   }
 
   @override
-  Future<Uint8List> readCharacteristic(String address, BmCharacteristicRef characteristic) async {
+  Future<Uint8List> readCharacteristic(String address, BmCharacteristicRef characteristic) =>
+      _gattQueue.run(address, () => _readCharacteristic(address, characteristic));
+
+  Future<Uint8List> _readCharacteristic(String address, BmCharacteristicRef characteristic) async {
     final jsChar = _resolveCharacteristic(address, characteristic);
     final value = (await jsChar.readValue().toDart).toDart;
     return value.buffer.asUint8List(value.offsetInBytes, value.lengthInBytes);
@@ -317,6 +326,13 @@ final class BluebirdWeb extends BluebirdPlatform {
     BmWriteType writeType,
     bool allowLongWrite,
     Uint8List value,
+  ) => _gattQueue.run(address, () => _writeCharacteristic(address, characteristic, writeType, value));
+
+  Future<void> _writeCharacteristic(
+    String address,
+    BmCharacteristicRef characteristic,
+    BmWriteType writeType,
+    Uint8List value,
   ) async {
     final jsChar = _resolveCharacteristic(address, characteristic);
     if (writeType == BmWriteType.withResponse) {
@@ -327,20 +343,29 @@ final class BluebirdWeb extends BluebirdPlatform {
   }
 
   @override
-  Future<Uint8List> readDescriptor(String address, BmDescriptorRef descriptor) async {
+  Future<Uint8List> readDescriptor(String address, BmDescriptorRef descriptor) =>
+      _gattQueue.run(address, () => _readDescriptor(address, descriptor));
+
+  Future<Uint8List> _readDescriptor(String address, BmDescriptorRef descriptor) async {
     final jsDesc = await _resolveDescriptor(address, descriptor);
     final value = (await jsDesc.readValue().toDart).toDart;
     return value.buffer.asUint8List(value.offsetInBytes, value.lengthInBytes);
   }
 
   @override
-  Future<void> writeDescriptor(String address, BmDescriptorRef descriptor, Uint8List value) async {
+  Future<void> writeDescriptor(String address, BmDescriptorRef descriptor, Uint8List value) =>
+      _gattQueue.run(address, () => _writeDescriptor(address, descriptor, value));
+
+  Future<void> _writeDescriptor(String address, BmDescriptorRef descriptor, Uint8List value) async {
     final jsDesc = await _resolveDescriptor(address, descriptor);
     await jsDesc.writeValue(value.toJS).toDart;
   }
 
   @override
-  Future<bool> setNotifyValue(String address, BmCharacteristicRef characteristic, bool enable) async {
+  Future<bool> setNotifyValue(String address, BmCharacteristicRef characteristic, bool enable) =>
+      _gattQueue.run(address, () => _setNotifyValue(address, characteristic, enable));
+
+  Future<bool> _setNotifyValue(String address, BmCharacteristicRef characteristic, bool enable) async {
     final jsChar = _resolveCharacteristic(address, characteristic);
     if (enable) {
       jsChar.addEventListener('characteristicvaluechanged', _characteristicValueChangedListener);
@@ -407,6 +432,7 @@ final class BluebirdWeb extends BluebirdPlatform {
   /// whether the disconnect was programmatic or spontaneous.
   void _handleDisconnected(String address) {
     _clearDeviceCache(address);
+    _gattQueue.disconnected(address);
 
     _events.add(BmConnectionStateEvent(address: address, connectionState: BluetoothConnectionState.disconnected));
 

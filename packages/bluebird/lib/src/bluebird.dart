@@ -502,27 +502,26 @@ class Bluebird {
   /// Runs one platform call with the standard guard pipeline, stating the
   /// operation [name] once. Device-scoped calls go through
   /// [BluetoothDevice.invoke], which adds the connection guards.
-  ///   - [bypassQueue] skips the platform queue; only for `disconnect`, which
-  ///     must be able to cancel the call holding it.
+  ///
+  /// Calls are not serialized here: each platform orders a device's GATT
+  /// operations itself, one at a time and in the order they were made, so a
+  /// call reaches it as soon as it is made. Giving up on a call ([timeout])
+  /// stops waiting for it, but it keeps its place until the platform finishes it.
   @internal
   static Future<T> invoke<T>(
     String name,
     Future<T> Function(BluebirdPlatform p) call, {
     Duration? timeout,
     bool ensureAdapterIsOn = false,
-    bool bypassQueue = false,
   }) {
-    Future<T> run() {
+    // Future.sync: an unsupported platform fails the call rather than throwing at the caller
+    var future = Future.sync(() {
       _initBluebird();
-      var future = _call(call);
-      if (ensureAdapterIsOn) future = future.bluebirdEnsureAdapterIsOn(name);
-      if (timeout != null) future = future.bluebirdTimeout(timeout, name);
-      return future;
-    }
-
-    // Only allow 1 invocation at a time (guarantees that hot restart finishes).
-    // The guards run inside the queue so that giving up on a call releases it.
-    return bypassQueue ? run() : Mutex.platform.protect(run);
+      return _call(call);
+    });
+    if (ensureAdapterIsOn) future = future.bluebirdEnsureAdapterIsOn(name);
+    if (timeout != null) future = future.bluebirdTimeout(timeout, name);
+    return future;
   }
 
   /// The raw platform call, with its [PlatformException]s translated.

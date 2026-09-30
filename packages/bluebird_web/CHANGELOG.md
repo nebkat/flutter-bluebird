@@ -1,3 +1,7 @@
+## Unreleased
+
+- GATT operations wait their turn on a per-device queue, since Web Bluetooth rejects one started while another is pending. Operations still waiting when the device disconnects fail with `deviceDisconnected` instead of running on the next connection.
+
 ## 0.5.0
 
 - Updated for the new platform interface.

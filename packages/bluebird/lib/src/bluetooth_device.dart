@@ -97,15 +97,14 @@ class BluetoothDevice implements BluebirdLoggable {
   }
 
   /// [Bluebird.invoke] plus the device-scoped guards — connected pre-check,
-  /// global serialization, disconnection watchdog — stating [name] once.
-  ///   - [before] runs inside the serialization mutex, before the call.
+  /// disconnection watchdog — stating [name] once.
+  ///   - [before] runs before the call reaches the platform.
   @internal
   Future<T> invoke<T>(
     String name,
     Future<T> Function(BluebirdPlatform p) call, {
     Duration? timeout,
     bool requiresConnection = true,
-    bool serialized = true,
     Future<void> Function()? before,
   }) {
     if (requiresConnection) ensureConnected(name);
@@ -117,8 +116,16 @@ class BluetoothDevice implements BluebirdLoggable {
       return future;
     }
 
-    return serialized ? Mutex.global.protect(run) : run();
+    final future = run();
+    final settled = future.then<void>((_) {}, onError: (_) {});
+    _inFlight.add(settled);
+    settled.whenComplete(() => _inFlight.remove(settled));
+    return future;
   }
+
+  /// This device's calls that have not settled yet, for a queued [disconnect]
+  /// to wait out.
+  final Set<Future<void>> _inFlight = {};
 
   /// Register a subscription to be canceled when the device is disconnected.
   /// This function simplifies cleanup, so you can prevent creating duplicate stream subscriptions.
@@ -161,7 +168,8 @@ class BluetoothDevice implements BluebirdLoggable {
 
     var timedOut = false;
     try {
-      await Mutex.global.protect(() async {
+      // one connect at a time across all devices: Android is unreliable when connectGatt calls overlap
+      await Mutex.connect.protect(() async {
         // record connection time
         if (System.isAndroid) _connectTimestamp = DateTime.now();
 
@@ -193,12 +201,7 @@ class BluetoothDevice implements BluebirdLoggable {
       // masking the connect error
       if (timedOut) {
         try {
-          await Bluebird.invoke(
-            "disconnect",
-            (p) => p.disconnect(remoteId),
-            timeout: _cancelTimeout,
-            bypassQueue: true,
-          );
+          await Bluebird.invoke("disconnect", (p) => p.disconnect(remoteId), timeout: _cancelTimeout);
         } catch (e) {
           logger.warning("connect: failed to cancel the timed-out attempt: $e");
         }
@@ -223,9 +226,10 @@ class BluetoothDevice implements BluebirdLoggable {
   }
 
   /// Cancels connection to the Bluetooth Device
-  ///   - [queue] If true, this disconnect request will be executed after all other operations complete.
-  ///     If false, this disconnect request will be executed right now, i.e. skipping to the front
-  ///     of the bluebird operation queue, which is useful to cancel an in-progress connection attempt.
+  ///   - [queue] If true, this disconnect request will be executed after every operation already
+  ///     requested of this device completes, including a connection attempt.
+  ///     If false, this disconnect request will be executed right now, failing any operation still
+  ///     in progress, which is useful to cancel an in-progress connection attempt.
   ///   - [androidDelay] Android only. Minimum gap between connect and disconnect to
   ///     workaround a race condition that leaves connection stranded. A stranded connection in this case
   ///     refers to a connection that Bluebird and Android Bluetooth stack are not aware of and thus cannot be
@@ -255,32 +259,27 @@ class BluetoothDevice implements BluebirdLoggable {
       if (_connectionState == BluetoothConnectionState.disconnected) return;
     }
 
-    Future<void> action() async {
-      // enter the `disconnecting` state (the platforms don't report it); the
-      // native `disconnected` event follows and moves us to disconnected
-      if (_connectionState != BluetoothConnectionState.disconnected) {
-        _emitConnectionState(BluetoothConnectionState.disconnecting);
-      }
-
-      // Workaround Android race condition
-      await _ensureAndroidDisconnectionDelay(androidDelay);
-
-      // invoke
-      await Bluebird.invoke(
-        "disconnect",
-        (p) => p.disconnect(remoteId),
-        ensureAdapterIsOn: true,
-        timeout: timeout,
-        bypassQueue: !queue,
-      );
-
-      if (System.isAndroid) {
-        // Disconnected, remove connect timestamp
-        _connectTimestamp = null;
-      }
+    if (queue) {
+      await attempt?.done.future;
+      await Future.wait(_inFlight.toList());
     }
 
-    await (queue ? Mutex.global.protect(action) : action());
+    // enter the `disconnecting` state (the platforms don't report it); the
+    // native `disconnected` event follows and moves us to disconnected
+    if (_connectionState != BluetoothConnectionState.disconnected) {
+      _emitConnectionState(BluetoothConnectionState.disconnecting);
+    }
+
+    // Workaround Android race condition
+    await _ensureAndroidDisconnectionDelay(androidDelay);
+
+    // invoke
+    await Bluebird.invoke("disconnect", (p) => p.disconnect(remoteId), ensureAdapterIsOn: true, timeout: timeout);
+
+    if (System.isAndroid) {
+      // Disconnected, remove connect timestamp
+      _connectTimestamp = null;
+    }
   }
 
   /// Discover services, characteristics, and descriptors of the remote device
@@ -365,7 +364,7 @@ class BluetoothDevice implements BluebirdLoggable {
   ///     a mismatch surfaces as a "Client security clearance failed" connect
   ///     error. Requires Android 10 (API 29).
   ///   - the returned [BluetoothL2CapChannel] carries data on a dedicated transport that
-  ///     bypasses the global operation queue (see [BluetoothL2CapChannel]).
+  ///     bypasses the device's operation queue (see [BluetoothL2CapChannel]).
   Future<BluetoothL2CapChannel> openL2capChannel(
     int psm, {
     bool secure = false,
@@ -413,7 +412,6 @@ class BluetoothDevice implements BluebirdLoggable {
       "requestConnectionPriority",
       (p) => p.requestConnectionPriority(remoteId, connectionPriorityRequest),
       timeout: timeout,
-      serialized: false,
     );
   }
 
@@ -433,7 +431,6 @@ class BluetoothDevice implements BluebirdLoggable {
       "setPreferredPhy",
       (p) => p.setPreferredPhy(remoteId, Phy.maskFrom(txPhy), Phy.maskFrom(rxPhy), option.index),
       timeout: timeout,
-      serialized: false,
     );
   }
 
@@ -464,7 +461,7 @@ class BluetoothDevice implements BluebirdLoggable {
   /// Refresh ble services & characteristics (Android Only)
   Future<void> clearGattCache() {
     ensurePlatform(System.isAndroid, "clearGattCache");
-    return invoke("clearGattCache", (p) => p.clearGattCache(remoteId), serialized: false);
+    return invoke("clearGattCache", (p) => p.clearGattCache(remoteId));
   }
 
   /// The bond state of the device (Android Only), as a stream that also exposes
@@ -480,12 +477,7 @@ class BluetoothDevice implements BluebirdLoggable {
   /// time it is needed (Android Only).
   Future<BluetoothBondState> _fetchBondState() async {
     ensurePlatform(System.isAndroid, "bondState");
-    _bondState ??= await invoke(
-      "getBondState",
-      (p) => p.getBondState(remoteId),
-      requiresConnection: false,
-      serialized: false,
-    );
+    _bondState ??= await invoke("getBondState", (p) => p.getBondState(remoteId), requiresConnection: false);
     return _bondState!;
   }
 

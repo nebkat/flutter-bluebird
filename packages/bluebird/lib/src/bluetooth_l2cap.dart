@@ -20,7 +20,7 @@ import 'utils.dart';
 /// event (or [isClosed]).
 ///
 /// Unlike GATT operations, reads and writes here do **not** pass through the
-/// global operation queue — the channel is a separate transport, so its
+/// device's operation queue — the channel is a separate transport, so its
 /// throughput is not gated by (and does not gate) characteristic I/O.
 class BluetoothL2CapChannel {
   final BluetoothDevice device;
