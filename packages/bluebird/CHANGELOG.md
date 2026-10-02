@@ -1,4 +1,4 @@
-## Unreleased
+## 0.6.0
 
 - GATT operations are now ordered by the platform, per device, instead of by a global queue in Dart. A call reaches the platform as soon as it is made, so a janky UI no longer stretches the gap between one operation and the next, and one device's operations no longer wait on another's. Connects are still made one at a time across all devices. Requires the matching `bluebird_android`, `bluebird_darwin` and `bluebird_web`.
 - Giving up on an operation (its `timeout`) no longer makes the next one fail with `operationInProgress` until the abandoned one finishes: the next one waits its turn instead. An operation the platform never completes fails with `timeout` after 35 seconds and, if it was an ATT transaction, disconnects the device, since the link cannot carry another one.
